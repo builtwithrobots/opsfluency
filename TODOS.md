@@ -1,7 +1,7 @@
 # TODOS — OpsFluency
 
 > Living doc. Track pending work here so fresh sessions can pick up without re-auditing.
-> Last updated: 2026-04-20
+> Last updated: 2026-04-20 (auth() await + proxy.ts documentation landed)
 
 ---
 
@@ -11,11 +11,8 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 
 ### Correctness fixes (highest priority — will cause runtime bugs)
 
-- [ ] **Fix `auth()` calls to be `await`ed.** `@clerk/nextjs ^7.2.2` is installed and `auth()` is async in v7. Two snippets are wrong today:
-  - `CLAUDE.md` line ~127 (under "Getting company context in API routes")
-  - `CLAUDE.md` line ~280 (under "API Route Patterns")
-  - Change `const { userId } = auth();` → `const { userId } = await auth();`
-- [ ] **Document `proxy.ts`, not `middleware.ts`.** Next 16 renamed middleware to `proxy.ts` and the file already exists. Add it to the Project Structure tree and list which routes bypass Clerk (candidates: `/monitor/[id]`, `/pair-monitor`, QR scan landing, `/sign-in`).
+- [x] **Fix `auth()` calls to be `await`ed.** `@clerk/nextjs ^7.2.2` is installed and `auth()` is async in v7. Both snippets updated in `CLAUDE.md` (lines ~127 and ~280).
+- [x] **Document `proxy.ts`, not `middleware.ts`.** Added to the Project Structure tree plus an "Auth proxy (`proxy.ts`)" subsection enumerating the public routes (`/sign-in`, `/sign-up`, `/monitor/[id]`, `/pair-monitor`, `/s/[qr_code_id]`).
 - [ ] **Specify the Supabase client split.** The examples use a bare `supabase` with no import. Document:
   - `lib/supabase/server.ts` — service-role client, server-only
   - `lib/supabase/anon.ts` — anon client, safe for browser
