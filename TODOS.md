@@ -1,7 +1,7 @@
 # TODOS — OpsFluency
 
 > Living doc. Track pending work here so fresh sessions can pick up without re-auditing.
-> Last updated: 2026-04-20 (auth() await + proxy.ts documentation landed)
+> Last updated: 2026-04-20 (all 4 correctness fixes landed: auth() await, proxy.ts, Supabase client split, RLS position)
 
 ---
 
@@ -13,11 +13,8 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 
 - [x] **Fix `auth()` calls to be `await`ed.** `@clerk/nextjs ^7.2.2` is installed and `auth()` is async in v7. Both snippets updated in `CLAUDE.md` (lines ~127 and ~280).
 - [x] **Document `proxy.ts`, not `middleware.ts`.** Added to the Project Structure tree plus an "Auth proxy (`proxy.ts`)" subsection enumerating the public routes (`/sign-in`, `/sign-up`, `/monitor/[id]`, `/pair-monitor`, `/s/[qr_code_id]`).
-- [ ] **Specify the Supabase client split.** The examples use a bare `supabase` with no import. Document:
-  - `lib/supabase/server.ts` — service-role client, server-only
-  - `lib/supabase/anon.ts` — anon client, safe for browser
-  - Hard rule: `SUPABASE_SERVICE_ROLE_KEY` never imported from client code. Add a comment on the import.
-- [ ] **State the RLS position explicitly.** Either "RLS on every company-scoped table + a `requesting_company_id()` helper" **or** "MVP relies on server-side `company_id` filtering via service-role client; RLS deferred to Phase 2." Pick one and justify it.
+- [x] **Specify the Supabase client split.** Added a "Supabase clients" subsection to `CLAUDE.md` covering three clients: `lib/supabase/server.ts` (request-scoped authenticated, RLS enforced), `lib/supabase/admin.ts` (service-role, server-only, bypasses RLS with justification required at each import site), `lib/supabase/browser.ts` (anon, `"use client"` only). Both API-route code snippets updated to import `getRequestClient` from `@/lib/supabase/server`.
+- [x] **State the RLS position explicitly.** Picked option (a): RLS enabled on every company-scoped table from day one, backed by a `requesting_company_id()` SQL helper that reads `request.clerk_user_id` from the Postgres session. New "Row Level Security (RLS)" subsection in `CLAUDE.md` documents the decision, the policy pattern, and the rule that every new company-scoped table ships with RLS + a `<table>_company_isolation` policy in the same migration.
 
 ### Missing operational info Claude needs to verify work
 

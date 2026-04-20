@@ -132,10 +132,15 @@ CREATE TABLE company_members (
 **Getting company context in API routes:**
 
 ```typescript
+import { auth } from '@clerk/nextjs/server';
+import { getRequestClient } from '@/lib/supabase/server';
+
 // Always get company context from Supabase -- never from Clerk org
 export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const supabase = await getRequestClient(userId);
 
   // Look up which company this user belongs to and what role they have
   const { data: member } = await supabase
@@ -148,7 +153,7 @@ export async function GET(request: Request) {
 
   const { company_id, role } = member;
 
-  // Now filter all queries by company_id
+  // Now filter all queries by company_id -- RLS will reject cross-tenant rows even if this is omitted
   const { data } = await supabase
     .from('sops')
     .select('*')
@@ -159,6 +164,51 @@ export async function GET(request: Request) {
 ```
 
 **Never use Clerk orgId anywhere.** company_id always comes from the `company_members` lookup.
+
+### Supabase clients
+
+Three clients, one purpose each. The import path tells you where each is safe to use.
+
+- **`lib/supabase/server.ts`** — request-scoped authenticated client. Exports `getRequestClient(clerkUserId)` which returns a Supabase client whose Postgres session has `request.clerk_user_id` set, so RLS policies can resolve the caller's company. Use this in every API route, Server Action, and Server Component. Operates as the `authenticated` role — **RLS is enforced**.
+- **`lib/supabase/admin.ts`** — service-role client. Bypasses RLS. Server-only. Reserved for: migrations, the default-department seed on company creation, cron jobs, and cross-tenant analytics. Every import site must have a comment justifying why RLS bypass is required.
+- **`lib/supabase/browser.ts`** — anon client for `"use client"` components. No elevated permissions. RLS-enforced via the anon role.
+
+Hard rules:
+
+- `SUPABASE_SERVICE_ROLE_KEY` is **only** read inside `lib/supabase/admin.ts`. Never import it from client code, never reference it outside that file.
+- Never import `lib/supabase/admin` from a file that could end up in the browser bundle. Put `import 'server-only'` at the top of `admin.ts` to fail fast if someone tries.
+- Server Components and API routes default to `getRequestClient` — reach for `admin` only when you've written down *why* RLS must be bypassed.
+
+### Row Level Security (RLS)
+
+**Decision:** RLS is enabled on every company-scoped table from day one, backed by a `requesting_company_id()` SQL helper. Justification: a single missed `.eq('company_id', ...)` in a server query would silently leak cross-tenant data. RLS makes that mistake impossible instead of just improbable, and adding it retroactively after the schema is 15 tables deep is painful.
+
+Pattern:
+
+```sql
+-- Session var is set per request by getRequestClient() via `SET LOCAL`
+CREATE OR REPLACE FUNCTION requesting_company_id() RETURNS uuid
+LANGUAGE sql STABLE AS $$
+  SELECT cm.company_id
+  FROM company_members cm
+  WHERE cm.clerk_user_id = current_setting('request.clerk_user_id', true)
+  LIMIT 1;
+$$;
+
+ALTER TABLE sops ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY sops_company_isolation ON sops
+  FOR ALL TO authenticated
+  USING (company_id = requesting_company_id())
+  WITH CHECK (company_id = requesting_company_id());
+```
+
+Rules:
+
+- Every new company-scoped table ships with `ENABLE ROW LEVEL SECURITY` and a `<table>_company_isolation` policy in the same migration that creates the table. No exceptions.
+- Server queries still include `.eq('company_id', company_id)` as defense in depth and because it lets Postgres pick the right index.
+- Tables that are intentionally global (e.g., `companies` itself, which an admin needs to read their own row from) get a narrower policy — document why inline in the migration.
+- The service-role client (`lib/supabase/admin.ts`) bypasses RLS. Treat every usage as a security-review-worthy line.
 
 ### SOP Conversion is a Multi-Step Pipeline -- Never One Shot
 The SOP import pipeline has hard gates between steps. Do not skip or combine them:
@@ -285,10 +335,15 @@ Do not build generic multi-language infrastructure for MVP. Keep it simple and e
 All API routes follow this pattern. company_id always comes from Supabase -- never from Clerk:
 
 ```typescript
+import { auth } from '@clerk/nextjs/server';
+import { getRequestClient } from '@/lib/supabase/server';
+
 export async function GET(request: Request) {
   // Step 1: Verify Clerk identity
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const supabase = await getRequestClient(userId);
 
   // Step 2: Look up company membership and role from Supabase
   const { data: member } = await supabase
