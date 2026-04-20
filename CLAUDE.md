@@ -34,6 +34,21 @@ OpsFluency is a frontline knowledge and engagement platform for multilingual war
 
 ---
 
+## Commands
+
+Claude runs these to verify its own work. All are safe to run in any session.
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Local dev server (Next 16 + Turbopack). Usually unnecessary in Claude Code sessions; the Vercel preview URL is the primary dev surface. |
+| `npm run build` | Production build. Run to confirm a change doesn't break the build. |
+| `npm run lint` | ESLint via `next lint`. |
+| `npx tsc --noEmit` | Typecheck. **Run this after any non-trivial TypeScript change.** |
+
+After a command fails, fix the underlying issue before moving on. Do not suppress type errors with `@ts-ignore` or `any` — ask for clarification instead.
+
+---
+
 ## Project Structure
 
 ```
@@ -225,6 +240,12 @@ Default shape for every piece of session-authed server code:
 
 Rule of thumb: if the caller has a Clerk session and the code is reachable from the manager dashboard or worker PWA, it is a Server Action — not an API route.
 
+### Default to Server Components
+
+Every `.tsx` file in `app/` is a Server Component unless it explicitly opts out with `"use client"`. Opt in to client only when one of the following is actually required: React hooks (`useState`, `useEffect`, `useTransition`, etc.), browser APIs (`window`, `localStorage`, `navigator`), interactive DOM event handlers, or a third-party component that itself needs them.
+
+If a file doesn't meet that bar, it must stay a Server Component — push the interactive subtree down into a small `*Client.tsx` child and keep the parent on the server. Client components can't fetch data with `getRequestClient`, can't read env vars beyond `NEXT_PUBLIC_*`, and bloat the JS bundle, so the default matters.
+
 ### SOP Conversion is a Multi-Step Pipeline -- Never One Shot
 The SOP import pipeline has hard gates between steps. Do not skip or combine them:
 
@@ -238,6 +259,26 @@ The SOP import pipeline has hard gates between steps. Do not skip or combine the
 8. Translation runs (Google Cloud + glossary override)
 9. Manager approves Spanish version
 10. Publish + QR code generated
+
+### SOP status lifecycle
+
+Every SOP has exactly one status. Transitions are one-way except `published → archived`, and each is gated by the pipeline:
+
+```
+draft
+  └─→ pending_terms          (Sonnet flagged terms; waiting for manager definitions)
+        └─→ pending_translation  (all terms defined; Google Translate can run)
+              └─→ pending_approval   (Spanish draft ready for manager sign-off)
+                    └─→ published        (live; QR code serves this version)
+                          └─→ archived        (manager-initiated; QR returns 410)
+```
+
+Rules:
+
+- Stored as Postgres `TEXT` with a `CHECK (status IN (...))` constraint on `sops`. Never hardcode the strings in UI or queries — import the union type and enum from `lib/types/sop.ts`.
+- The Server Action that updates status must read the current status inside the same transaction and reject any transition not listed above.
+- `archived` is terminal. Restoring means creating a new SOP that references the old one, not flipping the status back.
+- English edits to a `published` SOP create a new `sop_versions` row and flip `sop_versions.needs_retranslation = true` on the previous Spanish — the `sops.status` stays `published` throughout.
 
 ### Translate-on-Publish, Not on Demand
 Translation runs once at publish time, not on every worker page load. Both English and Spanish Markdown are stored in `sop_versions`. Workers get pre-translated content instantly.
@@ -277,11 +318,11 @@ Follows the DockClarity pairing pattern exactly. Monitors are TV screens that pa
 
 ## Supabase Tables (MVP)
 
-All tables and their columns are defined in the PRD (section 6). Key reminders:
+All tables and their columns are defined in [`./PRD.md`](./PRD.md) (section 6). Key reminders:
 
 - `companies` -- one row per customer company (replaces Clerk Organizations)
 - `company_members` -- who belongs to which company and their role (admin/manager/worker)
-- `sops` -- master record, status lifecycle, no content stored here
+- `sops` -- master record, status lifecycle (see "SOP status lifecycle" above), no content stored here
 - `sop_versions` -- content lives here, one row per publish
 - `qr_codes` -- one per SOP, permanent, stores print config as JSONB
 - `glossary_terms` -- company-scoped, English + Spanish, always injected into AI calls
@@ -625,12 +666,10 @@ All UI must meet WCAG 2.1 AA from the start. This is non-negotiable.
 
 ## Development Workflow
 
-- No local dev environment. All development through Claude Code.
-- All changes go through GitHub.
-- Vercel auto-deploys on push to main.
-- Preview deployments on all branches.
-- Never break existing functionality when making changes.
-- Always increment version comment in file header (vX.X.X).
+- All changes go through GitHub via a PR on a `claude/*` branch.
+- Vercel auto-deploys on push to main; preview deployments build on every branch.
+- Primary dev surface is the Vercel preview URL on the PR. Local `npm run dev` is supported but rarely needed in Claude Code sessions.
+- Before marking a task complete, run the relevant commands from `## Commands` (at minimum `npx tsc --noEmit` after any TypeScript change) and verify the preview URL if the change is user-facing.
 
 ---
 

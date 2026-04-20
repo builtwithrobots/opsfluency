@@ -1,7 +1,7 @@
 # TODOS — OpsFluency
 
 > Living doc. Track pending work here so fresh sessions can pick up without re-auditing.
-> Last updated: 2026-04-20 (correctness fixes + data fetching pattern, Zod / error envelope, AI call conventions landed)
+> Last updated: 2026-04-20 (+ SOP status lifecycle, Commands section, Server Components default, Development Workflow rewrite, package.json rename, tsconfig ES2022, PRD link)
 
 ---
 
@@ -18,14 +18,9 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 
 ### Missing operational info Claude needs to verify work
 
-- [ ] **Add a `## Commands` section** with exact invocations:
-  - `npm run dev` — local dev (Turbopack)
-  - `npm run build` — production build
-  - `npm run lint` — ESLint
-  - `npx tsc --noEmit` — typecheck (verify code compiles)
-  - `npm test` — (once a test runner is picked; see below)
+- [x] **Add a `## Commands` section.** Added right after Tech Stack in `CLAUDE.md` with `npm run dev` / `npm run build` / `npm run lint` / `npx tsc --noEmit`. Noted that `npx tsc --noEmit` is required after any non-trivial TypeScript change and that `@ts-ignore` / `any` are not acceptable suppressions. `npm test` deferred until a test runner is picked.
 - [x] **Pick a validation library + canonical API route example.** Zod added to the tech stack. `CLAUDE.md` now has a "Server Code Patterns" section with a shared `lib/auth/company-context.ts` helper (`AuthError` with `UNAUTHENTICATED` / `NO_COMPANY` / `FORBIDDEN`), plus a canonical Server Action and a canonical external API route — both Zod-validated. Error envelope `{ error: { code, message?, details? } }` is documented with a status-code table (400 `INVALID_INPUT`, 401 `UNAUTHENTICATED`, 403 `NO_COMPANY` / `FORBIDDEN`, 404 `NOT_FOUND`, 500 `INTERNAL`).
-- [ ] **Enumerate the SOP status lifecycle.** Currently "status lifecycle" is referenced but values aren't listed. Proposal (_DECIDE:_ confirm vs PRD §6): `draft → pending_terms → pending_translation → pending_approval → published → archived`.
+- [x] **Enumerate the SOP status lifecycle.** Picked the proposal: `draft → pending_terms → pending_translation → pending_approval → published → archived`. New "SOP status lifecycle" subsection in `CLAUDE.md` spells out each transition, the `CHECK` constraint + `lib/types/sop.ts` rule, that transitions are guarded by reading the current status in the same Server Action transaction, that `archived` is terminal, and that English edits create a new `sop_versions` row + set `needs_retranslation = true` without flipping `sops.status`.
 - [ ] **Document the re-translation flag.** English edits must mark Spanish as stale. Proposal (_DECIDE:_): `needs_retranslation BOOLEAN NOT NULL DEFAULT FALSE` on `sop_versions`, cleared when manager re-approves Spanish.
 - [ ] **Document the department-seeding mechanism.** "Seed 4 defaults on company creation" — where does the code live? Proposal (_DECIDE:_): run inside the company creation Server Action that fires on first sign-up, not a Postgres trigger (easier to test, visible in code).
 - [ ] **Monitor + worker public route auth.** Neither is a logged-in human flow:
@@ -34,7 +29,7 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 
 ### Missing conventions that will cause drift
 
-- [ ] **Server Components vs `"use client"` default.** Add: "Default to Server Components. Add `"use client"` only when hooks, browser APIs, or interactive state are required."
+- [x] **Server Components vs `"use client"` default.** New "Default to Server Components" subsection in `CLAUDE.md` under Key Architectural Decisions. Lists the exact opt-in triggers (React hooks, browser APIs, interactive event handlers, third-party dependents) and requires pushing interactive subtrees into small `*Client.tsx` children when the parent doesn't itself need the client runtime.
 - [x] **Data fetching pattern.** Picked: Server Components read Supabase directly via `getRequestClient(userId)`; session-authed mutations are Server Actions; `/api` is strictly reserved for external/non-session callers (webhooks, monitor heartbeat, QR scan logging, cron). Documented in a new "Data fetching" subsection under Key Architectural Decisions in `CLAUDE.md`.
 - [ ] **Supabase Storage buckets.** Name them and document signed URL TTLs:
   - `sop-uploads` — original docs, private, signed URLs (1h) for manager review
@@ -44,23 +39,21 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 
 ### Remove / reconcile existing lines
 
-- [ ] **Delete** "Always increment version comment in file header (vX.X.X)." Per-file semver drifts and adds noise with no enforcement.
-- [ ] **Reconcile** "No local dev environment. All development through Claude Code." `npm run dev` exists; pick wording like "Primary dev surface is Vercel preview deployments. Local `next dev` is supported but not required."
-- [ ] **Soften or back up** "Never break existing functionality." Either:
-  - Add Vitest + Playwright to the tech stack + `## Commands`, or
-  - Replace with "verify changes via the Vercel preview URL on the PR before merging."
+- [x] **Delete** "Always increment version comment in file header (vX.X.X)." Removed from the Development Workflow section in `CLAUDE.md`.
+- [x] **Reconcile** "No local dev environment." Rewritten to: Vercel preview URL is the primary dev surface; `npm run dev` is supported but rarely needed in Claude Code sessions. All changes go through a `claude/*` branch + PR.
+- [x] **Soften or back up** "Never break existing functionality." Replaced with a concrete verification rule: run the relevant `## Commands` (at minimum `npx tsc --noEmit` after any TS change) and verify the preview URL if the change is user-facing.
 
 ### Starter residue to remove (add a new section in CLAUDE.md)
 
-- [ ] `package.json` name is still `nextjs-clerk-starter` → rename to `opsfluency`
+- [x] `package.json` name renamed from `nextjs-clerk-starter` to `opsfluency`.
 - [ ] `app/components/user-details.tsx` imports Clerk `useOrganization` — conflicts with the "no Organizations" rule. Delete the component (nothing real uses it once the dashboard is rebuilt).
 - [ ] `app/_template/` contains the starter marketing content and is referenced from `app/page.tsx` and `app/dashboard/page.tsx`. Remove when the real manager shell lands.
 - [ ] `README.md` (7030 bytes) appears to duplicate `PRD.md`. Replace with a real setup/overview.
-- [ ] `tsconfig.json` `target` is `ES2017`. Bump to `ES2022` for Next 16 / React 19.
+- [x] `tsconfig.json` `target` bumped from `ES2017` to `ES2022` for Next 16 / React 19. (Pre-existing typecheck errors in `app/_template/` image imports are unrelated and tracked by the starter-residue cleanup items above.)
 
 ### Nice-to-haves for CLAUDE.md
 
-- [ ] Link `PRD.md` explicitly (`./PRD.md`) where schema details are cited.
+- [x] Link `PRD.md` explicitly (`./PRD.md`) where schema details are cited. Updated in the "Supabase Tables (MVP)" section of `CLAUDE.md`.
 - [ ] Add `## Git Workflow`: branch naming (`claude/<task>-<slug>`), Conventional Commits, Vercel preview URL per PR.
 - [ ] Add concrete accessibility testing commands (axe CLI, Lighthouse CI) rather than only stating the rules.
 - [ ] Note Prettier/ESLint config once chosen.
