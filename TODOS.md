@@ -1,7 +1,7 @@
 # TODOS — OpsFluency
 
 > Living doc. Track pending work here so fresh sessions can pick up without re-auditing.
-> Last updated: 2026-04-20 (all 4 correctness fixes landed: auth() await, proxy.ts, Supabase client split, RLS position)
+> Last updated: 2026-04-20 (correctness fixes + data fetching pattern, Zod / error envelope, AI call conventions landed)
 
 ---
 
@@ -24,12 +24,7 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
   - `npm run lint` — ESLint
   - `npx tsc --noEmit` — typecheck (verify code compiles)
   - `npm test` — (once a test runner is picked; see below)
-- [ ] **Pick a validation library** (recommend Zod) and add a canonical API route example showing:
-  - 400 on schema parse failure
-  - 401 unauthorized
-  - 403 wrong company / insufficient role
-  - 404 not found
-  - 500 Supabase error
+- [x] **Pick a validation library + canonical API route example.** Zod added to the tech stack. `CLAUDE.md` now has a "Server Code Patterns" section with a shared `lib/auth/company-context.ts` helper (`AuthError` with `UNAUTHENTICATED` / `NO_COMPANY` / `FORBIDDEN`), plus a canonical Server Action and a canonical external API route — both Zod-validated. Error envelope `{ error: { code, message?, details? } }` is documented with a status-code table (400 `INVALID_INPUT`, 401 `UNAUTHENTICATED`, 403 `NO_COMPANY` / `FORBIDDEN`, 404 `NOT_FOUND`, 500 `INTERNAL`).
 - [ ] **Enumerate the SOP status lifecycle.** Currently "status lifecycle" is referenced but values aren't listed. Proposal (_DECIDE:_ confirm vs PRD §6): `draft → pending_terms → pending_translation → pending_approval → published → archived`.
 - [ ] **Document the re-translation flag.** English edits must mark Spanish as stale. Proposal (_DECIDE:_): `needs_retranslation BOOLEAN NOT NULL DEFAULT FALSE` on `sop_versions`, cleared when manager re-approves Spanish.
 - [ ] **Document the department-seeding mechanism.** "Seed 4 defaults on company creation" — where does the code live? Proposal (_DECIDE:_): run inside the company creation Server Action that fires on first sign-up, not a Postgres trigger (easier to test, visible in code).
@@ -40,16 +35,12 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 ### Missing conventions that will cause drift
 
 - [ ] **Server Components vs `"use client"` default.** Add: "Default to Server Components. Add `"use client"` only when hooks, browser APIs, or interactive state are required."
-- [ ] **Data fetching pattern.** Proposal (_DECIDE:_): Server Components call Supabase directly via `lib/supabase/server`; mutations use Server Actions; `/api` routes are only for external callers (monitor heartbeat, QR scan logging, webhooks).
+- [x] **Data fetching pattern.** Picked: Server Components read Supabase directly via `getRequestClient(userId)`; session-authed mutations are Server Actions; `/api` is strictly reserved for external/non-session callers (webhooks, monitor heartbeat, QR scan logging, cron). Documented in a new "Data fetching" subsection under Key Architectural Decisions in `CLAUDE.md`.
 - [ ] **Supabase Storage buckets.** Name them and document signed URL TTLs:
   - `sop-uploads` — original docs, private, signed URLs (1h) for manager review
   - `company-logos` — public bucket, logos for QR print headers
 - [ ] **QR URL shape.** Proposal (_DECIDE:_): `${NEXT_PUBLIC_APP_URL}/s/[qr_code_id]`. The `qr_code_id` is the `qr_codes.id` (UUID), permanent, never the `sop_id`. Archive returns a friendly 410 page, not a 404.
-- [ ] **AI call conventions.** Add to the Sonnet section:
-  - Timeout: 60s hard, AbortController
-  - Retry: 1 retry on 429/5xx with jittered backoff
-  - Parse safety: try/catch JSON.parse; on failure, log the raw response and return a recoverable error to the manager
-  - Cost guardrail: log `usage.input_tokens` + `usage.output_tokens` for every conversion
+- [x] **AI call conventions.** New "AI call conventions" subsection under the Sonnet section in `CLAUDE.md`. Covers 60s hard timeout via `AbortController`, 1 retry on 429/5xx with jittered backoff (500–1500ms), `JSON.parse` wrapped in try/catch returning `AI_PARSE_FAILURE` with no auto-retry, `ai_call_log` row for every Anthropic call (`model`, `input_tokens`, `output_tokens`, `sop_id`, `company_id`, `duration_ms`), and a rule that all Sonnet calls go through `lib/ai/sonnet.ts` rather than the Anthropic SDK directly.
 
 ### Remove / reconcile existing lines
 

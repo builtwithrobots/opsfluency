@@ -29,6 +29,7 @@ OpsFluency is a frontline knowledge and engagement platform for multilingual war
 | Translation | Google Cloud Translation API (with glossary injection -- never use Claude for translation) |
 | QR Codes | qrcode.react |
 | PWA | next-pwa |
+| Validation | Zod (schema validation at every server entry point) |
 | Deployment | Vercel (auto-deploy from GitHub) |
 
 ---
@@ -210,6 +211,20 @@ Rules:
 - Tables that are intentionally global (e.g., `companies` itself, which an admin needs to read their own row from) get a narrower policy — document why inline in the migration.
 - The service-role client (`lib/supabase/admin.ts`) bypasses RLS. Treat every usage as a security-review-worthy line.
 
+### Data fetching: RSC + Server Actions, `/api` only for external callers
+
+Default shape for every piece of session-authed server code:
+
+- **Reads** — Server Components call Supabase directly via `getRequestClient(userId)`. No API round-trip for data the UI renders.
+- **Mutations** — Server Actions (`"use server"`), not API routes. Zod-validate the input at the top, run the write, call `revalidatePath` / `revalidateTag` before returning.
+- **`/api` routes** — reserved for callers that don't have a Clerk session or can't invoke a Server Action:
+  - Webhooks (Clerk user events, and Stripe if billing lands later)
+  - Monitor heartbeat (`POST /api/monitors/heartbeat`, authenticated by the signed monitor-pairing cookie)
+  - QR scan logging (`POST /api/sops/:id/scans`, callable from the public scan landing before the worker has signed in)
+  - Cron jobs and external integrations
+
+Rule of thumb: if the caller has a Clerk session and the code is reachable from the manager dashboard or worker PWA, it is a Server Action — not an API route.
+
 ### SOP Conversion is a Multi-Step Pipeline -- Never One Shot
 The SOP import pipeline has hard gates between steps. Do not skip or combine them:
 
@@ -330,42 +345,140 @@ Do not build generic multi-language infrastructure for MVP. Keep it simple and e
 
 ---
 
-## API Route Patterns
+## Server Code Patterns
 
-All API routes follow this pattern. company_id always comes from Supabase -- never from Clerk:
+Every piece of server-side code — Server Components, Server Actions, and the small set of external API routes — follows the same spine:
+
+1. Resolve company context via `getCompanyContext()` (throws typed errors on unauth / no-company / wrong-role).
+2. Validate input with Zod *before* any Supabase call.
+3. Run the query. RLS enforces tenancy; `.eq('company_id', company_id)` is defense in depth and index-friendly.
+4. Return typed data, or the standard error envelope.
+
+### `lib/auth/company-context.ts`
+
+The Clerk + `company_members` lookup lives in exactly one place:
 
 ```typescript
+import 'server-only';
 import { auth } from '@clerk/nextjs/server';
 import { getRequestClient } from '@/lib/supabase/server';
 
-export async function GET(request: Request) {
-  // Step 1: Verify Clerk identity
+export type Role = 'admin' | 'manager' | 'worker';
+
+export class AuthError extends Error {
+  constructor(public code: 'UNAUTHENTICATED' | 'NO_COMPANY' | 'FORBIDDEN') {
+    super(code);
+  }
+}
+
+export async function getCompanyContext(required?: Exclude<Role, 'worker'>) {
   const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!userId) throw new AuthError('UNAUTHENTICATED');
 
   const supabase = await getRequestClient(userId);
-
-  // Step 2: Look up company membership and role from Supabase
   const { data: member } = await supabase
     .from('company_members')
     .select('company_id, role')
     .eq('clerk_user_id', userId)
     .single();
 
-  if (!member) return NextResponse.json({ error: 'No company found' }, { status: 403 });
-
-  const { company_id, role } = member;
-
-  // Step 3: Filter all queries by company_id
-  const { data, error } = await supabase
-    .from('sops')
-    .select('*')
-    .eq('company_id', company_id);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  if (!member) throw new AuthError('NO_COMPANY');
+  if (required && member.role !== 'admin' && member.role !== required) {
+    throw new AuthError('FORBIDDEN');
+  }
+  return { userId, supabase, company_id: member.company_id, role: member.role as Role };
 }
 ```
+
+### Server Action (default for session-authed mutations)
+
+```typescript
+'use server';
+
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { getCompanyContext, AuthError } from '@/lib/auth/company-context';
+
+const CreateSopInput = z.object({
+  title: z.string().min(1).max(200),
+  template: z.enum(['step-by-step', 'reference', 'safety-checklist', 'onboarding']),
+});
+
+export async function createSop(input: unknown) {
+  try {
+    const { supabase, company_id } = await getCompanyContext('manager');
+    const parsed = CreateSopInput.parse(input);
+
+    const { data, error } = await supabase
+      .from('sops')
+      .insert({ ...parsed, company_id, status: 'draft' })
+      .select()
+      .single();
+    if (error) return { ok: false as const, error: { code: 'INTERNAL', message: error.message } };
+
+    revalidatePath('/dashboard/sops');
+    return { ok: true as const, data };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false as const, error: { code: 'INVALID_INPUT', details: e.issues } };
+    if (e instanceof AuthError) return { ok: false as const, error: { code: e.code } };
+    throw e;
+  }
+}
+```
+
+### External API route (webhooks, monitor heartbeat, QR scan logging, cron)
+
+```typescript
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getCompanyContext, AuthError } from '@/lib/auth/company-context';
+
+const Query = z.object({ status: z.enum(['draft', 'published']).optional() });
+
+export async function GET(request: Request) {
+  try {
+    const { supabase, company_id } = await getCompanyContext();
+    const parsed = Query.parse(Object.fromEntries(new URL(request.url).searchParams));
+
+    let query = supabase.from('sops').select('*').eq('company_id', company_id);
+    if (parsed.status) query = query.eq('status', parsed.status);
+
+    const { data, error } = await query;
+    if (error) return fail(500, 'INTERNAL', error.message);
+    return NextResponse.json({ data });
+  } catch (e) {
+    if (e instanceof z.ZodError) return fail(400, 'INVALID_INPUT', undefined, e.issues);
+    if (e instanceof AuthError) {
+      if (e.code === 'UNAUTHENTICATED') return fail(401, 'UNAUTHENTICATED');
+      return fail(403, e.code);
+    }
+    throw e;
+  }
+}
+
+function fail(status: number, code: string, message?: string, details?: unknown) {
+  return NextResponse.json({ error: { code, message, details } }, { status });
+}
+```
+
+### Error envelope
+
+Every failed response — Server Action or API route — uses this exact shape:
+
+```typescript
+{ error: { code: string, message?: string, details?: unknown } }
+```
+
+| Situation | HTTP (API) | Code |
+|---|---|---|
+| Zod parse failure | 400 | `INVALID_INPUT` |
+| No Clerk session | 401 | `UNAUTHENTICATED` |
+| Clerk session but no `company_members` row | 403 | `NO_COMPANY` |
+| Session + company, wrong role | 403 | `FORBIDDEN` |
+| Row not found (after company scoping) | 404 | `NOT_FOUND` |
+| Supabase / Sonnet / Google error | 500 | `INTERNAL` |
+
+Server Actions return `{ ok: false, error: { code, ... } }` instead of throwing so callers can discriminate in a typed way.
 
 ---
 
@@ -412,6 +525,16 @@ const response = await anthropic.messages.create({
   messages: [{ role: 'user', content: documentText }]
 });
 ```
+
+### AI call conventions (every Sonnet and Google Translate call)
+
+- **Timeout: 60s hard** via `AbortController.signal` passed to the SDK. Timeout is a recoverable error surfaced to the manager, not a crash.
+- **Retry: 1 retry on 429 / 5xx** with jittered backoff (500–1500ms). No retry on other 4xx — those indicate a prompt or input bug that won't fix itself.
+- **Parse safety.** Wrap every `JSON.parse` in try/catch. On failure, log the raw response (first 2KB) and return `{ code: 'AI_PARSE_FAILURE', retry_allowed: true }` to the caller. Do **not** retry automatically — a second call will usually produce the same malformed output.
+- **Cost logging.** After every Anthropic call, write one row to `ai_call_log`: `{ model, input_tokens, output_tokens, sop_id, company_id, duration_ms }`. This is the only early-warning signal for cost runaway before billing notices.
+- **Never log full prompt or full response at INFO level.** Glossaries and SOP content are tenant-sensitive.
+
+All Sonnet calls go through `lib/ai/sonnet.ts` (e.g. `convertSop({ documentText, glossary, signal })`), which encapsulates the timeout, retry, parse, and log steps. Callers never touch the Anthropic SDK directly — if a call site imports `@anthropic-ai/sdk`, that's a bug.
 
 ---
 
