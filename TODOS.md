@@ -11,8 +11,8 @@ Five-phase plan, one PR each, stacked on `main`. See branch `claude/audit-codeba
 
 | Phase | Branch | Status |
 |---|---|---|
-| 1. Docs & skills cleanup + tokenization | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
-| 2. Starter residue removal | TBD | Pending |
+| 1. Docs & skills cleanup + tokenization | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
+| 2. Starter residue removal | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
 | 3. Dependencies & env vars | TBD | Pending |
 | 4. `lib/` scaffolding (supabase, auth, types, ai) | TBD | Pending |
 | 5. First migration (companies, company_members, RLS, default depts) | TBD | Pending |
@@ -60,10 +60,12 @@ The codebase audit surfaced gaps in `CLAUDE.md` that will cause incorrect code g
 ### Starter residue to remove (add a new section in CLAUDE.md)
 
 - [x] `package.json` name renamed from `nextjs-clerk-starter` to `opsfluency`.
-- [ ] `app/components/user-details.tsx` imports Clerk `useOrganization` — conflicts with the "no Organizations" rule. Delete the component (nothing real uses it once the dashboard is rebuilt).
-- [ ] `app/_template/` contains the starter marketing content and is referenced from `app/page.tsx` and `app/dashboard/page.tsx`. Remove when the real manager shell lands.
-- [ ] `README.md` (7030 bytes) appears to duplicate `PRD.md`. Replace with a real setup/overview.
-- [x] `tsconfig.json` `target` bumped from `ES2017` to `ES2022` for Next 16 / React 19. (Pre-existing typecheck errors in `app/_template/` image imports are unrelated and tracked by the starter-residue cleanup items above.)
+- [x] `app/components/user-details.tsx` deleted along with `code-switcher.tsx` and `theme.ts` (Phase 2).
+- [x] `app/_template/` directory removed; `app/page.tsx` and `app/dashboard/page.tsx` rewritten as minimal placeholders that use the Steel & Signal design tokens from `globals.css` (Phase 2).
+- [x] `README.md` rewritten as real setup / overview docs pointing to `CLAUDE.md`, `PRD.md`, and `TODOS.md` (Phase 2).
+- [x] `app/layout.tsx` switched from `next/font/local` (Geist) to `next/font/google` (Chakra Petch / Inter / JetBrains Mono) — matches the contract in `globals.css`. Dropped the prism CDN scripts and `@clerk/ui` import (Phase 2).
+- [x] `app/api/protected/route.ts` stub deleted (Phase 2).
+- [x] `tsconfig.json` `target` bumped from `ES2017` to `ES2022` for Next 16 / React 19.
 
 ### Nice-to-haves for CLAUDE.md
 
@@ -89,6 +91,22 @@ Listed here for continuity — do **not** start until CLAUDE.md is fixed, becaus
 9. **Monitor pairing + display.**
 10. **QR print layout.**
 11. **HR module** (contacts + chat).
+
+---
+
+## Phase 2 completion notes (2026-04-21)
+
+**What landed**
+
+- Deleted `app/_template/` (marketing starter content), `app/components/` (starter user-details / code-switcher / theme), `app/api/protected/` stub, and `app/fonts/` (Geist local fonts).
+- Rewrote `app/layout.tsx` with real metadata, `next/font/google` matching the `globals.css` contract (Chakra Petch / Inter / JetBrains Mono), WCAG skip link, and a plain `ClerkProvider` (dropped starter's `@clerk/ui` import and custom appearance).
+- Rewrote `app/page.tsx` and `app/dashboard/page.tsx` as minimal placeholders using the Steel & Signal design tokens already defined in `globals.css`. Dashboard keeps `auth.protect()` so Clerk redirects unauthenticated users.
+- Rewrote `README.md` as a real setup + contributor guide (previously a byte-for-byte copy of `PRD.md`).
+
+**Known follow-ups discovered in Phase 2 (pushed to Phase 3)**
+
+- `next lint` was removed in Next 16 — `npm run lint` currently fails with "Invalid project directory provided". Phase 3 will install ESLint + `eslint-config-next` directly and update the script.
+- `@clerk/ui` is still listed as a dependency in `package.json` but no longer imported anywhere. Remove in Phase 3.
 
 ---
 
