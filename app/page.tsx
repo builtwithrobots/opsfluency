@@ -1,9 +1,29 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 
-export default async function Home() {
+import { getRequestClient } from "@/lib/supabase/server";
+
+type Cta =
+  | { kind: "signedOut" }
+  | { kind: "needsOnboarding" }
+  | { kind: "signedIn" };
+
+async function resolveCta(): Promise<Cta> {
   const { userId } = await auth();
-  const isSignedIn = Boolean(userId);
+  if (!userId) return { kind: "signedOut" };
+
+  const supabase = await getRequestClient();
+  const { data: member } = await supabase
+    .from("company_members")
+    .select("company_id")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  return member ? { kind: "signedIn" } : { kind: "needsOnboarding" };
+}
+
+export default async function Home() {
+  const cta = await resolveCta();
 
   return (
     <main
@@ -29,18 +49,25 @@ export default async function Home() {
           departmental communication — one system.
         </p>
         <div className="flex items-center gap-3 pt-4">
-          {isSignedIn ? (
+          {cta.kind === "signedIn" ? (
             <Link
               href="/dashboard"
-              className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-[#0C0E14] font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
+              className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
             >
               Open dashboard
+            </Link>
+          ) : cta.kind === "needsOnboarding" ? (
+            <Link
+              href="/onboarding"
+              className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
+            >
+              Finish setup
             </Link>
           ) : (
             <>
               <Link
                 href="/sign-up"
-                className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-[#0C0E14] font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
+                className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
               >
                 Sign up
               </Link>
