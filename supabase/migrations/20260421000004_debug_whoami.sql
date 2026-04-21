@@ -27,6 +27,12 @@
 
 begin;
 
+-- Drop first — the earlier revision of this file declared
+-- `returns table (...)`, and Postgres forbids changing the return
+-- type of an existing function via CREATE OR REPLACE. Safe to drop
+-- unconditionally; this is a debug helper with no dependents.
+drop function if exists debug_whoami();
+
 create or replace function debug_whoami()
 returns jsonb
 language sql
