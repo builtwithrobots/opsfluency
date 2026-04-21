@@ -12,8 +12,8 @@ Five-phase plan, one PR each, stacked on `main`. See branch `claude/audit-codeba
 | Phase | Branch | Status |
 |---|---|---|
 | 1. Docs & skills cleanup + tokenization | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
-| 2. Starter residue removal | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
-| 3. Dependencies & env vars | TBD | Pending |
+| 2. Starter residue removal | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
+| 3. Dependencies & env vars | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
 | 4. `lib/` scaffolding (supabase, auth, types, ai) | TBD | Pending |
 | 5. First migration (companies, company_members, RLS, default depts) | TBD | Pending |
 
@@ -91,6 +91,29 @@ Listed here for continuity — do **not** start until CLAUDE.md is fixed, becaus
 9. **Monitor pairing + display.**
 10. **QR print layout.**
 11. **HR module** (contacts + chat).
+
+---
+
+## Phase 3 completion notes (2026-04-21)
+
+**What landed**
+
+- Removed unused starter deps: `@clerk/ui`, `react-syntax-highlighter`, `prism-react-renderer`, `@types/react-syntax-highlighter`, `@types/next-pwa`.
+- Installed product deps (runtime): `@supabase/supabase-js`, `@anthropic-ai/sdk`, `@google-cloud/translate`, `qrcode.react`, `next-pwa`.
+- Installed ESLint (Next 16 flat-config compatible): `eslint`, `eslint-config-next@16.2.4`, `@eslint/eslintrc` as devDependencies. Created `eslint.config.mjs` that imports `eslint-config-next/core-web-vitals` and `eslint-config-next/typescript` directly (the `FlatCompat`-based approach hits a circular-structure bug with ESLint 9).
+- Updated `package.json` scripts: `"lint": "eslint"`, new `"lint:fix": "eslint --fix"`, new `"typecheck": "tsc --noEmit"`.
+- Expanded `.env.example` with section comments and all vars from `CLAUDE.md` → "Environment Variables Required": Clerk, Supabase (anon + service role), Anthropic, Google Cloud Translation, `NEXT_PUBLIC_APP_URL`, and `MONITOR_COOKIE_SECRET`.
+- Fixed a `react/no-unescaped-entities` lint error in `app/dashboard/page.tsx` surfaced by the new lint config.
+
+**Verification**
+
+- `npx tsc --noEmit` — clean
+- `npm run lint` — clean (0 problems)
+- `npm run build` — success, 5 routes generated (`/`, `/_not-found`, `/dashboard`, `/sign-in/[[...sign-in]]`, plus the proxy)
+
+**Known `next-pwa` vulnerability**
+
+`npm audit` reports 5 high-severity advisories in `next-pwa`'s build-time dependency chain (`workbox-build` → `rollup-plugin-terser` → `serialize-javascript`). These are build-time tools, not runtime-exploitable. `next-pwa` itself is lightly maintained. Consider switching to `@ducanh2912/next-pwa` (active fork) or `@serwist/next` when PWA wiring actually lands in a later phase. Any switch is a `CLAUDE.md` spec change — not a Phase 3 decision.
 
 ---
 

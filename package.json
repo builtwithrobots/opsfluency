@@ -6,25 +6,33 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@clerk/nextjs": "^7.2.2",
-    "@clerk/ui": "^1.6.2",
+    "@google-cloud/translate": "^9.3.0",
+    "@supabase/supabase-js": "^2.104.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^24.0.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/react-syntax-highlighter": "^15.5.13",
     "clsx": "^2.1.1",
     "next": "16.2.4",
+    "next-pwa": "^5.6.0",
     "postcss": "^8.5.10",
-    "prism-react-renderer": "^2.4.1",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-syntax-highlighter": "^15.6.1",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4"
   }
 }

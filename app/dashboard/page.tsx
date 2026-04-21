@@ -27,8 +27,8 @@ export default async function DashboardPage() {
         </h1>
         <p className="max-w-xl text-dc-text-2">
           The SOP import pipeline, glossary manager, worker invitations,
-          announcements, monitors, and analytics will live here. We're scaffolding
-          the foundation first.
+          announcements, monitors, and analytics will live here. We&apos;re
+          scaffolding the foundation first.
         </p>
       </main>
     </div>
