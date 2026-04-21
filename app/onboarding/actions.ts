@@ -68,5 +68,5 @@ export async function createCompanyAction(
   }
 
   revalidatePath("/dashboard");
-  redirect("/dashboard");
+  redirect("/dashboard?welcome=1");
 }

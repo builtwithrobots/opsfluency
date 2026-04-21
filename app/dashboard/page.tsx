@@ -7,9 +7,20 @@ import { getCompanyContext } from "@/lib/auth/company-context";
 
 import { DashboardStatCard } from "@/components/dashboard/stat-card";
 import { EmptyActivityCard } from "@/components/dashboard/empty-activity-card";
+import { WelcomeBanner } from "@/components/dashboard/welcome-banner";
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams: Promise<{ welcome?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const { supabase, company_id, role } = await getCompanyContext();
+  const { welcome } = await searchParams;
+  const showWelcome = welcome === "1";
+
+  const { data: company } = showWelcome
+    ? await supabase.from("companies").select("name").eq("id", company_id).single()
+    : { data: null };
 
   // Only company_members is live in the schema right now. Other counts will
   // light up as their tables land — see supabase/migrations/.
@@ -20,6 +31,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-10">
+      {showWelcome ? <WelcomeBanner companyName={company?.name ?? "your workspace"} /> : null}
+
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">

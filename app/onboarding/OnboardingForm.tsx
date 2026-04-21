@@ -1,7 +1,12 @@
 "use client";
 
+import { AlertCircle } from "lucide-react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+
+import { Button } from "@/components/ui/button";
+import { Description, ErrorMessage, Field, Label } from "@/components/ui/fieldset";
+import { Input } from "@/components/ui/input";
 
 import { createCompanyAction, type CreateCompanyState } from "./actions";
 
@@ -14,21 +19,20 @@ export function OnboardingForm() {
   const topError = state.status === "error" ? formatTopError(state) : undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form action={formAction} className="flex flex-col gap-6" noValidate>
       {topError ? (
         <div
           role="alert"
-          className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          className="flex items-start gap-3 rounded-md border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/10 px-4 py-3 text-sm text-(--color-signal-urgent)"
         >
-          {topError}
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>{topError}</span>
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="name" className="text-sm font-medium text-dc-text">
-          Company name
-        </label>
-        <input
+      <Field>
+        <Label htmlFor="name">Company name</Label>
+        <Input
           id="name"
           name="name"
           type="text"
@@ -38,20 +42,16 @@ export function OnboardingForm() {
           placeholder="Acme Manufacturing"
           aria-invalid={Boolean(nameError)}
           aria-describedby={nameError ? "name-error" : undefined}
-          className="px-4 py-3 rounded-md border border-dc-edge bg-dc-raised text-dc-text placeholder:text-dc-text-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+          invalid={Boolean(nameError)}
         />
-        {nameError ? (
-          <p id="name-error" className="text-sm text-red-300">
-            {nameError}
-          </p>
-        ) : null}
-      </div>
+        {nameError ? <ErrorMessage id="name-error">{nameError}</ErrorMessage> : null}
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="phone" className="text-sm font-medium text-dc-text">
-          Company phone <span className="text-dc-text-2 font-normal">(optional)</span>
-        </label>
-        <input
+      <Field>
+        <Label htmlFor="phone">
+          Company phone <span className="font-normal text-dc-text-3">(optional)</span>
+        </Label>
+        <Input
           id="phone"
           name="phone"
           type="tel"
@@ -60,17 +60,16 @@ export function OnboardingForm() {
           placeholder="(555) 123-4567"
           aria-invalid={Boolean(phoneError)}
           aria-describedby={phoneError ? "phone-error" : undefined}
-          className="px-4 py-3 rounded-md border border-dc-edge bg-dc-raised text-dc-text placeholder:text-dc-text-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+          invalid={Boolean(phoneError)}
         />
         {phoneError ? (
-          <p id="phone-error" className="text-sm text-red-300">
-            {phoneError}
-          </p>
-        ) : null}
-        <p className="text-xs text-dc-text-2">
-          Shown in the QR code print header. You can change this later in settings.
-        </p>
-      </div>
+          <ErrorMessage id="phone-error">{phoneError}</ErrorMessage>
+        ) : (
+          <Description>
+            Shown in the QR code print header. You can change this later in settings.
+          </Description>
+        )}
+      </Field>
 
       <SubmitButton />
     </form>
@@ -80,13 +79,9 @@ export function OnboardingForm() {
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="mt-2 px-6 py-3 rounded-md bg-[var(--color-brand)] text-[#0C0E14] font-semibold hover:bg-[var(--color-brand-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-    >
+    <Button type="submit" color="brand" disabled={pending} className="mt-2 w-full">
       {pending ? "Creating your workspace…" : "Create company"}
-    </button>
+    </Button>
   );
 }
 

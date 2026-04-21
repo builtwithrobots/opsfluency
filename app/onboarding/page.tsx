@@ -14,26 +14,29 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-dc-edge">
-        <span
-          className="font-bold text-xl tracking-tight"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          OpsFluency
-        </span>
+    <div className="flex min-h-screen flex-col bg-dc-bg">
+      <header className="flex items-center justify-between border-b border-[color:var(--dc-edge)] bg-dc-surface px-6 py-4">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-8 items-center justify-center rounded-lg bg-(--color-brand) shadow-[0_0_12px_rgba(20,184,166,0.35)]"
+          >
+            <span className="font-display text-[11px] font-bold text-white">OF</span>
+          </span>
+          <span className="font-display text-lg tracking-[0.05em] uppercase text-dc-text">
+            OpsFluency
+          </span>
+        </div>
         <UserButton />
       </header>
-      <main
-        id="main"
-        className="flex-1 flex items-center justify-center px-6 py-16"
-      >
-        <div className="w-full max-w-md flex flex-col gap-8">
+
+      <main id="main" className="flex flex-1 items-center justify-center px-6 py-16">
+        <div className="flex w-full max-w-md flex-col gap-8">
           <div className="flex flex-col gap-3 text-center">
-            <h1
-              className="text-3xl md:text-4xl font-bold tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+            <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
+              Step 1 of 1
+            </p>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-dc-text md:text-4xl">
               Create your company
             </h1>
             <p className="text-dc-text-2">
@@ -41,7 +44,9 @@ export default async function OnboardingPage() {
               (Safety, Equipment, Process, HR), and opens the manager dashboard.
             </p>
           </div>
-          <OnboardingForm />
+          <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6 shadow-xs">
+            <OnboardingForm />
+          </div>
         </div>
       </main>
     </div>
