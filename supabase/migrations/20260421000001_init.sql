@@ -73,15 +73,25 @@ create index ai_call_log_company_id_created_at_idx
 -- Supabase is configured to trust Clerk as a third-party auth provider, so
 -- `auth.jwt()` returns Clerk's native JWT. The `sub` claim is the Clerk
 -- user id (the value we store in `company_members.clerk_user_id`).
+--
+-- `security definer` is required: these helpers are called from RLS
+-- policies on `company_members`, so running them as invoker would re-enter
+-- the same policies and recurse forever (stack-overflow on every query).
+-- Running as definer lets the helper's own SELECT skip RLS while the
+-- calling query's policies still apply normally.
+-- `set search_path = public, auth` prevents search-path injection — the
+-- standard precaution for any security-definer function.
 -- ────────────────────────────────────────────────────────────────────────────
 
 create or replace function requesting_company_id()
 returns uuid
 language sql
 stable
+security definer
+set search_path = public, auth
 as $$
   select cm.company_id
-  from company_members cm
+  from public.company_members cm
   where cm.clerk_user_id = auth.jwt() ->> 'sub'
   limit 1
 $$;
@@ -92,12 +102,22 @@ create or replace function requesting_role()
 returns text
 language sql
 stable
+security definer
+set search_path = public, auth
 as $$
   select cm.role
-  from company_members cm
+  from public.company_members cm
   where cm.clerk_user_id = auth.jwt() ->> 'sub'
   limit 1
 $$;
+
+-- Lock down the helpers: PUBLIC cannot call them; anon/authenticated/
+-- service_role explicitly granted. Matches the principle-of-least-
+-- privilege stance we use throughout the schema.
+revoke all on function requesting_company_id() from public;
+revoke all on function requesting_role()       from public;
+grant  execute on function requesting_company_id() to anon, authenticated, service_role;
+grant  execute on function requesting_role()       to anon, authenticated, service_role;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- RLS policies
@@ -175,7 +195,12 @@ $$;
 -- Only service-role may invoke this. Callers from anon/authenticated
 -- roles get a permission error — which is the correct behavior: signup
 -- flows run server-side through the admin client.
+-- `BYPASSRLS` on service_role lets the function see past RLS, but the
+-- EXECUTE privilege is a separate Postgres concept and must be granted
+-- explicitly — otherwise the admin client hits `permission denied for
+-- function` on the first signup.
 revoke all on function bootstrap_company(text, text, text, text) from public;
 revoke all on function bootstrap_company(text, text, text, text) from anon, authenticated;
+grant  execute on function bootstrap_company(text, text, text, text) to service_role;
 
 commit;

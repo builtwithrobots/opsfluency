@@ -42,5 +42,13 @@ export async function bootstrapCompany(
   });
 
   if (error) throw error;
-  return data as BootstrappedCompany;
+
+  // supabase-js deserializes a composite-typed RPC (`returns companies`)
+  // as either the row object or a single-element array depending on the
+  // driver version. Normalize defensively so callers always see the row.
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error("bootstrap_company returned no row");
+  }
+  return row as BootstrappedCompany;
 }
