@@ -1,3 +1,8 @@
+import { redirect } from "next/navigation";
+
+import { Heading } from "@/components/ui/heading";
+import { Text } from "@/components/ui/text";
+import { AuthError } from "@/lib/auth/company-context";
 import { getSuperAdminContext } from "@/lib/auth/super-admin-context";
 
 interface TenantRow {
@@ -11,9 +16,9 @@ interface TenantRow {
 async function loadTenants(): Promise<TenantRow[]> {
   const { supabase } = await getSuperAdminContext();
 
-  // RLS allows the super admin to read every company via the
-  // `or is_super_admin()` branch on `companies_self_read`. Same for
-  // `company_members_self_read`, which we use for a membership count.
+  // RLS lets the super admin read every company via the
+  // `or is_super_admin()` branch on `companies_self_read`, and every
+  // member row via `company_members_self_read`.
   const { data: companies, error } = await supabase
     .from("companies")
     .select("id, name, phone, created_at")
@@ -40,21 +45,27 @@ async function loadTenants(): Promise<TenantRow[]> {
   }));
 }
 
-export default async function SuperAdminPage() {
-  const tenants = await loadTenants();
+export default async function TenantsPage() {
+  let tenants: TenantRow[];
+  try {
+    tenants = await loadTenants();
+  } catch (e) {
+    // Non-super-admins landing here get bounced to the dashboard home.
+    if (e instanceof AuthError && e.code === "FORBIDDEN") redirect("/dashboard");
+    if (e instanceof AuthError && e.code === "UNAUTHENTICATED") redirect("/sign-in");
+    throw e;
+  }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-12">
+    <div className="flex flex-col gap-8">
       <header>
         <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-          God mode
+          Platform
         </p>
-        <h1 className="font-display mt-2 text-3xl font-bold tracking-tight text-dc-text md:text-4xl">
-          Tenants
-        </h1>
-        <p className="mt-2 text-dc-text-2">
+        <Heading className="font-display mt-2">Tenants</Heading>
+        <Text className="mt-2 max-w-2xl">
           Every company in the system. Read-only for now — creation, impersonation, and audit tooling land in later steps.
-        </p>
+        </Text>
       </header>
 
       {tenants.length > 0 ? (
@@ -83,6 +94,6 @@ export default async function SuperAdminPage() {
           </p>
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -1,9 +1,11 @@
+import { redirect } from "next/navigation";
 import { ArrowUpRight, Bell, FileText, ScanLine, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Heading, Subheading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
-import { getCompanyContext } from "@/lib/auth/company-context";
+import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
+import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
 import { DashboardStatCard } from "@/components/dashboard/stat-card";
 import { EmptyActivityCard } from "@/components/dashboard/empty-activity-card";
@@ -14,7 +16,20 @@ interface DashboardPageProps {
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { supabase, company_id, role } = await getCompanyContext();
+  let ctx;
+  try {
+    ctx = await getCompanyContext();
+  } catch (e) {
+    // Super admins have no company_members row and therefore nothing
+    // meaningful on the member-scoped home page. Route them to their
+    // own landing.
+    if (e instanceof AuthError && e.code === "NO_COMPANY") {
+      if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform/tenants");
+    }
+    throw e;
+  }
+
+  const { supabase, company_id, role } = ctx;
   const { welcome } = await searchParams;
   const showWelcome = welcome === "1";
 
