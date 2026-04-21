@@ -56,10 +56,15 @@ Project-specific skills live in `.claude/skills/` and auto-trigger by descriptio
 | Skill | When it triggers | What it owns |
 |---|---|---|
 | `opsfluency-sop-pipeline` | Any code touching `sops`, `sop_versions`, `glossary_terms`, `qr_codes`, or the import → convert → flag → translate → publish flow | Pipeline order, glossary hard gate, Sonnet prompt rules, version management |
-| `opsfluency-accessibility` | Any user-facing UI (employee PWA, manager dashboard, TV monitor) | OpsFluency-specific a11y on top of WCAG 2.1 AA — glove taps, warehouse lighting, TV distance, bilingual `lang` |
+| `opsfluency-accessibility` | Any user-facing UI (employee PWA, manager dashboard, TV monitor) | OpsFluency-specific a11y on top of WCAG 2.1 AA — glove taps, warehouse lighting, TV distance, bilingual `lang`. **Canonical for any OpsFluency UI.** Generic audit skills (`web-design-guidelines`, `web-quality-skills`) are supplementary second-pass checks, never the primary review. |
 | `opsfluency-bilingual-content` | Any code rendering user strings or user-generated text, or gating by `employees.preferred_language` | System strings vs user-generated content, `content_en` / `content_es` columns, language toggle |
 
-General-purpose skills (`frontend-design`, `react-best-practices`, `nextjs-skills`, `composition-patterns`, `planning-with-files`, `docx`, `pdf`) are available but optional. They carry no OpsFluency-specific rules.
+All other skills in `.claude/skills/` are general-purpose and optional — they carry no OpsFluency-specific rules. The two routing rules below resolve overlap when more than one would otherwise auto-trigger:
+
+- **UI / visual design.** Three skills overlap (`frontend-design`, `frontend-ui-ux`, `ui-ux-pro-max`). Default to **`frontend-design`**. Reach for **`ui-ux-pro-max`** when you need stack-specific palette / typography / style options at the start of a new surface, and **`frontend-ui-ux`** when you're polishing interaction detail without a mockup. **All three defer to `opsfluency-accessibility` for any frontline (PWA, manager dashboard, monitor) UI.**
+- **Database / Postgres.** `supabase-best-practices` is generic Postgres performance guidance — it does not know about the OpsFluency three-client model, RLS helpers, JWT bridge, or super-admin allowlist. The architecture rules in this file (see "Supabase clients", "Row Level Security", "Super admin") override it whenever they conflict.
+
+Note: two skills' folder names don't match their declared frontmatter `name` (Claude invokes by `name`): `supabase-best-practices/` → `supabase-postgres-best-practices`, `web-quality-skills/` → `web-quality-audit`. Inherited verbatim from the upstream skill set.
 
 ---
 
@@ -227,6 +232,7 @@ Hard rules:
 - `SUPABASE_SERVICE_ROLE_KEY` is **only** read inside `lib/supabase/admin.ts`. Never import it from client code, never reference it outside that file.
 - Never import `lib/supabase/admin` from a file that could end up in the browser bundle. Put `import 'server-only'` at the top of `admin.ts` to fail fast if someone tries.
 - Server Components and API routes default to `getRequestClient` — reach for `admin` only when you've written down *why* RLS must be bypassed.
+- The general-purpose `supabase-best-practices` skill covers Postgres query / index / connection performance only. The three-client model, RLS helpers, Clerk JWT bridge, and super-admin model in this file are OpsFluency-specific and override anything in that skill.
 
 ### Clerk → Supabase third-party auth bridge
 
@@ -297,7 +303,7 @@ Default shape for every piece of session-authed server code:
 - **Reads** — Server Components call Supabase directly via `getRequestClient()`. No API round-trip for data the UI renders.
 - **Mutations** — Server Actions (`"use server"`), not API routes. Zod-validate the input at the top, run the write, call `revalidatePath` / `revalidateTag` before returning.
 - **`/api` routes** — reserved for callers that don't have a Clerk session or can't invoke a Server Action:
-  - Webhooks (Clerk user events; Paddle for self-serve billing and Stripe for at-scale/enterprise billing once those land)
+  - Webhooks (Clerk user events; Paddle for self-serve billing and Stripe for at-scale/enterprise billing once those land — when the Stripe path is built, follow the `stripe-best-practices` skill: Checkout Sessions API by default, latest API version)
   - Monitor heartbeat (`POST /api/monitors/heartbeat`, authenticated by the signed monitor-pairing cookie)
   - QR scan logging (`POST /api/sops/:id/scans`, callable from the public scan landing before the employee has signed in)
   - Cron jobs and external integrations
