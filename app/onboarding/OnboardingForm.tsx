@@ -93,6 +93,14 @@ function formatTopError(state: Extract<CreateCompanyState, { status: "error" }>)
       return "You already belong to a company. Opening your dashboard…";
     case "INVALID_INPUT":
       return state.fieldErrors ? "Fix the highlighted fields and try again." : "Invalid input.";
+    case "BRIDGE_UNCONFIGURED":
+      return (
+        "Your workspace was created, but Supabase can't see your Clerk session. " +
+        "This means Clerk isn't registered as a Third-party Auth provider in your " +
+        "Supabase project. In the Supabase dashboard go to Authentication → " +
+        "Sign in / Providers → Third-party Auth → Add Clerk, paste your Clerk " +
+        "Frontend API URL, then retry. (Your existing row is safe; we'll reuse it.)"
+      );
     case "INTERNAL":
       return state.message ?? "Something went wrong creating your company.";
   }
