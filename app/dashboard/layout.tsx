@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
+import { AuthBridgeError } from "@/components/dashboard/auth-bridge-error";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -11,6 +12,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   } catch (e) {
     if (e instanceof AuthError && e.code === "NO_COMPANY") redirect("/onboarding");
     if (e instanceof AuthError && e.code === "UNAUTHENTICATED") redirect("/sign-in");
+    if (e instanceof AuthError && e.code === "AUTH_BRIDGE_FAILED") {
+      return <AuthBridgeError detail={e.detail} />;
+    }
     throw e;
   }
 

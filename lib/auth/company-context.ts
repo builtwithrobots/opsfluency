@@ -3,6 +3,7 @@ import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getAdminClient } from "@/lib/supabase/admin";
 import { getRequestClient } from "@/lib/supabase/server";
 
 export type Role = "admin" | "manager" | "employee";
@@ -10,10 +11,14 @@ export type Role = "admin" | "manager" | "employee";
 export type AuthErrorCode =
   | "UNAUTHENTICATED"
   | "NO_COMPANY"
-  | "FORBIDDEN";
+  | "FORBIDDEN"
+  | "AUTH_BRIDGE_FAILED";
 
 export class AuthError extends Error {
-  constructor(public code: AuthErrorCode) {
+  constructor(
+    public code: AuthErrorCode,
+    public detail?: string,
+  ) {
     super(code);
     this.name = "AuthError";
   }
@@ -55,9 +60,31 @@ export async function getCompanyContext(
     .from("company_members")
     .select("company_id, role")
     .eq("clerk_user_id", userId)
-    .single();
+    .maybeSingle();
 
-  if (!member) throw new AuthError("NO_COMPANY");
+  if (!member) {
+    // Distinguish "row doesn't exist" from "row exists but RLS is hiding it."
+    // The latter happens when Supabase isn't trusting the Clerk JWT — most
+    // commonly because Third-party Auth → Clerk isn't configured in the
+    // Supabase dashboard, or the configured Clerk domain doesn't match the
+    // JWT's `iss` claim. Admin client bypasses RLS, so if it finds the row
+    // the bridge is the problem; if not, onboarding genuinely hasn't run.
+    const admin = getAdminClient();
+    const { data: adminMember } = await admin
+      .from("company_members")
+      .select("company_id, role")
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
+
+    if (adminMember) {
+      throw new AuthError(
+        "AUTH_BRIDGE_FAILED",
+        `company_members row exists for ${userId} but is not visible via the user's Clerk JWT. Check Supabase → Authentication → Third-party Auth → Clerk.`,
+      );
+    }
+
+    throw new AuthError("NO_COMPANY");
+  }
 
   const role = member.role as Role;
 
