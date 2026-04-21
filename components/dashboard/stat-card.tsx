@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 type Accent =
   | "brand"
@@ -25,7 +25,10 @@ const accentTone: Record<Accent, string> = {
 interface DashboardStatCardProps {
   label: string;
   value: number | string;
-  icon: LucideIcon;
+  // Pre-rendered icon element. Must be a ReactNode, not a component —
+  // forwardRef components (like lucide-react icons) can't be passed
+  // across the Server → Client boundary.
+  icon: ReactNode;
   accent?: Accent;
   delay?: number;
 }
@@ -33,7 +36,7 @@ interface DashboardStatCardProps {
 export function DashboardStatCard({
   label,
   value,
-  icon: Icon,
+  icon,
   accent = "brand",
   delay = 0,
 }: DashboardStatCardProps) {
@@ -58,7 +61,7 @@ export function DashboardStatCard({
           aria-hidden
           className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${accentTone[accent]}`}
         >
-          <Icon className="size-5" />
+          {icon}
         </span>
       </div>
       <motion.span

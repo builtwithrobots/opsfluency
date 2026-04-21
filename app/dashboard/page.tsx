@@ -63,28 +63,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <DashboardStatCard
           label="Published SOPs"
           value="—"
-          icon={FileText}
+          icon={<FileText className="size-5" />}
           accent="brand"
           delay={0}
         />
         <DashboardStatCard
           label="Team members"
           value={memberCount ?? 0}
-          icon={Users}
+          icon={<Users className="size-5" />}
           accent="signal-info"
           delay={0.05}
         />
         <DashboardStatCard
           label="QR scans (7d)"
           value="—"
-          icon={ScanLine}
+          icon={<ScanLine className="size-5" />}
           accent="signal-live"
           delay={0.1}
         />
         <DashboardStatCard
           label="Pending approvals"
           value="—"
-          icon={Bell}
+          icon={<Bell className="size-5" />}
           accent="signal-warn"
           delay={0.15}
         />
