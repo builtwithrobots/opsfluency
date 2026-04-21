@@ -179,7 +179,7 @@ export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = await getRequestClient(userId);
+  const supabase = await getRequestClient();
 
   // Look up which company this user belongs to and what role they have
   const { data: member } = await supabase
@@ -208,7 +208,7 @@ export async function GET(request: Request) {
 
 Three clients, one purpose each. The import path tells you where each is safe to use.
 
-- **`lib/supabase/server.ts`** — request-scoped authenticated client. Exports `getRequestClient(clerkUserId)` which returns a Supabase client whose Postgres session has `request.clerk_user_id` set, so RLS policies can resolve the caller's company. Use this in every API route, Server Action, and Server Component. Operates as the `authenticated` role — **RLS is enforced**.
+- **`lib/supabase/server.ts`** — request-scoped authenticated client. Exports `getRequestClient()` which returns a Supabase client that forwards the Clerk-issued JWT as the Bearer token. Supabase validates the token (Clerk is configured as a third-party auth provider in the Supabase dashboard) and RLS policies read the caller's identity from `auth.jwt() ->> 'sub'`. Use this in every API route, Server Action, and Server Component. Operates as the `authenticated` role — **RLS is enforced**.
 - **`lib/supabase/admin.ts`** — service-role client. Bypasses RLS. Server-only. Reserved for: migrations, the default-department seed on company creation, cron jobs, and cross-tenant analytics. Every import site must have a comment justifying why RLS bypass is required.
 - **`lib/supabase/browser.ts`** — anon client for `"use client"` components. No elevated permissions. RLS-enforced via the anon role.
 
@@ -225,12 +225,14 @@ Hard rules:
 Pattern:
 
 ```sql
--- Session var is set per request by getRequestClient() via `SET LOCAL`
+-- Clerk issues a JWT per session. Supabase trusts Clerk as a third-party
+-- auth provider and validates it as the Bearer token. The `sub` claim is
+-- the Clerk user id.
 CREATE OR REPLACE FUNCTION requesting_company_id() RETURNS uuid
 LANGUAGE sql STABLE AS $$
   SELECT cm.company_id
   FROM company_members cm
-  WHERE cm.clerk_user_id = current_setting('request.clerk_user_id', true)
+  WHERE cm.clerk_user_id = auth.jwt() ->> 'sub'
   LIMIT 1;
 $$;
 
@@ -253,7 +255,7 @@ Rules:
 
 Default shape for every piece of session-authed server code:
 
-- **Reads** — Server Components call Supabase directly via `getRequestClient(userId)`. No API round-trip for data the UI renders.
+- **Reads** — Server Components call Supabase directly via `getRequestClient()`. No API round-trip for data the UI renders.
 - **Mutations** — Server Actions (`"use server"`), not API routes. Zod-validate the input at the top, run the write, call `revalidatePath` / `revalidateTag` before returning.
 - **`/api` routes** — reserved for callers that don't have a Clerk session or can't invoke a Server Action:
   - Webhooks (Clerk user events, and Stripe if billing lands later)
@@ -456,7 +458,7 @@ export async function getCompanyContext(required?: Exclude<Role, 'worker'>) {
   const { userId } = await auth();
   if (!userId) throw new AuthError('UNAUTHENTICATED');
 
-  const supabase = await getRequestClient(userId);
+  const supabase = await getRequestClient();
   const { data: member } = await supabase
     .from('company_members')
     .select('company_id, role')

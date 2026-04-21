@@ -45,7 +45,7 @@ export async function getCompanyContext(
   const { userId } = await auth();
   if (!userId) throw new AuthError("UNAUTHENTICATED");
 
-  const supabase = await getRequestClient(userId);
+  const supabase = await getRequestClient();
 
   const { data: member } = await supabase
     .from("company_members")

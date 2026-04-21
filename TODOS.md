@@ -14,10 +14,12 @@ Five-phase plan, one PR each, stacked on `main`. See branch `claude/audit-codeba
 | 1. Docs & skills cleanup + tokenization | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
 | 2. Starter residue removal | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
 | 3. Dependencies & env vars | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
-| 4. `lib/` scaffolding (supabase, auth, types, ai) | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
-| 5. First migration (companies, company_members, RLS, default depts) | TBD | Pending |
+| 4. `lib/` scaffolding (supabase, auth, types, ai) | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
+| 5. First migration (companies, company_members, RLS, default depts) | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
 
 Phase 6+ (real product build) begins after Phase 5.
+
+**Audit closure complete at the end of Phase 5.**
 
 ---
 
@@ -91,6 +93,41 @@ Listed here for continuity — do **not** start until CLAUDE.md is fixed, becaus
 9. **Monitor pairing + display.**
 10. **QR print layout.**
 11. **HR module** (contacts + chat).
+
+---
+
+## Phase 5 completion notes (2026-04-21)
+
+**Decision:** JWT-claim RLS (Option A). Clerk is configured in the Supabase dashboard as a third-party auth provider; RLS reads caller identity from `auth.jwt() ->> 'sub'`.
+
+**What landed**
+
+- `CLAUDE.md` → Row Level Security section updated: `requesting_company_id()` helper now reads `auth.jwt() ->> 'sub'` instead of `current_setting('request.clerk_user_id', true)`. Supabase clients section updated to reflect the Bearer-JWT flow.
+- `lib/supabase/server.ts` simplified: `getRequestClient()` (no param) returns a client with the Clerk JWT as the Bearer token. `x-clerk-user-id` header removed — one auth signal, not two.
+- `lib/auth/company-context.ts` updated for the new signature.
+- **`supabase/migrations/20260421000001_init.sql`** — the first migration:
+  - Tables: `companies`, `company_members`, `departments`, `ai_call_log`
+  - Helpers: `requesting_company_id()`, `requesting_role()` (both read `auth.jwt() ->> 'sub'`)
+  - RLS: `companies_self_read`, `company_members_self_read`, `departments_company_isolation` — `ai_call_log` is service-role only (REVOKE from anon/authenticated)
+  - `bootstrap_company(name, phone, logo_url, admin_clerk_user_id)` RPC — `security definer`, REVOKE'd from anon/authenticated, runs the company + admin member + 4 default department inserts in one transaction
+- `lib/auth/bootstrap-company.ts` — typed TS wrapper for the `bootstrap_company` RPC. Uses the admin client because signup runs before the caller has a `company_members` row.
+- `docs/supabase-setup.md` — one-time setup: project creation, Supabase CLI install, `supabase db push`, and (most importantly) the **Clerk third-party auth provider** dashboard step that makes the JWT flow work.
+
+**Verification**
+
+- `npx tsc --noEmit` — clean
+- `npm run lint` — clean (0 problems)
+- `npm run build` — success, 5 routes generated
+
+**Audit closure — DONE.** The repo now has:
+- A documented architecture in `CLAUDE.md` with no open `_DECIDE:_` items
+- Skills aligned with the spec
+- No starter residue
+- All product deps installed, ESLint wired, env vars documented
+- `lib/` scaffolding for every future Server Component / Server Action / API route
+- First Supabase migration with RLS baked in from day one
+
+Phase 6+ (real product build: SOP import pipeline, manager shell, worker PWA, monitors, HR) begins next and should be scoped as its own multi-PR plan.
 
 ---
 
