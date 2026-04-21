@@ -10,11 +10,16 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
  * `/onboarding` is protected too — it's the first-admin company-bootstrap
  * screen and needs a Clerk session to resolve `userId` before the
  * `bootstrap_company` RPC can attach the new member row.
+ *
+ * `/super-admin` is session-protected; authorization against the
+ * `super_admins` allowlist happens in the route's own layout via
+ * `getSuperAdminContext()`.
  */
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/app(.*)",
   "/onboarding(.*)",
+  "/super-admin(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

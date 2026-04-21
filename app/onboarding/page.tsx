@@ -2,10 +2,15 @@ import { UserButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
+import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
 import { OnboardingForm } from "./OnboardingForm";
 
 export default async function OnboardingPage() {
+  // Super admins don't belong in any company — bootstrapping one for
+  // them would create a shell tenant. Send them to their own surface.
+  if (await isCurrentUserSuperAdmin()) redirect("/super-admin");
+
   try {
     await getCompanyContext();
     redirect("/dashboard");
