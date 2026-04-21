@@ -13,8 +13,8 @@ Five-phase plan, one PR each, stacked on `main`. See branch `claude/audit-codeba
 |---|---|---|
 | 1. Docs & skills cleanup + tokenization | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
 | 2. Starter residue removal | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
-| 3. Dependencies & env vars | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
-| 4. `lib/` scaffolding (supabase, auth, types, ai) | TBD | Pending |
+| 3. Dependencies & env vars | `claude/audit-codebase-guidelines-oump0` | **Shipped** (PR #11) |
+| 4. `lib/` scaffolding (supabase, auth, types, ai) | `claude/audit-codebase-guidelines-oump0` | **In progress** (this PR) |
 | 5. First migration (companies, company_members, RLS, default depts) | TBD | Pending |
 
 Phase 6+ (real product build) begins after Phase 5.
@@ -91,6 +91,32 @@ Listed here for continuity — do **not** start until CLAUDE.md is fixed, becaus
 9. **Monitor pairing + display.**
 10. **QR print layout.**
 11. **HR module** (contacts + chat).
+
+---
+
+## Phase 4 completion notes (2026-04-21)
+
+**What landed**
+
+- `lib/supabase/server.ts` — `getRequestClient(clerkUserId)` for Server Components, Server Actions, and API routes. Attaches the Clerk JWT as Bearer and sets `x-clerk-user-id` as a second signal that Phase 5's PostgREST pre-request hook can translate into the `request.clerk_user_id` GUC used by the `requesting_company_id()` RLS helper.
+- `lib/supabase/admin.ts` — service-role singleton factory with `import 'server-only'`; documented as RLS-bypass.
+- `lib/supabase/browser.ts` — anon singleton factory for `"use client"` components.
+- `lib/types/sop.ts` — `SopStatus` / `SopTemplate` unions, `ALLOWED_SOP_TRANSITIONS` + `canTransitionSop(from, to)`, `SOP_UPLOAD_MIME_TYPES`, `SOP_UPLOAD_MAX_BYTES`, `SOP_UPLOADS_BUCKET`. Every call site imports from here instead of hardcoding.
+- `lib/auth/company-context.ts` — `getCompanyContext(required?)` returning `{ userId, supabase, company_id, role }` or throwing a typed `AuthError` (`UNAUTHENTICATED` / `NO_COMPANY` / `FORBIDDEN`). Matches `CLAUDE.md` → "Server Code Patterns" exactly.
+- `lib/ai/sonnet.ts` — `callSonnet<T>(input, ctx)` wrapper with 60s timeout, 1 retry on 429/5xx with jittered backoff (500–1500ms), parse step with raw-preview capture on failure, and a best-effort `ai_call_log` insert via the admin client. No call site should import `@anthropic-ai/sdk` directly.
+- `proxy.ts` — `createRouteMatcher(['/dashboard(.*)', '/app(.*)'])` protects dashboard + worker PWA routes. `/sign-in`, `/sign-up`, `/monitor/[id]`, `/pair-monitor`, `/s/[qr_code_id]` are public by default.
+
+**Verification**
+
+- `npx tsc --noEmit` — clean
+- `npm run lint` — clean (0 problems)
+- `npm run build` — success, 5 routes generated, proxy middleware compiled
+
+**Notes for Phase 5**
+
+- The `requesting_company_id()` helper in the first migration should read `current_setting('request.clerk_user_id', true)`. The migration also needs a PostgREST-compatible pre-request function that reads the `x-clerk-user-id` header set by `getRequestClient` and calls `SET LOCAL request.clerk_user_id = ...`. If that's too much moving parts, the alternative is to update the helper to read `auth.jwt() ->> 'sub'` from Clerk's Bearer token — both paths are compatible with the Phase 4 client code.
+- `ai_call_log` table schema (minimum columns, matches `CLAUDE.md` → "AI call conventions"): `id UUID`, `model TEXT`, `input_tokens INT`, `output_tokens INT`, `sop_id UUID NULL`, `company_id UUID`, `duration_ms INT`, `created_at TIMESTAMPTZ DEFAULT NOW()`. Keep RLS disabled — this table is service-role only.
+- `lib/ai/sonnet.ts` defaults to `claude-sonnet-4-6` (latest Sonnet per the Anthropic model catalog).
 
 ---
 
