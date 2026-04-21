@@ -1,6 +1,6 @@
 # OpsFluency — User Journey Map
 
-**Version:** 1.2
+**Version:** 1.3
 **Date:** April 2026
 **Author:** Rob
 **Status:** Active — MVP Phase
@@ -76,8 +76,9 @@
 
 4. **Billing**
    - Plan selected at signup (Starter / Growth / Scale)
-   - Billing managed via Stripe
-   - Plan upgrades/downgrades available in Settings
+   - Billing managed via **Paddle** — primary payment processor for all self-serve plans (Paddle acts as merchant of record, handling global sales tax / VAT)
+   - **Stripe is reserved for at-scale / enterprise accounts** where direct processing fees become materially lower than Paddle's merchant-of-record margin. Admin doesn't choose the processor — it's a backend decision triggered when an account crosses the scale threshold, at which point the account is migrated by the Super Admin.
+   - Plan upgrades/downgrades available in Settings (processor-agnostic from the Admin's perspective)
 
 5. **Org Settings**
    - Update company name, logo, phone
@@ -340,4 +341,5 @@ The board is the Manager's central workspace for all employee submissions. Divid
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 1.3 | 2026-04 | Rob | Payments: Paddle as primary processor (merchant of record) for all self-serve plans; Stripe reserved for at-scale/enterprise accounts where direct processing fees become materially lower. Migration is a Super Admin action, invisible to the Admin. |
 | 1.2 | 2026-04 | Rob | MVP-phase journey map across all five roles, including submissions board, offline queue, and Admin-configurable response time thresholds. |

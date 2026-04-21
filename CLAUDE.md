@@ -283,7 +283,7 @@ Default shape for every piece of session-authed server code:
 - **Reads** — Server Components call Supabase directly via `getRequestClient()`. No API round-trip for data the UI renders.
 - **Mutations** — Server Actions (`"use server"`), not API routes. Zod-validate the input at the top, run the write, call `revalidatePath` / `revalidateTag` before returning.
 - **`/api` routes** — reserved for callers that don't have a Clerk session or can't invoke a Server Action:
-  - Webhooks (Clerk user events, and Stripe if billing lands later)
+  - Webhooks (Clerk user events; Paddle for self-serve billing and Stripe for at-scale/enterprise billing once those land)
   - Monitor heartbeat (`POST /api/monitors/heartbeat`, authenticated by the signed monitor-pairing cookie)
   - QR scan logging (`POST /api/sops/:id/scans`, callable from the public scan landing before the employee has signed in)
   - Cron jobs and external integrations
