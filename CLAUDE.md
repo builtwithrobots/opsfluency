@@ -228,6 +228,20 @@ Hard rules:
 - Never import `lib/supabase/admin` from a file that could end up in the browser bundle. Put `import 'server-only'` at the top of `admin.ts` to fail fast if someone tries.
 - Server Components and API routes default to `getRequestClient` — reach for `admin` only when you've written down *why* RLS must be bypassed.
 
+### Clerk → Supabase third-party auth bridge
+
+Two one-time dashboard changes are required for the JWT bridge to work. Both are easy to miss and produce identical-looking "empty result" symptoms when missing.
+
+1. **Supabase → Authentication → Sign In / Providers → Third-party Auth → Clerk** must be enabled, with **Domain** set to the Clerk Frontend API URL (e.g. `https://clerk.opsfluency.com` for a production custom-domain instance, or `https://<instance>.clerk.accounts.dev` for dev). The Domain must equal the JWT `iss` claim character-for-character — no trailing slash mismatch.
+
+2. **Clerk → Configure → Sessions → Customize session token** must include a `role` claim set to `authenticated`:
+   ```json
+   { "role": "authenticated" }
+   ```
+   Clerk v2 session tokens do not include a `role` claim by default. Without this, PostgREST extracts the JWT claims but keeps the caller on the `anon` role, so every RLS policy keyed `FOR SELECT TO authenticated` returns zero rows. The application sees `company_members` as empty even though the row exists via the service-role client — indistinguishable from an unconfigured third-party auth provider.
+
+Verify both after changing Clerk/Supabase config: sign out, sign back in (tokens refresh on new sessions only), then load `/dashboard`. A successful load confirms the bridge. If a JWT bridge regression ever returns, the `getCompanyContext()` admin-client fallback renders a dedicated error page (`AUTH_BRIDGE_FAILED`) instead of an infinite redirect loop between `/dashboard` and `/onboarding`.
+
 ### Row Level Security (RLS)
 
 **Decision:** RLS is enabled on every company-scoped table from day one, backed by a `requesting_company_id()` SQL helper. Justification: a single missed `.eq('company_id', ...)` in a server query would silently leak cross-tenant data. RLS makes that mistake impossible instead of just improbable, and adding it retroactively after the schema is 15 tables deep is painful.
