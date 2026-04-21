@@ -58,10 +58,10 @@ export default async function Home() {
         <div className="flex items-center gap-3 pt-4">
           {cta.kind === "superAdmin" ? (
             <Link
-              href="/super-admin"
+              href="/dashboard/platform/tenants"
               className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
             >
-              Open super admin
+              Open platform
             </Link>
           ) : cta.kind === "signedIn" ? (
             <Link

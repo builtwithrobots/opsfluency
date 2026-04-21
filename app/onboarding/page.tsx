@@ -8,8 +8,9 @@ import { OnboardingForm } from "./OnboardingForm";
 
 export default async function OnboardingPage() {
   // Super admins don't belong in any company — bootstrapping one for
-  // them would create a shell tenant. Send them to their own surface.
-  if (await isCurrentUserSuperAdmin()) redirect("/super-admin");
+  // them would create a shell tenant. Send them to the Platform surface
+  // inside the dashboard shell.
+  if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform/tenants");
 
   try {
     await getCompanyContext();

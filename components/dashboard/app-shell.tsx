@@ -20,13 +20,13 @@ import {
   SidebarBody,
   SidebarFooter,
   SidebarHeader,
+  SidebarHeading,
   SidebarItem,
   SidebarLabel,
   SidebarSection,
   SidebarSpacer,
 } from "@/components/ui/sidebar";
 import { SidebarLayout } from "@/components/ui/sidebar-layout";
-import type { Role } from "@/lib/auth/company-context";
 
 import {
   appDisplayName,
@@ -34,12 +34,13 @@ import {
   canSee,
   isActive,
   navFooterSection,
-  navSections,
+  superAdminIcon,
+  visibleSections,
+  type Viewer,
 } from "./nav-config";
 
 interface AppShellProps {
-  role: Role;
-  companyName: string;
+  viewer: Viewer;
   children: ReactNode;
 }
 
@@ -58,16 +59,48 @@ function BrandMark() {
   );
 }
 
-function CompanyContext({ name }: { name: string }) {
+function ContextLabel({ viewer }: { viewer: Viewer }) {
+  if (viewer.kind === "superAdmin") {
+    const Icon = superAdminIcon;
+    return (
+      <span className="flex items-center gap-1.5 px-2 pt-1 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
+        <Icon className="size-3" />
+        Super admin
+      </span>
+    );
+  }
   return (
     <span className="block truncate px-2 pt-1 text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
-      {name}
+      {viewer.companyName}
     </span>
   );
 }
 
-export function AppShell({ role, companyName, children }: AppShellProps) {
+function ViewerFooter({ viewer }: { viewer: Viewer }) {
+  const label = viewer.kind === "superAdmin" ? "Super admin" : viewer.role;
+  return (
+    <div className="flex min-w-0 items-center gap-3 px-2 py-2">
+      <span className="flex size-9 shrink-0 items-center justify-center">
+        <UserButton
+          appearance={{ elements: { avatarBox: "size-9 rounded-full" } }}
+        />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm/5 font-medium text-dc-text">
+          Signed in
+        </span>
+        <span className="block truncate text-xs/5 text-dc-text-2 capitalize">
+          {label}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+export function AppShell({ viewer, children }: AppShellProps) {
   const pathname = usePathname() ?? "/dashboard";
+  const sections = visibleSections(viewer);
+  const footerItems = navFooterSection.items.filter((item) => canSee(item, viewer));
 
   return (
     <SidebarLayout
@@ -85,7 +118,7 @@ export function AppShell({ role, companyName, children }: AppShellProps) {
         <Sidebar>
           <SidebarHeader>
             <Dropdown>
-              <DropdownButton as={SidebarItem} aria-label="Company menu">
+              <DropdownButton as={SidebarItem} aria-label="Workspace menu">
                 <BrandMark />
                 <SidebarLabel>
                   <span className={brandNameClasses}>{appDisplayName}</span>
@@ -93,24 +126,29 @@ export function AppShell({ role, companyName, children }: AppShellProps) {
                 <ChevronDown data-slot="icon" />
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="bottom start">
-                <DropdownItem href="/dashboard/settings">
-                  <DropdownLabel>Workspace settings</DropdownLabel>
-                </DropdownItem>
+                {viewer.kind === "member" ? (
+                  <DropdownItem href="/dashboard/settings">
+                    <DropdownLabel>Workspace settings</DropdownLabel>
+                  </DropdownItem>
+                ) : null}
                 <DropdownDivider />
-                <DropdownItem href="/sign-in">
+                <DropdownItem href="/sign-out">
                   <LogOut data-slot="icon" />
                   <DropdownLabel>Sign out</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
-            <CompanyContext name={companyName} />
+            <ContextLabel viewer={viewer} />
           </SidebarHeader>
 
           <SidebarBody>
-            {navSections.map((section, sectionIndex) => (
+            {sections.map((section, sectionIndex) => (
               <SidebarSection key={section.heading ?? `section-${sectionIndex}`}>
+                {section.heading ? (
+                  <SidebarHeading>{section.heading}</SidebarHeading>
+                ) : null}
                 <AnimatePresence initial={false}>
-                  {section.items.filter((item) => canSee(item, role)).map((item, index) => {
+                  {section.items.map((item, index) => {
                     const Icon = item.icon;
                     const active = isActive(item, pathname);
                     return (
@@ -133,35 +171,23 @@ export function AppShell({ role, companyName, children }: AppShellProps) {
 
             <SidebarSpacer />
 
-            <SidebarSection>
-              {navFooterSection.items.filter((item) => canSee(item, role)).map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarItem key={item.href} href={item.href}>
-                    <Icon data-slot="icon" />
-                    <SidebarLabel>{item.label}</SidebarLabel>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
+            {footerItems.length > 0 ? (
+              <SidebarSection>
+                {footerItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <SidebarItem key={item.href} href={item.href}>
+                      <Icon data-slot="icon" />
+                      <SidebarLabel>{item.label}</SidebarLabel>
+                    </SidebarItem>
+                  );
+                })}
+              </SidebarSection>
+            ) : null}
           </SidebarBody>
 
           <SidebarFooter className="max-lg:hidden">
-            <div className="flex min-w-0 items-center gap-3 px-2 py-2">
-              <span className="flex size-9 shrink-0 items-center justify-center">
-                <UserButton
-                  appearance={{ elements: { avatarBox: "size-9 rounded-full" } }}
-                />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm/5 font-medium text-dc-text">
-                  Signed in
-                </span>
-                <span className="block truncate text-xs/5 text-dc-text-2 capitalize">
-                  {role}
-                </span>
-              </span>
-            </div>
+            <ViewerFooter viewer={viewer} />
           </SidebarFooter>
         </Sidebar>
       }

@@ -3,40 +3,58 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
 import { AuthBridgeError } from "@/components/dashboard/auth-bridge-error";
+import type { Viewer } from "@/components/dashboard/nav-config";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
-export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  let ctx;
+type ResolveResult =
+  | { kind: "viewer"; viewer: Viewer }
+  | { kind: "bridgeError"; detail?: string };
+
+async function resolveViewer(): Promise<ResolveResult> {
   try {
-    ctx = await getCompanyContext();
+    const ctx = await getCompanyContext();
+
+    // Employees don't belong in the manager dashboard.
+    if (ctx.role === "employee") redirect("/app/home");
+
+    const { data: company } = await ctx.supabase
+      .from("companies")
+      .select("name")
+      .eq("id", ctx.company_id)
+      .single();
+
+    return {
+      kind: "viewer",
+      viewer: {
+        kind: "member",
+        role: ctx.role,
+        companyName: company?.name ?? "Workspace",
+      },
+    };
   } catch (e) {
     if (e instanceof AuthError && e.code === "NO_COMPANY") {
-      // Super admins have no company_members row by design — route them
-      // to god-mode instead of the first-admin onboarding form.
-      if (await isCurrentUserSuperAdmin()) redirect("/super-admin");
+      // Super admins carry no company_members row — they're welcome in
+      // the dashboard shell, just with the Platform sidebar only.
+      if (await isCurrentUserSuperAdmin()) {
+        return { kind: "viewer", viewer: { kind: "superAdmin" } };
+      }
       redirect("/onboarding");
     }
     if (e instanceof AuthError && e.code === "UNAUTHENTICATED") redirect("/sign-in");
     if (e instanceof AuthError && e.code === "AUTH_BRIDGE_FAILED") {
-      return <AuthBridgeError detail={e.detail} />;
+      return { kind: "bridgeError", detail: e.detail };
     }
     throw e;
   }
+}
 
-  const { supabase, company_id, role } = ctx;
-
-  // Role gate: employees don't belong in the manager dashboard.
-  if (role === "employee") redirect("/app/home");
-
-  const { data: company } = await supabase
-    .from("companies")
-    .select("name")
-    .eq("id", company_id)
-    .single();
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const result = await resolveViewer();
+  if (result.kind === "bridgeError") return <AuthBridgeError detail={result.detail} />;
 
   return (
-    <AppShell role={role} companyName={company?.name ?? "Workspace"}>
+    <AppShell viewer={result.viewer}>
       <div id="main">{children}</div>
     </AppShell>
   );
