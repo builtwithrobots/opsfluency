@@ -56,8 +56,8 @@ Project-specific skills live in `.claude/skills/` and auto-trigger by descriptio
 | Skill | When it triggers | What it owns |
 |---|---|---|
 | `opsfluency-sop-pipeline` | Any code touching `sops`, `sop_versions`, `glossary_terms`, `qr_codes`, or the import → convert → flag → translate → publish flow | Pipeline order, glossary hard gate, Sonnet prompt rules, version management |
-| `opsfluency-accessibility` | Any user-facing UI (worker PWA, manager dashboard, TV monitor) | OpsFluency-specific a11y on top of WCAG 2.1 AA — glove taps, warehouse lighting, TV distance, bilingual `lang` |
-| `opsfluency-bilingual-content` | Any code rendering user strings or user-generated text, or gating by `workers.preferred_language` | System strings vs user-generated content, `content_en` / `content_es` columns, language toggle |
+| `opsfluency-accessibility` | Any user-facing UI (employee PWA, manager dashboard, TV monitor) | OpsFluency-specific a11y on top of WCAG 2.1 AA — glove taps, warehouse lighting, TV distance, bilingual `lang` |
+| `opsfluency-bilingual-content` | Any code rendering user strings or user-generated text, or gating by `employees.preferred_language` | System strings vs user-generated content, `content_en` / `content_es` columns, language toggle |
 
 General-purpose skills (`frontend-design`, `react-best-practices`, `nextjs-skills`, `composition-patterns`, `planning-with-files`, `docx`, `pdf`) are available but optional. They carry no OpsFluency-specific rules.
 
@@ -73,13 +73,13 @@ opsfluency/
 │   │   ├── sops/            # SOP list, create, edit
 │   │   ├── import/          # SOP upload and conversion pipeline
 │   │   ├── glossary/        # Company glossary management
-│   │   ├── workers/         # Worker invitation and management
+│   │   ├── employees/       # Employee invitation and management
 │   │   ├── announcements/   # Post and manage announcements
 │   │   ├── departments/     # Department setup
 │   │   ├── monitors/        # Monitor pairing and management
 │   │   └── analytics/       # Scan analytics
-│   ├── app/                 # Worker-facing PWA pages
-│   │   ├── home/            # Worker dashboard (announcements + dept tabs)
+│   ├── app/                 # Employee-facing PWA pages
+│   │   ├── home/            # Employee dashboard (announcements + dept tabs)
 │   │   ├── sop/[id]/        # SOP viewer (bilingual)
 │   │   ├── scan/            # QR scan entry point
 │   │   ├── hr/              # HR SOPs, contacts, chat
@@ -91,7 +91,7 @@ opsfluency/
 │       ├── import/
 │       ├── glossary/
 │       ├── translate/
-│       ├── workers/
+│       ├── employees/
 │       ├── announcements/
 │       ├── monitors/
 │       ├── analytics/
@@ -121,13 +121,13 @@ Next 16 renamed `middleware.ts` to `proxy.ts`. The file wires `clerkMiddleware()
 - `/sign-in`, `/sign-up` — Clerk hosted auth flow
 - `/monitor/[id]` — paired TV display, authenticated via signed pairing token in a cookie (not a Clerk session)
 - `/pair-monitor` — one-time manager pairing flow that issues the monitor token
-- `/s/[qr_code_id]` — QR scan landing page; redirects to `/app/sop/[id]` and triggers worker sign-in if no session exists
+- `/s/[qr_code_id]` — QR scan landing page; redirects to `/app/sop/[id]` and triggers employee sign-in if no session exists
 
 **Monitor auth.** A manager pairs a TV via `/pair-monitor` (manager-authenticated). The Server Action inserts a `monitors` row, then sets a signed, HttpOnly, SameSite=Lax cookie `opsf_monitor` on the TV's browser that contains `{ monitor_id, company_id, iat }` signed with `MONITOR_COOKIE_SECRET`. The cookie has no expiration (monitors run for months). `/monitor/[id]` reads and verifies the cookie server-side, rejects on signature mismatch or `monitor_id` mismatch, and loads content scoped to `company_id`. Rotate the secret by invalidating all monitor sessions and re-pairing — document this as the unpair flow, not an automatic rotation.
 
 **QR scan auth.** `/s/[qr_code_id]` is public and stateless. It looks up `qr_codes.id`, resolves the current `published` SOP, and:
 - If the SOP is `archived` → return HTTP 410 with a friendly "no longer available" page.
-- If the worker has a Clerk session → redirect to `/app/sop/[sop_id]`.
+- If the employee has a Clerk session → redirect to `/app/sop/[sop_id]`.
 - If no session → redirect to `/sign-in?redirect_url=/app/sop/[sop_id]` so Clerk lands them on the right SOP after magic-link auth.
 
 The scan itself is logged asynchronously via `POST /api/sops/:id/scans` — this is the one `/api` route that must accept unauthenticated calls, rate-limited by IP + `qr_code_id`.
@@ -159,12 +159,22 @@ CREATE TABLE company_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   clerk_user_id TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'worker',
-  -- 'admin' | 'manager' | 'worker'
+  role TEXT NOT NULL DEFAULT 'employee',
+  -- 'admin' | 'manager' | 'employee'
   invited_at TIMESTAMPTZ,
   joined_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(company_id, clerk_user_id)
+);
+
+-- Cross-tenant god-mode allowlist. Super admins are NOT members of any
+-- company, so they live outside company_members. See
+-- "Super admin (cross-tenant god mode)" below for the full model.
+CREATE TABLE super_admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clerk_user_id TEXT NOT NULL UNIQUE,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
@@ -229,9 +239,11 @@ Pattern:
 -- auth provider and validates it as the Bearer token. The `sub` claim is
 -- the Clerk user id.
 CREATE OR REPLACE FUNCTION requesting_company_id() RETURNS uuid
-LANGUAGE sql STABLE AS $$
+LANGUAGE sql STABLE
+SECURITY DEFINER SET search_path = public, auth
+AS $$
   SELECT cm.company_id
-  FROM company_members cm
+  FROM public.company_members cm
   WHERE cm.clerk_user_id = auth.jwt() ->> 'sub'
   LIMIT 1;
 $$;
@@ -240,16 +252,29 @@ ALTER TABLE sops ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY sops_company_isolation ON sops
   FOR ALL TO authenticated
-  USING (company_id = requesting_company_id())
-  WITH CHECK (company_id = requesting_company_id());
+  USING      (company_id = requesting_company_id() OR is_super_admin())
+  WITH CHECK (company_id = requesting_company_id() OR is_super_admin());
 ```
 
 Rules:
 
 - Every new company-scoped table ships with `ENABLE ROW LEVEL SECURITY` and a `<table>_company_isolation` policy in the same migration that creates the table. No exceptions.
+- Every tenant policy includes an `OR is_super_admin()` clause in both `USING` and `WITH CHECK` so god-mode tooling can reach every tenant. Omitting it locks super admins out of the table.
+- Helpers (`requesting_company_id`, `requesting_role`, `is_super_admin`) are `SECURITY DEFINER` with `SET search_path = public, auth` — otherwise a policy on `company_members` that calls the helper recurses into itself.
 - Server queries still include `.eq('company_id', company_id)` as defense in depth and because it lets Postgres pick the right index.
 - Tables that are intentionally global (e.g., `companies` itself, which an admin needs to read their own row from) get a narrower policy — document why inline in the migration.
 - The service-role client (`lib/supabase/admin.ts`) bypasses RLS. Treat every usage as a security-review-worthy line.
+
+### Super admin (cross-tenant god mode)
+
+There is exactly one role that sees every tenant's data: `super_admin`. It is **not** stored in `company_members` — a super admin is not a "member" of any single company. Instead, a dedicated `super_admins` table is keyed by `clerk_user_id`, and the `is_super_admin()` SQL helper resolves the current caller's status from their Clerk JWT.
+
+Rules:
+
+- Adding a super admin = inserting a row into `super_admins` via the service-role client (or the SQL editor). There is no signup flow for this role — it's a hardcoded allowlist.
+- `super_admins` is locked at grant level (`REVOKE ALL ... FROM anon, authenticated`). No RLS policy needed; callers always go through `is_super_admin()` which runs `SECURITY DEFINER` and bypasses the grant.
+- `getCompanyContext()` does **not** resolve super admins — it throws `NO_COMPANY` for them. Super-admin-only routes use a separate `getSuperAdminContext()` helper (to be added when the first such route lands).
+- `requesting_role()` returns `NULL` for a super admin; check `is_super_admin()` first in any UI or policy that needs to differentiate.
 
 ### Data fetching: RSC + Server Actions, `/api` only for external callers
 
@@ -260,10 +285,10 @@ Default shape for every piece of session-authed server code:
 - **`/api` routes** — reserved for callers that don't have a Clerk session or can't invoke a Server Action:
   - Webhooks (Clerk user events, and Stripe if billing lands later)
   - Monitor heartbeat (`POST /api/monitors/heartbeat`, authenticated by the signed monitor-pairing cookie)
-  - QR scan logging (`POST /api/sops/:id/scans`, callable from the public scan landing before the worker has signed in)
+  - QR scan logging (`POST /api/sops/:id/scans`, callable from the public scan landing before the employee has signed in)
   - Cron jobs and external integrations
 
-Rule of thumb: if the caller has a Clerk session and the code is reachable from the manager dashboard or worker PWA, it is a Server Action — not an API route.
+Rule of thumb: if the caller has a Clerk session and the code is reachable from the manager dashboard or employee PWA, it is a Server Action — not an API route.
 
 ### Default to Server Components
 
@@ -305,10 +330,10 @@ Rules:
 - `archived` is terminal. Restoring means creating a new SOP that references the old one, not flipping the status back.
 - English edits to a `published` SOP create a new `sop_versions` row and flip `sop_versions.needs_retranslation = true` on the previous Spanish — the `sops.status` stays `published` throughout.
 
-**`needs_retranslation` flag.** `sop_versions.needs_retranslation BOOLEAN NOT NULL DEFAULT FALSE`. Set to `true` when the English side is edited; cleared only when a manager approves the re-translated Spanish. Workers continue seeing the last approved Spanish until the flag clears — never show a stale-flagged version in a way that suggests it's fresh, but also never hide it (partial content is worse than slightly-stale content).
+**`needs_retranslation` flag.** `sop_versions.needs_retranslation BOOLEAN NOT NULL DEFAULT FALSE`. Set to `true` when the English side is edited; cleared only when a manager approves the re-translated Spanish. Employees continue seeing the last approved Spanish until the flag clears — never show a stale-flagged version in a way that suggests it's fresh, but also never hide it (partial content is worse than slightly-stale content).
 
 ### Translate-on-Publish, Not on Demand
-Translation runs once at publish time, not on every worker page load. Both English and Spanish Markdown are stored in `sop_versions`. Workers get pre-translated content instantly.
+Translation runs once at publish time, not on every employee page load. Both English and Spanish Markdown are stored in `sop_versions`. Employees get pre-translated content instantly.
 
 ### Glossary is Always Injected as Context
 When calling Sonnet for conversion or Google Translate for translation, always fetch the full company glossary first and include it in the prompt/context. This is the core technical moat -- consistent terminology across all documents.
@@ -324,13 +349,13 @@ const { data: glossary } = await supabase
 const translatedContent = await translateWithGlossary(content, 'es', glossary);
 ```
 
-### Workers Auth = Magic Link Only
-Workers never set passwords. They log in via Clerk magic links (expiring, 72 hours). After first login, their Clerk session persists. Their role and company membership live in the `company_members` table in Supabase -- not in Clerk. If the link expires, a manager resends from the worker management screen. Never implement password auth for the worker role.
+### Employee Auth = Magic Link Only
+Employees never set passwords. They log in via Clerk magic links (expiring, 72 hours). After first login, their Clerk session persists. Their role and company membership live in the `company_members` table in Supabase -- not in Clerk. If the link expires, a manager resends from the employee management screen. Never implement password auth for the employee role.
 
 ### PWA Offline Strategy
-Workers in warehouses have spotty WiFi. The service worker must cache:
-- The worker's last-viewed SOPs (up to 20)
-- The worker's home dashboard content
+Employees in warehouses have spotty WiFi. The service worker must cache:
+- The employee's last-viewed SOPs (up to 20)
+- The employee's home dashboard content
 - Static assets
 
 Use a cache-first strategy for SOP content, network-first for announcements.
@@ -338,7 +363,7 @@ Use a cache-first strategy for SOP content, network-first for announcements.
 ### QR Codes are Permanent
 A QR code URL never changes after generation. It always points to the current active version of the SOP. If an SOP is updated, the QR code still works -- it just serves the new content. QR codes only break on archive (return a user-friendly "no longer available" page).
 
-**QR URL shape:** `${NEXT_PUBLIC_APP_URL}/s/<qr_code_id>`, where `qr_code_id` is `qr_codes.id` (UUID), permanent, and **never** the `sop_id`. The `/s/[qr_code_id]` route is public: it looks up the QR row, resolves the current `published` SOP, and redirects to `/app/sop/[id]`. If the SOP is `archived` the route returns HTTP 410 with a friendly "this procedure is no longer available — ask your manager" page (not a 404). If the worker has no Clerk session, redirect through sign-in while preserving the intended SOP id so the post-login redirect lands them on the content.
+**QR URL shape:** `${NEXT_PUBLIC_APP_URL}/s/<qr_code_id>`, where `qr_code_id` is `qr_codes.id` (UUID), permanent, and **never** the `sop_id`. The `/s/[qr_code_id]` route is public: it looks up the QR row, resolves the current `published` SOP, and redirects to `/app/sop/[id]`. If the SOP is `archived` the route returns HTTP 410 with a friendly "this procedure is no longer available — ask your manager" page (not a 404). If the employee has no Clerk session, redirect through sign-in while preserving the intended SOP id so the post-login redirect lands them on the content.
 
 ### Supabase Storage buckets
 
@@ -361,13 +386,14 @@ Follows the DockClarity pairing pattern exactly. Monitors are TV screens that pa
 All tables and their columns are defined in [`./PRD.md`](./PRD.md) (section 6). Key reminders:
 
 - `companies` -- one row per customer company (replaces Clerk Organizations)
-- `company_members` -- who belongs to which company and their role (admin/manager/worker)
+- `company_members` -- who belongs to which company and their role (admin/manager/employee)
+- `super_admins` -- cross-tenant god-mode allowlist keyed by `clerk_user_id`; NOT part of any company
 - `sops` -- master record, status lifecycle (see "SOP status lifecycle" above), no content stored here
 - `sop_versions` -- content lives here, one row per publish
 - `qr_codes` -- one per SOP, permanent, stores print config as JSONB
 - `glossary_terms` -- company-scoped, English + Spanish, always injected into AI calls
-- `workers` -- extended worker profile, preferred_language, last_active_at (clerk_user_id is the link to Clerk)
-- `worker_departments` -- junction table, many-to-many
+- `employees` -- extended employee profile, preferred_language, last_active_at (clerk_user_id is the link to Clerk)
+- `employee_departments` -- junction table, many-to-many
 - `sop_scans` -- every QR scan or manual view logged here
 - `announcements` -- department scoped or org-wide (department_id = null)
 - `monitors` -- paired TV screens, department scoped
@@ -399,7 +425,7 @@ When a new org is created, seed these four departments automatically:
 - Process
 - HR
 
-HR department has additional features beyond standard departments (contacts, chat). All other departments are view-only for workers.
+HR department has additional features beyond standard departments (contacts, chat). All other departments are view-only for employees.
 
 **How seeding runs.** In the Server Action that creates a new `companies` row (fired on first sign-up of an admin). **Not** a Postgres trigger — the Server Action is visible in code, testable, and runs inside the same transaction as the `company_members` insert. The four departments are inserted with `company_id` set to the new company's id, and the seed is idempotent (safe to re-run against an existing company via `ON CONFLICT DO NOTHING`).
 
@@ -407,13 +433,25 @@ HR department has additional features beyond standard departments (contacts, cha
 
 ## User Roles and What They Can Do
 
-| Role | Key Permissions |
-|---|---|
-| Admin | Everything -- billing, settings, all managers, all departments |
-| Manager | Create/publish SOPs, manage glossary, invite workers, post announcements, pair monitors |
-| Worker | View SOPs (their departments), scan QR codes, view announcements, HR chat only |
+There are **four** roles. Three are org-scoped (`admin`, `manager`, `employee`) and live in `company_members`. The fourth is cross-tenant (`super_admin`) and lives in the separate `super_admins` table — a super admin is not a "member" of any one company.
 
-Role is stored in the `company_members` table in Supabase (`role` column). Check role on every API route by looking up the `company_members` row for the current Clerk `userId` -- never trust client-side role claims. Clerk is used for identity only.
+| Role | Scope | Key Permissions |
+|---|---|---|
+| Super Admin | Cross-tenant (god mode) | Sees and acts on every company's data. Used for owner-level support, audits, cross-tenant analytics. |
+| Admin | Org | Billing, settings, all managers, all departments, view every submission in the org |
+| Manager | Org | SOPs, employees (invite/manage), announcements, monitors, submissions board — scoped to their own department, plus org-wide safety and quality alerts |
+| Employee | Org | View SOPs (their departments), scan QR codes, view announcements, HR chat, submit reports |
+
+**Submissions capability matrix** (Phase 2 feature, but the model is future-ready):
+
+| Role | Can submit? | Can view / respond? |
+|---|---|---|
+| Super Admin | — | Everything across every tenant |
+| Admin | — | Every submission in their own company |
+| Manager | — | Their department's submissions + org-wide safety and quality alerts |
+| Employee | ✅ | Their own submissions only |
+
+Org-scoped role is stored in `company_members.role`. Super admin status is stored in `super_admins` (keyed by `clerk_user_id`) and resolved at query time via the `is_super_admin()` SQL helper. Check role on every Server Action / API route by looking up the relevant row for the current Clerk `userId` — never trust client-side role claims. Clerk is used for identity only.
 
 ---
 
@@ -446,7 +484,7 @@ import 'server-only';
 import { auth } from '@clerk/nextjs/server';
 import { getRequestClient } from '@/lib/supabase/server';
 
-export type Role = 'admin' | 'manager' | 'worker';
+export type Role = 'admin' | 'manager' | 'employee';
 
 export class AuthError extends Error {
   constructor(public code: 'UNAUTHENTICATED' | 'NO_COMPANY' | 'FORBIDDEN') {
@@ -454,7 +492,7 @@ export class AuthError extends Error {
   }
 }
 
-export async function getCompanyContext(required?: Exclude<Role, 'worker'>) {
+export async function getCompanyContext(required?: Exclude<Role, 'employee'>) {
   const { userId } = await auth();
   if (!userId) throw new AuthError('UNAUTHENTICATED');
 
@@ -573,7 +611,7 @@ When calling Sonnet for SOP conversion, always:
 2. Ask for two outputs: (a) structured Markdown and (b) a JSON list of flagged site-specific terms
 3. Use a structured output format so the response can be reliably parsed
 
-**Why Sonnet and not Haiku:** This is the most critical step in the pipeline. Quality of the Markdown directly affects every translation and every worker experience. Sonnet produces better structured output, catches more nuanced site-specific terms, and the cost difference per SOP is negligible (pennies). Haiku is reserved for high-frequency lightweight tasks in Phase 2.
+**Why Sonnet and not Haiku:** This is the most critical step in the pipeline. Quality of the Markdown directly affects every translation and every employee experience. Sonnet produces better structured output, catches more nuanced site-specific terms, and the cost difference per SOP is negligible (pennies). Haiku is reserved for high-frequency lightweight tasks in Phase 2.
 
 **Never use Claude for translation.** Google Cloud Translation API with glossary injection is purpose-built for this, significantly cheaper, and produces consistent results.
 
@@ -728,7 +766,7 @@ Automated checks catch ~40% of issues — the rest require the manual OpsFluency
 2. Seed default departments on org creation
 3. Build SOP import pipeline (upload → Sonnet → flag → manager review → translate → publish)
 4. Build manager dashboard (SOP list, create, glossary)
-5. Build worker PWA (home, SOP viewer, QR scan)
+5. Build employee PWA (home, SOP viewer, QR scan)
 6. Build monitor pairing and display
 7. Build HR module (contacts, chat)
 8. QR print system

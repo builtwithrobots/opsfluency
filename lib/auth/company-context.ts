@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getRequestClient } from "@/lib/supabase/server";
 
-export type Role = "admin" | "manager" | "worker";
+export type Role = "admin" | "manager" | "employee";
 
 export type AuthErrorCode =
   | "UNAUTHENTICATED"
@@ -35,12 +35,16 @@ export interface CompanyContext {
  * - `FORBIDDEN` — session + company, but role is lower than `required`
  *
  * The `required` parameter enforces a minimum role for manager-only code.
- * `admin` always satisfies any `required` value; `worker` never satisfies
+ * `admin` always satisfies any `required` value; `employee` never satisfies
  * `manager`. For pages accessible to any authenticated company member,
  * call without `required`.
+ *
+ * Super admins are stored in the separate `super_admins` table and are
+ * resolved by `getSuperAdminContext()` (not yet implemented — add when the
+ * first super-admin-only route lands).
  */
 export async function getCompanyContext(
-  required?: Exclude<Role, "worker">,
+  required?: Exclude<Role, "employee">,
 ): Promise<CompanyContext> {
   const { userId } = await auth();
   if (!userId) throw new AuthError("UNAUTHENTICATED");
