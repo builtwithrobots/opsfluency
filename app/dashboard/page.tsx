@@ -1,43 +1,96 @@
-import { UserButton } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
+import { ArrowUpRight, Bell, FileText, ScanLine, Users } from "lucide-react";
 
-import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
+import { Button } from "@/components/ui/button";
+import { Heading, Subheading } from "@/components/ui/heading";
+import { Text } from "@/components/ui/text";
+import { getCompanyContext } from "@/lib/auth/company-context";
+
+import { DashboardStatCard } from "@/components/dashboard/stat-card";
+import { EmptyActivityCard } from "@/components/dashboard/empty-activity-card";
 
 export default async function DashboardPage() {
-  try {
-    await getCompanyContext();
-  } catch (e) {
-    if (e instanceof AuthError && e.code === "NO_COMPANY") redirect("/onboarding");
-    throw e;
-  }
+  const { supabase, company_id, role } = await getCompanyContext();
+
+  // Only company_members is live in the schema right now. Other counts will
+  // light up as their tables land — see supabase/migrations/.
+  const { count: memberCount } = await supabase
+    .from("company_members")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", company_id);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-dc-edge">
-        <span
-          className="font-bold text-xl tracking-tight"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          OpsFluency
-        </span>
-        <UserButton />
+    <div className="flex flex-col gap-10">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
+            Overview
+          </p>
+          <Heading className="font-display mt-2">Command center</Heading>
+          <Text className="mt-2 max-w-2xl">
+            Everything running on the floor, in one place. Publish SOPs, invite
+            teammates, post announcements, and pair monitor screens — the full
+            {" "}OpsFluency stack lights up as each module lands.
+          </Text>
+        </div>
+        {role !== "employee" && (
+          <div className="flex gap-2">
+            <Button href="/dashboard/import" color="brand">
+              <FileText data-slot="icon" />
+              New SOP
+            </Button>
+            <Button href="/dashboard/employees" outline>
+              <Users data-slot="icon" />
+              Invite teammate
+            </Button>
+          </div>
+        )}
       </header>
-      <main
-        id="main"
-        className="flex-1 flex flex-col items-center justify-center px-6 py-24 gap-4 text-center"
-      >
-        <h1
-          className="text-3xl md:text-4xl font-bold tracking-tight"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Manager dashboard
-        </h1>
-        <p className="max-w-xl text-dc-text-2">
-          The SOP import pipeline, glossary manager, employee invitations,
-          announcements, monitors, and analytics will live here. We&apos;re
-          scaffolding the foundation first.
-        </p>
-      </main>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <DashboardStatCard
+          label="Published SOPs"
+          value="—"
+          icon={FileText}
+          accent="brand"
+          delay={0}
+        />
+        <DashboardStatCard
+          label="Team members"
+          value={memberCount ?? 0}
+          icon={Users}
+          accent="signal-info"
+          delay={0.05}
+        />
+        <DashboardStatCard
+          label="QR scans (7d)"
+          value="—"
+          icon={ScanLine}
+          accent="signal-live"
+          delay={0.1}
+        />
+        <DashboardStatCard
+          label="Pending approvals"
+          value="—"
+          icon={Bell}
+          accent="signal-warn"
+          delay={0.15}
+        />
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <Subheading>Recent activity</Subheading>
+            <Text className="mt-1">SOPs, scans, and announcements will appear here as modules land.</Text>
+          </div>
+          <Button plain href="/dashboard/sops">
+            View SOPs
+            <ArrowUpRight data-slot="icon" />
+          </Button>
+        </div>
+
+        <EmptyActivityCard />
+      </section>
     </div>
   );
 }
