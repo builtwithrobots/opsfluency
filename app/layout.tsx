@@ -1,40 +1,32 @@
+import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ui } from "@clerk/ui";
-import type { Appearance } from "@clerk/ui";
+import { Chakra_Petch, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Script from "next/script";
-import localFont from "next/font/local";
-import { templateMetadata } from "./_template/content/metadata";
 
-export const metadata = templateMetadata;
+export const metadata: Metadata = {
+  title: "OpsFluency — Frontline Knowledge for Multilingual Teams",
+  description:
+    "Bilingual SOP publishing, QR-triggered learning, and departmental communication for warehouse and manufacturing facilities.",
+};
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
+const chakraPetch = Chakra_Petch({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
 });
 
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
 });
 
-/**
- * This object can be customized to change Clerk's built-in appearance. To learn more: https://clerk.com/docs/customization/overview
- */
-const clerkAppearanceObject = {
-  cssLayerName: "clerk",
-  variables: { colorPrimary: "#000000" },
-  elements: {
-    socialButtonsBlockButton:
-      "bg-white border-gray-200 hover:bg-transparent hover:border-black text-gray-600 hover:text-black",
-    socialButtonsBlockButtonText: "font-semibold",
-    formButtonReset:
-      "bg-white border border-solid border-gray-200 hover:bg-transparent hover:border-black text-gray-500 hover:text-black",
-    membersPageInviteButton:
-      "bg-black border border-black border-solid hover:bg-white hover:text-black",
-    card: "bg-[#fafafa]",
-  },
-} satisfies Appearance;
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export default function RootLayout({
   children,
@@ -42,15 +34,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <ClerkProvider ui={ui} appearance={clerkAppearanceObject}>
-        <body className={`min-h-screen flex flex-col antialiased`}>
+    <html
+      lang="en"
+      className={`${chakraPetch.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+    >
+      <ClerkProvider>
+        <body className="min-h-screen flex flex-col antialiased bg-dc-bg text-dc-text">
+          <a href="#main" className="skip-link">
+            Skip to main content
+          </a>
           {children}
         </body>
       </ClerkProvider>
-
-      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-core.min.js" />
-      <Script src="https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js" />
     </html>
   );
 }

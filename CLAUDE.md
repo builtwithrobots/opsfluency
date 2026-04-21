@@ -49,6 +49,20 @@ After a command fails, fix the underlying issue before moving on. Do not suppres
 
 ---
 
+## Skills
+
+Project-specific skills live in `.claude/skills/` and auto-trigger by description. When a skill and this file disagree, **`CLAUDE.md` is the spec and wins** — drift in a skill is a bug to fix in the skill.
+
+| Skill | When it triggers | What it owns |
+|---|---|---|
+| `opsfluency-sop-pipeline` | Any code touching `sops`, `sop_versions`, `glossary_terms`, `qr_codes`, or the import → convert → flag → translate → publish flow | Pipeline order, glossary hard gate, Sonnet prompt rules, version management |
+| `opsfluency-accessibility` | Any user-facing UI (worker PWA, manager dashboard, TV monitor) | OpsFluency-specific a11y on top of WCAG 2.1 AA — glove taps, warehouse lighting, TV distance, bilingual `lang` |
+| `opsfluency-bilingual-content` | Any code rendering user strings or user-generated text, or gating by `workers.preferred_language` | System strings vs user-generated content, `content_en` / `content_es` columns, language toggle |
+
+General-purpose skills (`frontend-design`, `react-best-practices`, `nextjs-skills`, `composition-patterns`, `planning-with-files`, `docx`, `pdf`) are available but optional. They carry no OpsFluency-specific rules.
+
+---
+
 ## Project Structure
 
 ```
@@ -109,6 +123,15 @@ Next 16 renamed `middleware.ts` to `proxy.ts`. The file wires `clerkMiddleware()
 - `/pair-monitor` — one-time manager pairing flow that issues the monitor token
 - `/s/[qr_code_id]` — QR scan landing page; redirects to `/app/sop/[id]` and triggers worker sign-in if no session exists
 
+**Monitor auth.** A manager pairs a TV via `/pair-monitor` (manager-authenticated). The Server Action inserts a `monitors` row, then sets a signed, HttpOnly, SameSite=Lax cookie `opsf_monitor` on the TV's browser that contains `{ monitor_id, company_id, iat }` signed with `MONITOR_COOKIE_SECRET`. The cookie has no expiration (monitors run for months). `/monitor/[id]` reads and verifies the cookie server-side, rejects on signature mismatch or `monitor_id` mismatch, and loads content scoped to `company_id`. Rotate the secret by invalidating all monitor sessions and re-pairing — document this as the unpair flow, not an automatic rotation.
+
+**QR scan auth.** `/s/[qr_code_id]` is public and stateless. It looks up `qr_codes.id`, resolves the current `published` SOP, and:
+- If the SOP is `archived` → return HTTP 410 with a friendly "no longer available" page.
+- If the worker has a Clerk session → redirect to `/app/sop/[sop_id]`.
+- If no session → redirect to `/sign-in?redirect_url=/app/sop/[sop_id]` so Clerk lands them on the right SOP after magic-link auth.
+
+The scan itself is logged asynchronously via `POST /api/sops/:id/scans` — this is the one `/api` route that must accept unauthenticated calls, rate-limited by IP + `qr_code_id`.
+
 ---
 
 ## Key Architectural Decisions
@@ -156,7 +179,7 @@ export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = await getRequestClient(userId);
+  const supabase = await getRequestClient();
 
   // Look up which company this user belongs to and what role they have
   const { data: member } = await supabase
@@ -185,7 +208,7 @@ export async function GET(request: Request) {
 
 Three clients, one purpose each. The import path tells you where each is safe to use.
 
-- **`lib/supabase/server.ts`** — request-scoped authenticated client. Exports `getRequestClient(clerkUserId)` which returns a Supabase client whose Postgres session has `request.clerk_user_id` set, so RLS policies can resolve the caller's company. Use this in every API route, Server Action, and Server Component. Operates as the `authenticated` role — **RLS is enforced**.
+- **`lib/supabase/server.ts`** — request-scoped authenticated client. Exports `getRequestClient()` which returns a Supabase client that forwards the Clerk-issued JWT as the Bearer token. Supabase validates the token (Clerk is configured as a third-party auth provider in the Supabase dashboard) and RLS policies read the caller's identity from `auth.jwt() ->> 'sub'`. Use this in every API route, Server Action, and Server Component. Operates as the `authenticated` role — **RLS is enforced**.
 - **`lib/supabase/admin.ts`** — service-role client. Bypasses RLS. Server-only. Reserved for: migrations, the default-department seed on company creation, cron jobs, and cross-tenant analytics. Every import site must have a comment justifying why RLS bypass is required.
 - **`lib/supabase/browser.ts`** — anon client for `"use client"` components. No elevated permissions. RLS-enforced via the anon role.
 
@@ -202,12 +225,14 @@ Hard rules:
 Pattern:
 
 ```sql
--- Session var is set per request by getRequestClient() via `SET LOCAL`
+-- Clerk issues a JWT per session. Supabase trusts Clerk as a third-party
+-- auth provider and validates it as the Bearer token. The `sub` claim is
+-- the Clerk user id.
 CREATE OR REPLACE FUNCTION requesting_company_id() RETURNS uuid
 LANGUAGE sql STABLE AS $$
   SELECT cm.company_id
   FROM company_members cm
-  WHERE cm.clerk_user_id = current_setting('request.clerk_user_id', true)
+  WHERE cm.clerk_user_id = auth.jwt() ->> 'sub'
   LIMIT 1;
 $$;
 
@@ -230,7 +255,7 @@ Rules:
 
 Default shape for every piece of session-authed server code:
 
-- **Reads** — Server Components call Supabase directly via `getRequestClient(userId)`. No API round-trip for data the UI renders.
+- **Reads** — Server Components call Supabase directly via `getRequestClient()`. No API round-trip for data the UI renders.
 - **Mutations** — Server Actions (`"use server"`), not API routes. Zod-validate the input at the top, run the write, call `revalidatePath` / `revalidateTag` before returning.
 - **`/api` routes** — reserved for callers that don't have a Clerk session or can't invoke a Server Action:
   - Webhooks (Clerk user events, and Stripe if billing lands later)
@@ -280,6 +305,8 @@ Rules:
 - `archived` is terminal. Restoring means creating a new SOP that references the old one, not flipping the status back.
 - English edits to a `published` SOP create a new `sop_versions` row and flip `sop_versions.needs_retranslation = true` on the previous Spanish — the `sops.status` stays `published` throughout.
 
+**`needs_retranslation` flag.** `sop_versions.needs_retranslation BOOLEAN NOT NULL DEFAULT FALSE`. Set to `true` when the English side is edited; cleared only when a manager approves the re-translated Spanish. Workers continue seeing the last approved Spanish until the flag clears — never show a stale-flagged version in a way that suggests it's fresh, but also never hide it (partial content is worse than slightly-stale content).
+
 ### Translate-on-Publish, Not on Demand
 Translation runs once at publish time, not on every worker page load. Both English and Spanish Markdown are stored in `sop_versions`. Workers get pre-translated content instantly.
 
@@ -310,6 +337,19 @@ Use a cache-first strategy for SOP content, network-first for announcements.
 
 ### QR Codes are Permanent
 A QR code URL never changes after generation. It always points to the current active version of the SOP. If an SOP is updated, the QR code still works -- it just serves the new content. QR codes only break on archive (return a user-friendly "no longer available" page).
+
+**QR URL shape:** `${NEXT_PUBLIC_APP_URL}/s/<qr_code_id>`, where `qr_code_id` is `qr_codes.id` (UUID), permanent, and **never** the `sop_id`. The `/s/[qr_code_id]` route is public: it looks up the QR row, resolves the current `published` SOP, and redirects to `/app/sop/[id]`. If the SOP is `archived` the route returns HTTP 410 with a friendly "this procedure is no longer available — ask your manager" page (not a 404). If the worker has no Clerk session, redirect through sign-in while preserving the intended SOP id so the post-login redirect lands them on the content.
+
+### Supabase Storage buckets
+
+Two buckets, named explicitly so nothing tries to improvise:
+
+| Bucket | Access | Contents | Signed URL TTL |
+|---|---|---|---|
+| `sop-uploads` | Private | Original PDF/DOCX/TXT files from managers, path `${company_id}/${sop_id}/${filename}` | 1 hour, regenerated per manager review session |
+| `company-logos` | Public | Logos used in QR print headers and dashboard chrome | N/A (public read) |
+
+Never store SOP uploads in a public bucket, even in dev. Never sign a URL with a TTL longer than an hour without explicit approval.
 
 ### Monitor System
 Follows the DockClarity pairing pattern exactly. Monitors are TV screens that pair via QR code and run fullscreen in a browser. They auto-refresh and require no user interaction after pairing. MVP monitor content is placeholder -- the infrastructure is built first, content modules slot in during Phase 2.
@@ -360,6 +400,8 @@ When a new org is created, seed these four departments automatically:
 - HR
 
 HR department has additional features beyond standard departments (contacts, chat). All other departments are view-only for workers.
+
+**How seeding runs.** In the Server Action that creates a new `companies` row (fired on first sign-up of an admin). **Not** a Postgres trigger — the Server Action is visible in code, testable, and runs inside the same transaction as the `company_members` insert. The four departments are inserted with `company_id` set to the new company's id, and the seed is idempotent (safe to re-run against an existing company via `ON CONFLICT DO NOTHING`).
 
 ---
 
@@ -416,7 +458,7 @@ export async function getCompanyContext(required?: Exclude<Role, 'worker'>) {
   const { userId } = await auth();
   if (!userId) throw new AuthError('UNAUTHENTICATED');
 
-  const supabase = await getRequestClient(userId);
+  const supabase = await getRequestClient();
   const { data: member } = await supabase
     .from('company_members')
     .select('company_id, role')
@@ -535,37 +577,15 @@ When calling Sonnet for SOP conversion, always:
 
 **Never use Claude for translation.** Google Cloud Translation API with glossary injection is purpose-built for this, significantly cheaper, and produces consistent results.
 
-```typescript
-const systemPrompt = `
-You are an expert technical writer converting workplace SOPs to structured Markdown.
+**System prompt contract** (owned by `lib/ai/sonnet.ts` — callers never rebuild this inline):
 
-COMPANY GLOSSARY (these terms are already defined -- use them exactly as specified):
-${glossary.map(t => `- "${t.term_en}": ${t.definition_en}`).join('\n')}
+- Role: expert technical writer converting workplace SOPs to structured Markdown.
+- Inject the full `glossary_terms` rows for the `company_id` as "already defined — use exactly as specified."
+- Instructions: convert the document to clean Markdown (no HTML), preserving structure and warnings; flag any term that is site-specific, a proper noun, or would translate incorrectly via generic AI.
+- Output shape, JSON only, no preamble: `{ "markdown": "...", "flagged_terms": [{ "term", "context", "reason", "suggested_definition_en", "suggested_term_es" }] }`.
+- Model: `claude-sonnet-4-6`. `max_tokens: 4096`. Never Haiku for this step.
 
-Your task:
-1. Convert the provided document to clean, structured Markdown following SOP best practices
-2. Flag any terms that appear to be site-specific, company-specific, or would translate
-   incorrectly using generic AI translation
-
-Return a JSON object with exactly this shape:
-{
-  "markdown": "...the full converted markdown...",
-  "flagged_terms": [
-    { "term": "...", "context": "...", "reason": "..." }
-  ]
-}
-
-Return only the JSON object. No preamble or explanation.
-`;
-
-// Use Sonnet -- not Haiku -- for this call
-const response = await anthropic.messages.create({
-  model: 'claude-sonnet-4-5',
-  max_tokens: 4096,
-  system: systemPrompt,
-  messages: [{ role: 'user', content: documentText }]
-});
-```
+The prompt lives as a constant inside `lib/ai/sonnet.ts`; test it by snapshotting the rendered prompt for a fixture document + fixture glossary.
 
 ### AI call conventions (every Sonnet and Google Translate call)
 
@@ -626,6 +646,9 @@ GOOGLE_CLOUD_TRANSLATION_API_KEY=
 
 # App
 NEXT_PUBLIC_APP_URL=
+
+# Monitor pairing cookie signer (any 32+ char random string)
+MONITOR_COOKIE_SECRET=
 ```
 
 ---
@@ -652,7 +675,7 @@ These are Phase 2. Scope creep kills MVPs.
 
 ## Accessibility Requirements
 
-All UI must meet WCAG 2.1 AA from the start. This is non-negotiable.
+All UI must meet WCAG 2.1 AA from the start. This is non-negotiable. Warehouse-specific rules (glove-friendly taps, lighting, TV distance, bilingual `lang`) live in the `opsfluency-accessibility` skill.
 
 - Minimum 44px touch targets on mobile
 - Minimum 4.5:1 color contrast ratio for normal text
@@ -662,14 +685,37 @@ All UI must meet WCAG 2.1 AA from the start. This is non-negotiable.
 - Focus indicators visible on all focusable elements
 - No reliance on color alone to convey information
 
+**Verification commands** (run before marking any UI task complete):
+
+| Command | Purpose |
+|---|---|
+| `npx @axe-core/cli <preview-url>` | Automated a11y audit against a deployed route. Fail the task on any violation tagged `wcag2a` or `wcag2aa`. |
+| `npx lighthouse <preview-url> --only-categories=accessibility --quiet` | Lighthouse a11y score; target ≥ 95. |
+
+Automated checks catch ~40% of issues — the rest require the manual OpsFluency checks documented in the `opsfluency-accessibility` skill.
+
 ---
 
 ## Development Workflow
 
-- All changes go through GitHub via a PR on a `claude/*` branch.
-- Vercel auto-deploys on push to main; preview deployments build on every branch.
+**Branching and PRs**
+
+- One branch per task, named `claude/<task-slug>` (e.g. `claude/sop-import-pipeline`).
+- Every change lands via a GitHub PR opened as **draft**. Ready-for-review only once typecheck + lint pass and the preview URL works.
+- Commit messages follow **Conventional Commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `test:`. Keep subjects ≤72 chars and write the why, not the what.
+- Squash-merge to `main`. Delete the branch on merge.
+- Never force-push to `main`. Never skip hooks (`--no-verify`) without explicit approval.
+
+**Deploy and verify**
+
+- Vercel auto-deploys `main` to production and every branch to a preview URL.
 - Primary dev surface is the Vercel preview URL on the PR. Local `npm run dev` is supported but rarely needed in Claude Code sessions.
-- Before marking a task complete, run the relevant commands from `## Commands` (at minimum `npx tsc --noEmit` after any TypeScript change) and verify the preview URL if the change is user-facing.
+- Before marking a task complete, run the relevant commands from `## Commands` (at minimum `npx tsc --noEmit` after any TypeScript change) and verify the preview URL if the change is user-facing. For UI changes, also run the two accessibility commands above.
+
+**Lint and format**
+
+- Linting is `next lint` via `npm run lint` (ESLint with the Next.js config). No Prettier config yet — revisit once the first real UI lands and a style disagreement actually exists.
+- Do not introduce new lint rules mid-feature. If a rule needs to change, do it in its own `chore: update lint config` PR so diffs stay readable.
 
 ---
 

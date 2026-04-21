@@ -1,6 +1,6 @@
 ---
 name: opsfluency-bilingual-content
-description: Rules for handling bilingual English and Spanish content throughout OpsFluency. Use whenever writing or reviewing code that displays user-facing text, translates manager announcements, renders SOP content in a worker's preferred language, handles the language toggle, stores content in content_en and content_es columns, or determines which language to show based on the workers.preferred_language setting. Covers both the app's UI strings and user-generated content like announcements and HR contacts.
+description: OpsFluency English/Spanish content rules. Use for any code rendering user strings or user-generated text, managing content_en / content_es columns, handling the language toggle, or gating by workers.preferred_language. Covers both system strings and user-generated content.
 ---
 
 # OpsFluency Bilingual Content

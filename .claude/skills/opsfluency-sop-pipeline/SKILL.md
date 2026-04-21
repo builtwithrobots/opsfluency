@@ -1,6 +1,6 @@
 ---
 name: opsfluency-sop-pipeline
-description: The SOP import, conversion, glossary flagging, translation, and publishing pipeline for OpsFluency. Use whenever writing, reviewing, or modifying any code that handles SOP file uploads, AI conversion to Markdown, glossary term flagging, Spanish translation, SOP version management, or the publish and QR code generation flow. Also use for anything involving the SOP lifecycle states (draft, active, expired, archived) or the sops, sop_versions, glossary_terms, or qr_codes Supabase tables.
+description: OpsFluency SOP pipeline — upload, Sonnet conversion, glossary flagging, Google translation, publish, QR. Use for code touching sops, sop_versions, glossary_terms, qr_codes, or the status lifecycle (draft, pending_terms, pending_translation, pending_approval, published, archived).
 ---
 
 # OpsFluency SOP Pipeline
@@ -11,17 +11,19 @@ The pipeline is the heart of OpsFluency. Every rule below exists to protect tran
 
 ## The Non-Negotiable Pipeline Order
 
-SOPs move through these stages in this exact order. No stage can start until the previous stage is complete. This is a state machine, not a suggestion.
+SOPs move through these stages in this exact order, mirrored by the `sops.status` lifecycle documented in `CLAUDE.md`. No stage can start until the previous stage is complete. This is a state machine, not a suggestion.
 
-1. Upload (PDF, DOCX, or TXT file saved to Supabase Storage)
-2. AI conversion to structured Markdown (Claude Sonnet)
-3. Glossary term flagging (Claude Sonnet identifies site-specific terms AND suggests definitions and Spanish translations for each)
-4. Manager accepts, edits, or overrides every flagged term (HARD GATE, see below)
-5. Manager reviews and optionally edits the Markdown
-6. Manager selects the content template for this SOP (step-by-step, reference, safety checklist, or onboarding)
-7. System translates the SOP to Spanish using the company glossary (Google Cloud Translation)
-8. Manager approves the Spanish translation
-9. Publish (SOP becomes active, QR code generated)
+| # | Stage | `sops.status` after this stage |
+|---|---|---|
+| 1 | Upload (PDF, DOCX, or TXT saved to the private `sop-uploads` bucket) | `draft` |
+| 2 | Sonnet converts to structured Markdown with full company glossary as context | `draft` |
+| 3 | Sonnet flags site-specific terms with suggested EN definition + ES translation | `pending_terms` |
+| 4 | Manager accepts, edits, or overrides every flagged term (HARD GATE) | `pending_terms` → `pending_translation` once all terms resolved |
+| 5 | Manager reviews and optionally edits the Markdown | `pending_translation` |
+| 6 | Manager selects the content template (step-by-step, reference, safety-checklist, onboarding) | `pending_translation` |
+| 7 | Google Cloud Translation runs EN → ES with glossary injection | `pending_translation` → `pending_approval` |
+| 8 | Manager approves the Spanish draft | `pending_approval` → `published` |
+| 9 | Publish creates the `qr_codes` row (once per SOP, permanent URL) | `published` |
 
 If code is being written that lets a user skip a stage, that code is wrong. Ask the user before proceeding.
 
@@ -38,13 +40,13 @@ OpsFluency has two separate template concepts. Do not confuse them.
 
 Workers see a different layout per SOP based on the content template. A safety checklist must render with checkboxes and hazard callouts. A reference document must render with a table of contents and collapsible sections. Never force content into the wrong template type.
 
-**Brand template** is set once per organization and applies to every SOP that company publishes. It controls visual branding (logo, primary color, footer text). The detailed design of brand template fields and the signup flow are deferred until those screens are built. For now, assume the following exist on the `companies` table: `brand_primary_color`, `brand_logo_url`, `brand_footer_text`.
+**Brand template** is set once per organization and applies to every SOP that company publishes. It controls visual branding (logo, primary color, footer text). The detailed design of brand template fields and the signup flow are deferred until those screens are built. Use whatever brand columns exist on `companies` when the time comes (per `CLAUDE.md`: `name`, `phone`, `logo_url` today; more may be added).
 
 ## The Glossary Hard Gate
 
 This is the most important rule in this skill.
 
-Translation cannot begin until every flagged glossary term has been accepted, edited, or overridden by the manager. The database enforces this through the `translation_status` field on `sop_versions`, which must stay at `pending` until every flagged term in the SOP has a corresponding row in `glossary_terms` with non-null `definition_en` and non-null `term_es`.
+Translation cannot begin until every flagged glossary term has been accepted, edited, or overridden by the manager. The lifecycle enforces this: `sops.status` stays at `pending_terms` until every flagged term in the SOP has a corresponding row in `glossary_terms` with non-null `definition_en` and non-null `term_es`. The transition `pending_terms → pending_translation` happens inside a single Server Action transaction that checks the glossary-completeness condition and updates `sops.status` atomically.
 
 When implementing the UI for this:
 
@@ -67,6 +69,8 @@ This is the single feature that separates OpsFluency from generic translation to
 MVP supports exactly three formats: PDF, DOCX, and TXT. Do not add support for other formats without explicit user approval. Reject all other uploads with a clear error message that lists the supported formats.
 
 File size limit: 10MB. Files larger than this should be rejected with a friendly error suggesting the user compress or split the file. Revisit this limit after the first 10 customers.
+
+Centralize the supported formats and size limit in `lib/types/sop.ts` as exported constants — never hardcode them at call sites.
 
 ## Claude Sonnet Conversion Rules
 
@@ -108,65 +112,62 @@ Translation uses Google Cloud Translation API, not Claude. Google's translation 
 Every translation call must:
 
 - Include the full company glossary as translation overrides
-- Translate from English to Spanish (es) for MVP
+- Translate from English to Spanish (`es`) for MVP
 - Preserve all Markdown formatting (headings, lists, bold, links)
-- Set `translation_status` to `ready` when complete, not `approved`
+- On success, transition `sops.status` from `pending_translation` to `pending_approval` — never directly to `published`
 
 Manager approval is a separate step. Never auto-approve a translation.
 
 ## SOP Lifecycle State Rules
 
-The `status` field on the `sops` table has exactly four values:
+The `status` field on the `sops` table has exactly six values. This matches `CLAUDE.md` exactly — import the union type and enum from `lib/types/sop.ts`, never hardcode these strings.
 
 | Status | Meaning | Worker Visible |
 |---|---|---|
-| draft | Created but not published | No |
-| active | Published and current | Yes |
-| expired | Past expiration date | No |
-| archived | Manually retired | No |
+| `draft` | Created, not yet processed | No |
+| `pending_terms` | Sonnet flagged terms, awaiting manager definitions | No |
+| `pending_translation` | All terms defined, ready for Google Translate | No |
+| `pending_approval` | Spanish draft ready for manager sign-off | No |
+| `published` | Live, QR code serves this version | Yes |
+| `archived` | Manager-initiated retirement | No (QR returns 410) |
 
-State transitions allowed:
+Transitions allowed (one direction only, except the archive move):
 
-- draft -> active (publish)
-- active -> expired (automatic, when `expires_at` is past)
-- active -> archived (manual)
-- expired -> active (manager republishes)
-- archived -> active is NOT allowed (require creating a new SOP)
+- `draft → pending_terms` (Sonnet returns flagged terms)
+- `pending_terms → pending_translation` (every flagged term resolved in `glossary_terms`)
+- `pending_translation → pending_approval` (Google Translate returns)
+- `pending_approval → published` (manager approves)
+- `published → archived` (manager-initiated, terminal)
+
+`archived` is terminal. Restoration requires creating a new SOP that references the old one; never flip the status back. Every transition happens inside a Server Action that reads the current status in the same transaction and rejects any move not listed above.
 
 ## Version Management Rules
 
 Every publish creates a new row in `sop_versions`, never overwrites. The `version_number` increments by 1 per SOP.
 
-When a manager updates the English master of an active SOP:
+When a manager updates the English master of a `published` SOP:
 
 - Create a new `sop_versions` row with the updated `content_en`
-- Set `content_es` to null and `translation_status` to `pending`
-- Re-run the translation pipeline with the current glossary
-- The previous version remains in the database for history but is not shown to workers
-- Workers always see the version with the most recent `published_at` where `translation_status = 'approved'`
+- Flip `sop_versions.needs_retranslation = true` on the previous Spanish row
+- `sops.status` stays `published` throughout — workers keep seeing the last approved Spanish until re-approval clears the flag
+- Re-run the translation pipeline with the current glossary, then manager approves again
+- Clear `needs_retranslation` only when the manager approves the re-translation
+
+Workers always see the version with the most recent `published_at` where the row is approved (the approval state lives in `sop_versions` alongside `content_es`). Never hide a stale-flagged version while re-translation is pending — partial content is worse than slightly-stale content.
 
 ## QR Code Rules
 
-QR codes are generated once per SOP, never per version. The `qr_codes` table has one row per SOP. The QR URL points to a worker-facing route that looks up the current active version at scan time.
+QR codes are generated once per SOP at the `pending_approval → published` transition, never per version. The `qr_codes` table has one row per SOP, with `id` as the permanent public identifier.
 
-QR codes survive SOP updates and version bumps. They break only when the SOP is archived, at which point scanning shows a friendly "this procedure is no longer available" message rather than a 404.
-
-## Expiration Rules
-
-Optional per SOP, set at publish time via `expires_at`.
-
-- Dashboard shows a notification 14 days before expiration
-- Expired SOPs are hidden from worker-facing search and QR scan results
-- Managers can still view expired SOPs and republish them
-- Expiration is a background job, not a trigger on read
+QR URL shape (per `CLAUDE.md`): `${NEXT_PUBLIC_APP_URL}/s/<qr_codes.id>`. The `/s/[qr_code_id]` route looks up the QR row, resolves the current `published` SOP, and redirects to `/app/sop/[sop_id]`. Archived SOPs return HTTP 410 with a friendly "this procedure is no longer available" page (not a 404). QR codes survive version bumps — the worker always lands on the current approved content.
 
 ## Things to Always Do
 
-- Scope every query by `company_id` from the `company_members` table, not from Clerk
-- Use Supabase Row Level Security policies as a second line of defense
-- Log every AI call (Claude, Google Translation) with token counts for cost tracking
-- Show loading states during AI conversion (takes 10 to 30 seconds for typical SOPs)
-- Save uploaded files to Supabase Storage with org-scoped paths
+- Scope every query by `company_id` resolved from `company_members` via `getCompanyContext()` — never from Clerk orgs
+- Rely on RLS + `.eq('company_id', company_id)` as defense in depth (`CLAUDE.md` → "Row Level Security")
+- Log every Sonnet call by writing an `ai_call_log` row (`model`, `input_tokens`, `output_tokens`, `sop_id`, `company_id`, `duration_ms`) via `lib/ai/sonnet.ts`
+- Show loading states during AI conversion (10–30 seconds for typical SOPs)
+- Save uploads to the private `sop-uploads` bucket at path `${company_id}/${sop_id}/${filename}` with 1-hour signed URLs for manager review
 
 ## Things to Never Do
 
@@ -174,6 +175,7 @@ Optional per SOP, set at publish time via `expires_at`.
 - Never use Haiku for the conversion step (quality matters more than cost)
 - Never auto-approve a Spanish translation
 - Never let a worker see an unapproved translation
-- Never expose `sop_versions` rows directly to workers (filter through the `status = active` and `translation_status = approved` join)
-- Never hardcode the supported upload formats or file size limits in multiple places (centralize in `lib/sop/constants.ts`)
+- Never expose `sop_versions` rows directly to workers (filter through the `sops.status = 'published'` + approved-Spanish condition)
+- Never hardcode the supported upload formats or file size limits at a call site — centralize in `lib/types/sop.ts`
 - Never apply a content template to an SOP whose structure does not match it (do not force a safety checklist into a reference document layout)
+- Never call the Anthropic SDK directly — all Sonnet calls go through `lib/ai/sonnet.ts`, which owns timeout / retry / parse / log

@@ -1,6 +1,6 @@
 ---
 name: opsfluency-accessibility
-description: OpsFluency-specific accessibility rules on top of standard WCAG 2.1 AA. Use whenever building or reviewing any user-facing component, page, form, or display in the OpsFluency worker PWA, manager dashboard, or TV monitor views. Covers touch targets, typography, color contrast, keyboard navigation, screen reader support, warehouse lighting and glove-friendly design, distance readability for TV monitors, language attributes for bilingual content, and reduced motion support. Enforces the non-negotiable accessibility requirements from the PRD.
+description: OpsFluency accessibility on top of WCAG 2.1 AA. Use when building or reviewing any worker PWA, manager dashboard, or TV monitor UI — glove-friendly taps, warehouse lighting, TV distance, bilingual lang attributes, reduced motion.
 ---
 
 # OpsFluency Accessibility
