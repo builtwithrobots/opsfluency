@@ -4,13 +4,19 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { AuthBridgeError } from "@/components/dashboard/auth-bridge-error";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
+import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   let ctx;
   try {
     ctx = await getCompanyContext();
   } catch (e) {
-    if (e instanceof AuthError && e.code === "NO_COMPANY") redirect("/onboarding");
+    if (e instanceof AuthError && e.code === "NO_COMPANY") {
+      // Super admins have no company_members row by design — route them
+      // to god-mode instead of the first-admin onboarding form.
+      if (await isCurrentUserSuperAdmin()) redirect("/super-admin");
+      redirect("/onboarding");
+    }
     if (e instanceof AuthError && e.code === "UNAUTHENTICATED") redirect("/sign-in");
     if (e instanceof AuthError && e.code === "AUTH_BRIDGE_FAILED") {
       return <AuthBridgeError detail={e.detail} />;

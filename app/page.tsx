@@ -6,13 +6,20 @@ import { getRequestClient } from "@/lib/supabase/server";
 type Cta =
   | { kind: "signedOut" }
   | { kind: "needsOnboarding" }
-  | { kind: "signedIn" };
+  | { kind: "signedIn" }
+  | { kind: "superAdmin" };
 
 async function resolveCta(): Promise<Cta> {
   const { userId } = await auth();
   if (!userId) return { kind: "signedOut" };
 
   const supabase = await getRequestClient();
+
+  // Super admins aren't members of any company, so they'd otherwise fall
+  // through to the "finish setup" CTA. Check the allowlist first.
+  const { data: isSuper } = await supabase.rpc("is_super_admin");
+  if (isSuper) return { kind: "superAdmin" };
+
   const { data: member } = await supabase
     .from("company_members")
     .select("company_id")
@@ -49,7 +56,14 @@ export default async function Home() {
           departmental communication — one system.
         </p>
         <div className="flex items-center gap-3 pt-4">
-          {cta.kind === "signedIn" ? (
+          {cta.kind === "superAdmin" ? (
+            <Link
+              href="/super-admin"
+              className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
+            >
+              Open super admin
+            </Link>
+          ) : cta.kind === "signedIn" ? (
             <Link
               href="/dashboard"
               className="px-6 py-3 rounded-md bg-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] transition-colors"
