@@ -1,35 +1,154 @@
+/**
+ * OpsFluency Global Styles
+ * Version: 1.0.0
+ * Design System: Steel & Signal
+ * Industrial precision meets frontline fluency.
+ */
+
 @layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 
+/* Class-based dark mode - toggles when .dark is on <html> */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── STATIC DESIGN TOKENS ─────────────────────────────────────────────────
+   Fonts + brand + status signals are fixed across light/dark modes.
+   Theme-adaptive surface/text/border tokens live in @layer base below.
+   ──────────────────────────────────────────────────────────────────────── */
 @theme {
+  /* Fonts — loaded by next/font/google in layout.tsx
+     The variable names (--font-display, --font-sans, --font-mono) are set
+     directly by next/font/google on <html>. The fallback values here ensure
+     text renders even before the font classes are applied. */
+  --font-display: "Chakra Petch", sans-serif;
+  --font-sans:    "Inter", sans-serif;
+  --font-mono:    "JetBrains Mono", monospace;
+
+  /* Brand — teal anchor (OpsFluency) */
+  --color-brand:       #14B8A6;
+  --color-brand-hover: #0D9488;
+  --color-brand-dim:   #0F766E;
+  --color-brand-50:    #F0FDFA;
+
+  /* Status signals — high contrast, used across all views */
+  --color-signal-live:    #06B6D4;   /* cyan   — active / in-progress */
+  --color-signal-ok:      #10B981;   /* emerald — complete / success  */
+  --color-signal-good:    #10B981;   /* alias for signal-ok           */
+  --color-signal-warn:    #F59E0B;   /* amber  — waiting / hold       */
+  --color-signal-urgent:  #EF4444;   /* red    — no-show / error      */
+  --color-signal-bad:     #EF4444;   /* alias for signal-urgent       */
+  --color-signal-info:    #3B82F6;   /* blue   — scheduled / info     */
+  --color-signal-neutral: #6B7280;   /* gray   — cancelled / inactive */
+  --color-signal-hub:     #A855F7;   /* purple — intelligence hubs    */
+
+  /* Theme-adaptive surface tokens — values defined in @layer base */
+  --color-dc-bg:      var(--dc-bg);
+  --color-dc-surface: var(--dc-surface);
+  --color-dc-raised:  var(--dc-raised);
+  --color-dc-overlay: var(--dc-overlay);
+  --color-dc-text:    var(--dc-text);
+  --color-dc-text-2:  var(--dc-text-2);
+  --color-dc-text-3:  var(--dc-text-3);
+  --color-dc-edge:    var(--dc-edge);
+  --color-dc-edge-2:  var(--dc-edge-2);
+
+  /* Legacy tokens — kept for Clerk appearance + existing components */
   --color-primary-600: #6c47ff;
   --color-primary-700: #5639cc;
-  --color-primary-50: #f4f2ff;
+  --color-primary-50:  #f4f2ff;
   --color-success-700: #027a48;
-  --color-success-50: #ecfdf3;
-
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-success-50:  #ecfdf3;
 }
 
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
+/* ── THEME-ADAPTIVE TOKENS ────────────────────────────────────────────────
+   Light: clean steel white. Dark: deep control-room slate.
+   All components using dc-* utilities adapt automatically — no dark: prefix
+   needed for surface/text/border values.
+   ──────────────────────────────────────────────────────────────────────── */
 @layer base {
+  :root {
+    --dc-bg:      #F0F2F5;
+    --dc-surface: #FFFFFF;
+    --dc-raised:  #F9FAFB;
+    --dc-overlay: #F3F4F6;
+    --dc-text:    #0F1117;
+    --dc-text-2:  #4B5563;
+    --dc-text-3:  #9CA3AF;
+    --dc-edge:    #E5E7EB;
+    --dc-edge-2:  #D1D5DB;
+  }
+
+  .dark {
+    --dc-bg:      #0C0E14;
+    --dc-surface: #141720;
+    --dc-raised:  #1C2030;
+    --dc-overlay: #232840;
+    --dc-text:    #F0F4FC;
+    --dc-text-2:  #8B9ABF;
+    --dc-text-3:  #4A5068;
+    --dc-edge:    #252A3A;
+    --dc-edge-2:  #363D54;
+  }
+
+  /* Tailwind v4 border-color compatibility */
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--dc-edge, var(--color-gray-200, currentcolor));
+  }
+
+  /* Skip link — WCAG 2.1 AA, first focusable element on every page */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .skip-link:focus {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    width: auto;
+    height: auto;
+    padding: 0.5rem 1.25rem;
+    background: var(--color-brand);
+    color: #0C0E14;
+    font-weight: 700;
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    z-index: 9999;
+    outline: 2px solid #0C0E14;
+    outline-offset: 2px;
+  }
+
+  /* Respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
+/* ── FOCUS RINGS — WCAG 2.1 AA ───────────────────────────────────────────
+   All interactive elements get a visible teal focus ring.
+   ──────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+/* ── BACKGROUND GRID (marketing / public pages) ────────────────────────── */
 .background {
   overflow: hidden;
   background: #f8f8f8;
@@ -57,4 +176,116 @@
     rgba(0, 0, 0, 1) calc(100% - 20px),
     rgba(0, 0, 0, 0) 100%
   );
+}
+
+/* ── ANIMATIONS ───────────────────────────────────────────────────────────
+   All declared but only run when prefers-reduced-motion allows.
+   ──────────────────────────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  14%       { transform: scale(1.4); opacity: 1;   }
+  28%       { transform: scale(1);   opacity: 0.8; }
+  42%       { transform: scale(1.2); opacity: 1;   }
+  56%       { transform: scale(1);   opacity: 0.7; }
+}
+
+@keyframes signalPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4); }
+  50%       { box-shadow: 0 0 0 5px rgba(6, 182, 212, 0); }
+}
+
+@keyframes brandGlow {
+  0%, 100% { box-shadow: 0 0 16px rgba(20, 184, 166, 0.08); }
+  50%       { box-shadow: 0 0 32px rgba(20, 184, 166, 0.22); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scanLine {
+  0%   { top: 0; opacity: 0; }
+  3%   { opacity: 0.8; }
+  50%  { top: calc(100% - 2px); opacity: 0.8; }
+  53%  { opacity: 0; }
+  54%  { top: calc(100% - 2px); opacity: 0; }
+  57%  { opacity: 0.8; }
+  97%  { top: 0; opacity: 0.8; }
+  100% { top: 0; opacity: 0; }
+}
+
+@keyframes scanCapture {
+  0%   { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
+@keyframes scanGlimmer {
+  0%, 35%, 100% { opacity: 0; transform: scale(0.5); }
+  55%, 70%      { opacity: 1; transform: scale(1); }
+}
+
+@keyframes scanRipple {
+  0%   { transform: scale(0.35); opacity: 0.9; }
+  100% { transform: scale(3);    opacity: 0; }
+}
+
+@keyframes captureCheck {
+  0%   { transform: scale(0) rotate(-8deg); opacity: 0; }
+  58%  { transform: scale(1.2) rotate(4deg); opacity: 1; }
+  78%  { transform: scale(0.92) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes cornerLock {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.8); }
+  62%  { transform: scale(1.07); }
+  100% { transform: scale(1); }
+}
+
+@keyframes calmPulse {
+  0%, 100% { opacity: 1;    }
+  50%      { opacity: 0.65; }
+}
+
+.animate-heartbeat    { animation: heartbeat 2s ease-in-out infinite; }
+.animate-signal-pulse { animation: signalPulse 2s ease-in-out infinite; }
+.animate-brand-glow   { animation: brandGlow 3s ease-in-out infinite; }
+.animate-fade-in      { animation: fadeIn 180ms ease-out both; }
+.animate-calm-pulse   { animation: calmPulse 3.2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-calm-pulse { animation: none; }
+}
+
+/* ── RADIX ACCORDION ─────────────────────────────────────────────────────
+   Smooth open/close for FAQ accordion items.
+   ──────────────────────────────────────────────────────────────────────── */
+@keyframes accordionSlideDown {
+  from { height: 0; opacity: 0; }
+  to   { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+
+@keyframes accordionSlideUp {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to   { height: 0; opacity: 0; }
+}
+
+[data-state="open"] > [data-radix-accordion-content] {
+  animation: accordionSlideDown 200ms ease-out;
+}
+
+[data-state="closed"] > [data-radix-accordion-content] {
+  animation: accordionSlideUp 200ms ease-out;
 }
