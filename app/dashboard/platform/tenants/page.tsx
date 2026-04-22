@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { startImpersonation } from "@/app/dashboard/_actions/impersonation";
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { AuthError } from "@/lib/auth/company-context";
@@ -64,7 +65,10 @@ export default async function TenantsPage() {
         </p>
         <Heading className="font-display mt-2">Tenants</Heading>
         <Text className="mt-2 max-w-2xl">
-          Every company in the system. Read-only for now — creation, impersonation, and audit tooling land in later steps.
+          Every company in the system. Click <strong>Impersonate</strong> to
+          temporarily operate as that tenant&apos;s admin — useful for
+          reproducing customer bugs and sanity-checking the manager UX.
+          Every start and stop is recorded in the audit log.
         </Text>
       </header>
 
@@ -82,7 +86,18 @@ export default async function TenantsPage() {
                   created {new Date(t.created_at).toLocaleDateString()}
                 </p>
               </div>
-              <code className="shrink-0 font-mono text-xs text-dc-text-3">{t.id}</code>
+              <div className="flex shrink-0 items-center gap-3">
+                <code className="font-mono text-xs text-dc-text-3">{t.id}</code>
+                <form action={startImpersonation}>
+                  <input type="hidden" name="company_id" value={t.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-(--color-brand)/30 bg-(--color-brand)/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-(--color-brand) uppercase hover:bg-(--color-brand)/20"
+                  >
+                    Impersonate
+                  </button>
+                </form>
+              </div>
             </li>
           ))}
         </ul>

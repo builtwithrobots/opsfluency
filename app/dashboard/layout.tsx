@@ -3,20 +3,28 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
 import { AuthBridgeError } from "@/components/dashboard/auth-bridge-error";
+import { ImpersonationBanner } from "@/components/dashboard/impersonation-banner";
 import type { Viewer } from "@/components/dashboard/nav-config";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
+interface Resolved {
+  viewer: Viewer;
+  impersonatingCompanyName?: string;
+}
+
 type ResolveResult =
-  | { kind: "viewer"; viewer: Viewer }
+  | { kind: "viewer"; resolved: Resolved }
   | { kind: "bridgeError"; detail?: string };
 
 async function resolveViewer(): Promise<ResolveResult> {
   try {
     const ctx = await getCompanyContext();
 
-    // Employees don't belong in the manager dashboard.
-    if (ctx.role === "employee") redirect("/app/home");
+    // Employees don't belong in the manager dashboard. Skip this
+    // redirect when impersonating so super admins can never get bounced
+    // out mid-session — impersonation always forces role='admin' anyway.
+    if (ctx.role === "employee" && !ctx.impersonating) redirect("/app/home");
 
     const { data: company } = await ctx.supabase
       .from("companies")
@@ -24,20 +32,22 @@ async function resolveViewer(): Promise<ResolveResult> {
       .eq("id", ctx.company_id)
       .single();
 
+    const companyName = company?.name ?? "Workspace";
+
     return {
       kind: "viewer",
-      viewer: {
-        kind: "member",
-        role: ctx.role,
-        companyName: company?.name ?? "Workspace",
+      resolved: {
+        viewer: { kind: "member", role: ctx.role, companyName },
+        impersonatingCompanyName: ctx.impersonating ? companyName : undefined,
       },
     };
   } catch (e) {
     if (e instanceof AuthError && e.code === "NO_COMPANY") {
       // Super admins carry no company_members row — they're welcome in
-      // the dashboard shell, just with the Platform sidebar only.
+      // the dashboard shell. Without an active impersonation cookie
+      // they get the Platform-focused view.
       if (await isCurrentUserSuperAdmin()) {
-        return { kind: "viewer", viewer: { kind: "superAdmin" } };
+        return { kind: "viewer", resolved: { viewer: { kind: "superAdmin" } } };
       }
       redirect("/onboarding");
     }
@@ -53,8 +63,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const result = await resolveViewer();
   if (result.kind === "bridgeError") return <AuthBridgeError detail={result.detail} />;
 
+  const { viewer, impersonatingCompanyName } = result.resolved;
+
   return (
-    <AppShell viewer={result.viewer}>
+    <AppShell viewer={viewer}>
+      {impersonatingCompanyName ? (
+        <ImpersonationBanner companyName={impersonatingCompanyName} />
+      ) : null}
       <div id="main">{children}</div>
     </AppShell>
   );

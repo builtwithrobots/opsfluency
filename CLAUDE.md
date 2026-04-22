@@ -293,8 +293,10 @@ Rules:
 
 - Adding a super admin = inserting a row into `super_admins` via the service-role client (or the SQL editor). There is no signup flow for this role — it's a hardcoded allowlist.
 - `super_admins` is locked at grant level (`REVOKE ALL ... FROM anon, authenticated`). No RLS policy needed; callers always go through `is_super_admin()` which runs `SECURITY DEFINER` and bypasses the grant.
-- `getCompanyContext()` does **not** resolve super admins — it throws `NO_COMPANY` for them. Super-admin-only routes use a separate `getSuperAdminContext()` helper (to be added when the first such route lands).
+- `getCompanyContext()` does **not** resolve super admins by default — it throws `NO_COMPANY` for them. Super-admin-only routes use `getSuperAdminContext()`. The one exception is **impersonation** (below): when a super admin has an active impersonation cookie, `getCompanyContext()` transparently returns the impersonated tenant's context with `role: 'admin'` and `impersonating: true`.
 - `requesting_role()` returns `NULL` for a super admin; check `is_super_admin()` first in any UI or policy that needs to differentiate.
+
+**Impersonation.** Super admins pick a tenant from `/dashboard/platform/tenants` and click **Impersonate**. The `startImpersonation` Server Action verifies super-admin status, writes an `impersonation_events` row, and sets a signed, HttpOnly, SameSite=Lax cookie `opsf_impersonation` containing `{ company_id, super_admin_clerk_user_id, iat }` signed with `IMPERSONATION_COOKIE_SECRET`. TTL is 4 hours. While the cookie is valid, `getCompanyContext()` returns the impersonated company and every downstream server query scopes to that tenant. RLS still lets the request through via the `or is_super_admin()` branch every tenant policy carries — the JWT is still the super admin's. `getCompanyContext()` re-verifies super-admin status on every request so revoking a super admin immediately kills any active session. A sticky banner renders above every dashboard route while impersonating; clicking **Exit impersonation** runs `stopImpersonation`, which writes a `stop` audit row and clears the cookie.
 
 ### Data fetching: RSC + Server Actions, `/api` only for external callers
 
@@ -707,6 +709,9 @@ NEXT_PUBLIC_APP_URL=
 
 # Monitor pairing cookie signer (any 32+ char random string)
 MONITOR_COOKIE_SECRET=
+
+# Super-admin impersonation cookie signer (any 32+ char random string)
+IMPERSONATION_COOKIE_SECRET=
 ```
 
 ---

@@ -3,6 +3,7 @@ import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { readImpersonationCookie } from "@/lib/auth/impersonation";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getRequestClient } from "@/lib/supabase/server";
 
@@ -29,6 +30,11 @@ export interface CompanyContext {
   supabase: SupabaseClient;
   company_id: string;
   role: Role;
+  // True when the caller is a super admin operating on this tenant
+  // through an active impersonation cookie. Downstream code usually
+  // doesn't care — RLS already lets god mode through — but audit
+  // logging and the UI banner do.
+  impersonating?: boolean;
 }
 
 /**
@@ -37,6 +43,7 @@ export interface CompanyContext {
  * Throws `AuthError`:
  * - `UNAUTHENTICATED` — no Clerk session
  * - `NO_COMPANY` — Clerk session exists but no `company_members` row
+ *   and no active super-admin impersonation session
  * - `FORBIDDEN` — session + company, but role is lower than `required`
  *
  * The `required` parameter enforces a minimum role for manager-only code.
@@ -45,8 +52,13 @@ export interface CompanyContext {
  * call without `required`.
  *
  * Super admins are stored in the separate `super_admins` table and are
- * resolved by `getSuperAdminContext()` (not yet implemented — add when the
- * first super-admin-only route lands).
+ * resolved by `getSuperAdminContext()`. When a super admin has started
+ * an impersonation session from `/dashboard/platform/tenants`, this
+ * function transparently returns the impersonated tenant's context
+ * with `role: 'admin'` and `impersonating: true`. Every downstream
+ * server query sees the impersonated `company_id` and RLS lets the
+ * super admin through via the `or is_super_admin()` branch that
+ * every tenant policy carries.
  */
 export async function getCompanyContext(
   required?: Exclude<Role, "employee">,
@@ -55,6 +67,25 @@ export async function getCompanyContext(
   if (!userId) throw new AuthError("UNAUTHENTICATED");
 
   const supabase = await getRequestClient();
+
+  // Impersonation short-circuit. A super admin with a valid cookie
+  // operates on the target tenant as if they were its admin. The
+  // cookie's signature proves authenticity, but we still re-verify
+  // super-admin status every request — a revoked super admin's live
+  // cookie must stop working immediately, not at TTL expiry.
+  const impersonation = await readImpersonationCookie();
+  if (impersonation && impersonation.super_admin_clerk_user_id === userId) {
+    const { data: stillSuper } = await supabase.rpc("is_super_admin");
+    if (stillSuper) {
+      return {
+        userId,
+        supabase,
+        company_id: impersonation.company_id,
+        role: "admin",
+        impersonating: true,
+      };
+    }
+  }
 
   const { data: member } = await supabase
     .from("company_members")
