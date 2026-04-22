@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 import type { QrTargetType } from '@/lib/qr/print-config';
 
 const TARGET_TYPES: { value: QrTargetType; label: string; description: string }[] = [
@@ -48,16 +49,16 @@ export default function NewQrForm() {
     <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-6">
       {/* Target type */}
       <fieldset>
-        <legend className="mb-2 text-sm font-medium text-neutral-300">Target type</legend>
+        <legend className="mb-2 text-sm font-medium text-dc-text-2">Target type</legend>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {TARGET_TYPES.map(t => (
             <label
               key={t.value}
               className={[
-                'flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors',
+                'flex cursor-pointer flex-col gap-1 rounded-xl border p-3 transition-colors',
                 type === t.value
                   ? 'border-(--color-brand) bg-(--color-brand)/10'
-                  : 'border-neutral-700 hover:border-neutral-500',
+                  : 'border-[color:var(--dc-edge)] hover:border-[color:var(--dc-edge-2)]',
               ].join(' ')}
             >
               <input
@@ -68,8 +69,8 @@ export default function NewQrForm() {
                 onChange={() => setType(t.value)}
                 className="sr-only"
               />
-              <span className="text-sm font-semibold text-neutral-100">{t.label}</span>
-              <span className="text-xs text-neutral-400">{t.description}</span>
+              <span className="text-sm font-semibold text-dc-text">{t.label}</span>
+              <span className="text-xs text-dc-text-3">{t.description}</span>
             </label>
           ))}
         </div>
@@ -77,8 +78,8 @@ export default function NewQrForm() {
 
       {/* Label */}
       <div>
-        <label htmlFor="qr-label" className="mb-1 block text-sm font-medium text-neutral-300">
-          Label <span className="text-neutral-500">(optional)</span>
+        <label htmlFor="qr-label" className="mb-1 block text-sm font-medium text-dc-text-2">
+          Label <span className="text-dc-text-3">(optional)</span>
         </label>
         <input
           id="qr-label"
@@ -87,15 +88,16 @@ export default function NewQrForm() {
           onChange={e => setLabel(e.target.value)}
           maxLength={200}
           placeholder="e.g. Forklift Safety — Bay 3"
-          className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-600 focus:border-neutral-500 focus:outline-none"
+          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-[color:var(--dc-edge-2)] focus:outline-none"
         />
       </div>
 
       {/* URL — only shown for url type */}
       {type === 'url' && (
         <div>
-          <label htmlFor="qr-url" className="mb-1 block text-sm font-medium text-neutral-300">
-            Destination URL <span className="text-red-400">*</span>
+          <label htmlFor="qr-url" className="mb-1 block text-sm font-medium text-dc-text-2">
+            Destination URL{' '}
+            <span className="text-(--color-signal-urgent)" aria-label="required">*</span>
           </label>
           <input
             id="qr-url"
@@ -104,22 +106,18 @@ export default function NewQrForm() {
             onChange={e => setUrl(e.target.value)}
             required={type === 'url'}
             placeholder="https://example.com/procedure"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-600 focus:border-neutral-500 focus:outline-none"
+            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-[color:var(--dc-edge-2)] focus:outline-none"
           />
         </div>
       )}
 
       {error && (
-        <p className="text-sm text-red-400" role="alert">{error}</p>
+        <p className="text-sm text-(--color-signal-urgent)" role="alert">{error}</p>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-(--color-brand) px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-(--color-brand)/90 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? 'Creating…' : 'Create QR code →'}
-      </button>
+      <Button type="submit" color="brand" disabled={loading}>
+        {loading ? 'Creating…' : 'Create QR code'}
+      </Button>
     </form>
   );
 }

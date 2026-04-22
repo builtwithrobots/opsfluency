@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 
 import { getCompanyContext } from '@/lib/auth/company-context';
 import { Heading } from '@/components/ui/heading';
@@ -35,13 +36,17 @@ export default async function QrDetailPage({ params }: Props) {
     <div className="flex flex-col gap-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Button href="/dashboard/qr" plain className="-ml-2 mb-2 text-sm text-neutral-400">
-            ← Back to QR codes
+          <Button href="/dashboard/qr" plain className="-ml-2 mb-3">
+            <ArrowLeft data-slot="icon" strokeWidth={2} />
+            Back to QR codes
           </Button>
-          <Heading className="font-display">
+          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
+            Print editor
+          </p>
+          <Heading className="font-display mt-2">
             {qr.label || 'QR Code'}
           </Heading>
-          <Text className="mt-1 font-mono text-xs text-neutral-500">
+          <Text className="mt-1 font-mono text-xs">
             /s/{qr.id}
           </Text>
         </div>

@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { QrCode, ExternalLink } from 'lucide-react';
+import { ExternalLink, QrCode, ScanLine } from 'lucide-react';
 
 import { getCompanyContext } from '@/lib/auth/company-context';
 import { Heading } from '@/components/ui/heading';
@@ -46,67 +45,122 @@ export default async function QrCodesPage() {
       </header>
 
       {!qrCodes?.length ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-700 py-20 text-center">
-          <QrCode className="mb-4 h-10 w-10 text-neutral-600" strokeWidth={1.5} />
-          <p className="text-base font-medium text-neutral-300">No QR codes yet</p>
-          <Text className="mt-1 max-w-xs">
-            Create your first QR code and print it to start tracking scans.
-          </Text>
-          <Button href="/dashboard/qr/new" color="brand" className="mt-6">
-            Create QR code
-          </Button>
-        </div>
+        <QrEmptyState />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-neutral-800">
-          <table className="w-full text-sm">
-            <thead className="border-b border-neutral-800 bg-neutral-900/60">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-neutral-400">Label</th>
-                <th className="px-4 py-3 text-left font-medium text-neutral-400">Type</th>
-                <th className="px-4 py-3 text-left font-medium text-neutral-400">Scan URL</th>
-                <th className="px-4 py-3 text-left font-medium text-neutral-400">Created</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800">
-              {qrCodes.map(qr => (
-                <tr key={qr.id} className="hover:bg-neutral-900/40">
-                  <td className="px-4 py-3 font-medium text-neutral-100">
-                    {qr.label || <span className="text-neutral-500 italic">Unlabelled</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge color="zinc">
-                      {TYPE_LABELS[qr.target_type as QrTargetType] ?? qr.target_type}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <a
-                      href={`${appUrl}/s/${qr.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white"
-                    >
-                      /s/{qr.id.slice(0, 8)}…
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </td>
-                  <td className="px-4 py-3 text-neutral-400">
-                    {new Date(qr.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/dashboard/qr/${qr.id}`}
-                      className="text-sm text-(--color-brand) hover:underline"
-                    >
-                      Edit / Print
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {qrCodes.map((qr, i) => (
+            <QrCard
+              key={qr.id}
+              qr={qr}
+              appUrl={appUrl}
+              index={i}
+            />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Empty state ────────────────────────────────────────────────── */
+
+function QrEmptyState() {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-8 shadow-xs">
+      {/* Ambient blob — matches EmptyActivityCard pattern */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-(--color-brand) opacity-10 blur-3xl"
+      />
+      <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+        <span
+          aria-hidden
+          className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-(--color-brand)/10 text-(--color-brand)"
+        >
+          <QrCode className="size-7" strokeWidth={1.5} />
+        </span>
+        <div>
+          <p className="font-display text-sm tracking-[0.15em] text-(--color-brand) uppercase">
+            Getting started
+          </p>
+          <h3 className="mt-1 text-xl font-semibold text-dc-text">
+            No QR codes yet
+          </h3>
+          <p className="mt-1 max-w-md text-dc-text-2">
+            Create a QR code and print it to any surface. The URL never changes — scans always
+            resolve to the current content.
+          </p>
+          <Button href="/dashboard/qr/new" color="brand" className="mt-5">
+            <QrCode data-slot="icon" strokeWidth={2} />
+            Create your first QR code
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── QR card ────────────────────────────────────────────────────── */
+
+interface QrCardProps {
+  qr: { id: string; label: string; target_type: string; created_at: string };
+  appUrl: string;
+  index: number;
+}
+
+function QrCard({ qr, appUrl, index }: QrCardProps) {
+  const scanUrl = `${appUrl}/s/${qr.id}`;
+
+  return (
+    <div
+      className="group relative flex flex-col gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5 shadow-xs transition-shadow hover:shadow-md"
+      style={{ animationDelay: `${index * 40}ms` }}
+    >
+      {/* Top row: icon + type badge */}
+      <div className="flex items-start justify-between">
+        <span
+          aria-hidden
+          className="flex size-9 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
+        >
+          <QrCode className="size-4" strokeWidth={2} />
+        </span>
+        <Badge color="zinc">
+          {TYPE_LABELS[qr.target_type as QrTargetType] ?? qr.target_type}
+        </Badge>
+      </div>
+
+      {/* Label */}
+      <div className="flex-1">
+        <p className="font-semibold text-dc-text">
+          {qr.label || <span className="italic text-dc-text-3">Unlabelled</span>}
+        </p>
+        <a
+          href={scanUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-dc-text-3 hover:text-(--color-brand)"
+        >
+          /s/{qr.id.slice(0, 8)}…
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </div>
+
+      {/* Footer row: date + action */}
+      <div className="flex items-center justify-between border-t border-[color:var(--dc-edge)] pt-3">
+        <div className="flex items-center gap-1.5 text-xs text-dc-text-3">
+          <ScanLine className="h-3.5 w-3.5" />
+          {new Date(qr.created_at).toLocaleDateString()}
+        </div>
+        <Button href={`/dashboard/qr/${qr.id}`} plain className="text-sm">
+          Edit / Print
+        </Button>
+      </div>
+
+      {/* Brand underline that grows on hover — matches stat-card pattern */}
+      <span
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 rounded-b-xl bg-(--color-brand) transition-transform duration-200 group-hover:scale-x-100"
+      />
     </div>
   );
 }

@@ -20,8 +20,8 @@ export default function DotSlider({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-neutral-300">{label}</span>
-        <span className="text-sm tabular-nums text-neutral-400">{value}%</span>
+        <span className="text-sm font-medium text-dc-text-2">{label}</span>
+        <span className="text-sm tabular-nums text-dc-text-3">{value}%</span>
       </div>
       <input
         type="range"
@@ -31,7 +31,7 @@ export default function DotSlider({
         value={value}
         onChange={e => onChange(Number(e.target.value))}
         aria-label={label}
-        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-neutral-700 accent-white"
+        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-dc-raised accent-white"
       />
       <div className="flex justify-between">
         {Array.from({ length: (max - min) / step + 1 }, (_, i) => min + i * step).map(v => (
@@ -42,7 +42,7 @@ export default function DotSlider({
             aria-label={`Set ${label} to ${v}%`}
             className={[
               'h-2.5 w-2.5 rounded-full transition-colors',
-              v === value ? 'bg-white' : 'bg-neutral-600 hover:bg-neutral-400',
+              v === value ? 'bg-white' : 'bg-dc-edge hover:bg-dc-text-3',
             ].join(' ')}
           />
         ))}

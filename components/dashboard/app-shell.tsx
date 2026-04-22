@@ -203,6 +203,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
     >
       <motion.div
         key={pathname}
+        className="mx-auto w-full max-w-7xl"
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: "easeOut" }}

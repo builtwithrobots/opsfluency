@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { TEMPLATE_TAGLINES, type PrintConfig } from '@/lib/qr/print-config';
 
@@ -11,10 +12,13 @@ interface Props {
 }
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+const SHEET_W = 768;
+const SHEET_H = 1008;
 
 /**
- * Live print preview rendered at 768×1008pt (8.5×11in at 96dpi minus 0.25in margins).
- * The outer wrapper scales the fixed container to fit the available width.
+ * Live print preview at 768×1008pt (8.5×11in at 96dpi minus 0.25in margins).
+ * Measures the wrapper width on mount and on resize, then scales the fixed
+ * sheet down proportionally so it never overflows its container.
  */
 export default function QRPrintPreview({
   qrCodeId,
@@ -22,25 +26,44 @@ export default function QRPrintPreview({
   companyName,
   logoUrl,
 }: Props) {
-  const scanUrl  = `${appUrl}/s/${qrCodeId}`;
-  const qrPx     = Math.round((config.qr_size / 100) * 768 * 0.7); // QR size within content area
-  const tagline  = TEMPLATE_TAGLINES[config.template];
+  const wrapperRef          = useRef<HTMLDivElement>(null);
+  const [scale, setScale]   = useState(1);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const w = el.getBoundingClientRect().width;
+      setScale(Math.min(1, w / SHEET_W));
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const scanUrl = `${appUrl}/s/${qrCodeId}`;
+  const qrPx    = Math.round((config.qr_size / 100) * SHEET_W * 0.7);
+  const tagline = TEMPLATE_TAGLINES[config.template];
 
   return (
-    /*
-     * Outer: fills available space and scales the 768×1008 inner down proportionally.
-     * The `aspect-[768/1008]` keeps the wrapper the correct height so nothing shifts.
-     */
-    <div className="w-full" style={{ aspectRatio: '768/1008' }}>
+    /* Outer: reserves the correct height based on the computed scale */
+    <div
+      ref={wrapperRef}
+      className="w-full overflow-hidden"
+      style={{ height: SHEET_H * scale }}
+    >
       <div
         className="origin-top-left"
         style={{
-          width:     768,
-          height:    1008,
-          transform: `scale(var(--preview-scale, 1))`,
+          width:     SHEET_W,
+          height:    SHEET_H,
+          transform: `scale(${scale})`,
         }}
       >
-        {/* Print sheet */}
+        {/* Print sheet — id used by @media print CSS to isolate this element */}
         <div
           id="qr-print-sheet"
           className="flex h-full flex-col items-center justify-between bg-white px-10 py-8 font-sans"
