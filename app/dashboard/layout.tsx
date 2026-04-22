@@ -26,6 +26,11 @@ async function resolveViewer(): Promise<ResolveResult> {
     // out mid-session — impersonation always forces role='admin' anyway.
     if (ctx.role === "employee" && !ctx.impersonating) redirect("/app/home");
 
+    // Independent super-admin probe. A user can be both a company
+    // member AND a super admin (the dev-account case); we want the
+    // full member sidebar AND the Platform section for them.
+    const isSuperAdmin = await isCurrentUserSuperAdmin();
+
     const { data: company } = await ctx.supabase
       .from("companies")
       .select("name")
@@ -37,7 +42,12 @@ async function resolveViewer(): Promise<ResolveResult> {
     return {
       kind: "viewer",
       resolved: {
-        viewer: { kind: "member", role: ctx.role, companyName },
+        viewer: {
+          kind: "member",
+          role: ctx.role,
+          companyName,
+          isSuperAdmin: isSuperAdmin || undefined,
+        },
         impersonatingCompanyName: ctx.impersonating ? companyName : undefined,
       },
     };
