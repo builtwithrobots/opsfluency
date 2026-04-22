@@ -71,7 +71,7 @@ export function EmptyActivityCard() {
                     aria-hidden
                     className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand) group-hover:bg-(--color-brand)/15"
                   >
-                    <Icon className="size-4" />
+                    <Icon className="size-4" strokeWidth={2} />
                   </span>
                   <span>
                     <span className="block text-sm font-semibold text-dc-text">

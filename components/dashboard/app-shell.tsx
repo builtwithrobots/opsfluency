@@ -64,7 +64,7 @@ function ContextLabel({ viewer }: { viewer: Viewer }) {
     const Icon = superAdminIcon;
     return (
       <span className="flex items-center gap-1.5 px-2 pt-1 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
-        <Icon className="size-3" />
+        <Icon className="size-3" strokeWidth={2} />
         Super admin
       </span>
     );
@@ -123,7 +123,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
                 <SidebarLabel>
                   <span className={brandNameClasses}>{appDisplayName}</span>
                 </SidebarLabel>
-                <ChevronDown data-slot="icon" />
+                <ChevronDown data-slot="icon" strokeWidth={2} />
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="bottom start">
                 {viewer.kind === "member" ? (
@@ -133,7 +133,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
                 ) : null}
                 <DropdownDivider />
                 <DropdownItem href="/sign-out">
-                  <LogOut data-slot="icon" />
+                  <LogOut data-slot="icon" strokeWidth={2} />
                   <DropdownLabel>Sign out</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
@@ -159,7 +159,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
                         transition={{ duration: 0.22, delay: index * 0.02, ease: "easeOut" }}
                       >
                         <SidebarItem href={item.href} current={active}>
-                          <Icon data-slot="icon" />
+                          <Icon data-slot="icon" strokeWidth={2} />
                           <SidebarLabel>{item.label}</SidebarLabel>
                         </SidebarItem>
                       </motion.div>
@@ -177,7 +177,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
                   const Icon = item.icon;
                   return (
                     <SidebarItem key={item.href} href={item.href}>
-                      <Icon data-slot="icon" />
+                      <Icon data-slot="icon" strokeWidth={2} />
                       <SidebarLabel>{item.label}</SidebarLabel>
                     </SidebarItem>
                   );

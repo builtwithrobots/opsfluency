@@ -63,11 +63,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {role !== "employee" && (
           <div className="flex gap-2">
             <Button href="/dashboard/import" color="brand">
-              <FileText data-slot="icon" />
+              <FileText data-slot="icon" strokeWidth={2} />
               New SOP
             </Button>
             <Button href="/dashboard/employees" outline>
-              <Users data-slot="icon" />
+              <Users data-slot="icon" strokeWidth={2} />
               Invite teammate
             </Button>
           </div>
@@ -78,28 +78,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <DashboardStatCard
           label="Published SOPs"
           value="—"
-          icon={<FileText className="size-5" />}
+          icon={<FileText className="size-5" strokeWidth={2} />}
           accent="brand"
           delay={0}
         />
         <DashboardStatCard
           label="Team members"
           value={memberCount ?? 0}
-          icon={<Users className="size-5" />}
+          icon={<Users className="size-5" strokeWidth={2} />}
           accent="signal-info"
           delay={0.05}
         />
         <DashboardStatCard
           label="QR scans (7d)"
           value="—"
-          icon={<ScanLine className="size-5" />}
+          icon={<ScanLine className="size-5" strokeWidth={2} />}
           accent="signal-live"
           delay={0.1}
         />
         <DashboardStatCard
           label="Pending approvals"
           value="—"
-          icon={<Bell className="size-5" />}
+          icon={<Bell className="size-5" strokeWidth={2} />}
           accent="signal-warn"
           delay={0.15}
         />
@@ -113,7 +113,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
           <Button plain href="/dashboard/sops">
             View SOPs
-            <ArrowUpRight data-slot="icon" />
+            <ArrowUpRight data-slot="icon" strokeWidth={2} />
           </Button>
         </div>
 

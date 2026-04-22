@@ -47,7 +47,7 @@ export function WelcomeBanner({ companyName }: WelcomeBannerProps) {
               animate={{ rotate: 0, scale: 1 }}
               transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
             >
-              <PartyPopper className="size-5" />
+              <PartyPopper className="size-5" strokeWidth={2} />
             </motion.span>
             <div className="min-w-0 flex-1">
               <p className="font-display text-xs tracking-[0.15em] text-(--color-brand) uppercase">
@@ -68,7 +68,7 @@ export function WelcomeBanner({ companyName }: WelcomeBannerProps) {
               aria-label="Dismiss welcome banner"
               className="shrink-0 rounded-md p-1 text-dc-text-3 transition-colors hover:bg-dc-raised hover:text-dc-text"
             >
-              <X className="size-4" />
+              <X className="size-4" strokeWidth={2} />
             </button>
           </div>
         </motion.div>

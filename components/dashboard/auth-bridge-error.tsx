@@ -24,7 +24,7 @@ export function AuthBridgeError({ detail }: AuthBridgeErrorProps) {
             aria-hidden
             className="flex size-10 items-center justify-center rounded-lg bg-(--color-signal-urgent)/15 text-(--color-signal-urgent)"
           >
-            <AlertTriangle className="size-5" />
+            <AlertTriangle className="size-5" strokeWidth={2} />
           </span>
           <div>
             <p className="text-xs font-medium tracking-[0.15em] text-(--color-signal-urgent) uppercase">

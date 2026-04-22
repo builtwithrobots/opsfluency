@@ -78,13 +78,16 @@ export const navSections: readonly NavSection[] = [primary, platform] as const;
 export const navFooterSection: NavSection = footer;
 
 /**
- * Visibility gate. Admins see every member-tagged item regardless of
- * the role list. Super admins see only items that opt into the super
- * admin sidebar. Employees should not reach the dashboard at all but we
- * scope defensively anyway.
+ * Visibility gate. Super admins are god mode — they see every item,
+ * including tenant-scoped ones they can only reach by impersonation.
+ * Platform items stay super-admin-only because their `visibility` has
+ * no `member` key, so managers and admins still can't see them.
+ * Admins see every member-tagged item regardless of the role list.
+ * Employees should not reach the dashboard at all but we scope
+ * defensively anyway.
  */
 export function canSee(item: NavItem, viewer: Viewer): boolean {
-  if (viewer.kind === "superAdmin") return item.visibility.superAdmin === true;
+  if (viewer.kind === "superAdmin") return true;
   if (viewer.role === "admin") return Boolean(item.visibility.member?.length);
   return item.visibility.member?.includes(viewer.role) ?? false;
 }
