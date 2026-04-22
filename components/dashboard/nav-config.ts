@@ -82,22 +82,19 @@ export const navSections: readonly NavSection[] = [primary, platform] as const;
 export const navFooterSection: NavSection = footer;
 
 /**
- * Visibility gate.
+ * Visibility gate. Super admins are god mode: both the pure-super-admin
+ * kind (no company_members row) and the member+super_admin case see
+ * every nav item. Clicking through to pages that require company
+ * context without an active impersonation session will redirect or
+ * 404 — that's an acceptable dev state; per-page access handling
+ * lands as each page ships.
  *
- *  - Pure super admin (no company_members row) sees only items opted
- *    into the super-admin sidebar. Tenant-scoped pages are reached by
- *    impersonating a tenant from `/dashboard/platform/tenants`, which
- *    flips the viewer to a member with `role: 'admin'`.
- *  - Member + super admin sees everything: their role's normal items
- *    plus any `superAdmin: true` item (Platform, Help, Changelog).
- *    This is the expected state for dev users who both belong to a
- *    company and sit in `super_admins`.
- *  - Admin sees every member-tagged item regardless of the role list.
- *  - Manager / employee sees items that list their role explicitly.
+ * Normal members follow role rules: admin sees every member-tagged
+ * item; manager/employee sees items listing their role explicitly.
  */
 export function canSee(item: NavItem, viewer: Viewer): boolean {
-  if (viewer.kind === "superAdmin") return item.visibility.superAdmin === true;
-  if (viewer.isSuperAdmin && item.visibility.superAdmin === true) return true;
+  if (viewer.kind === "superAdmin") return true;
+  if (viewer.isSuperAdmin) return true;
   if (viewer.role === "admin") return Boolean(item.visibility.member?.length);
   return item.visibility.member?.includes(viewer.role) ?? false;
 }
