@@ -69,9 +69,18 @@ function ContextLabel({ viewer }: { viewer: Viewer }) {
       </span>
     );
   }
+  const SuperIcon = superAdminIcon;
   return (
-    <span className="block truncate px-2 pt-1 text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
-      {viewer.companyName}
+    <span className="flex flex-col gap-0.5 px-2 pt-1">
+      <span className="block truncate text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
+        {viewer.companyName}
+      </span>
+      {viewer.isSuperAdmin ? (
+        <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
+          <SuperIcon className="size-3" strokeWidth={2} />
+          Super admin
+        </span>
+      ) : null}
     </span>
   );
 }

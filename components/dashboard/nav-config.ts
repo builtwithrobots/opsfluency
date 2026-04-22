@@ -17,13 +17,17 @@ import {
 import type { Role } from "@/lib/auth/company-context";
 
 /**
- * Viewer discriminator for the dashboard shell. A super admin is not a
- * company member, so they carry no `role` or `companyName` — they only
- * see Platform nav items. Regular admins / managers / employees carry
- * both and see items tagged for their role.
+ * Viewer discriminator for the dashboard shell. A pure super admin (no
+ * `company_members` row) lives in the `superAdmin` kind and only sees
+ * Platform nav items — tenant-scoped pages would crash without a
+ * company_id. A regular admin / manager / employee is in the `member`
+ * kind and sees items tagged for their role. A user who is both a
+ * company member AND a super admin (the common dev case) is a member
+ * viewer with `isSuperAdmin: true`, which unlocks Platform items on
+ * top of their normal role-based nav.
  */
 export type Viewer =
-  | { kind: "member"; role: Role; companyName: string }
+  | { kind: "member"; role: Role; companyName: string; isSuperAdmin?: boolean }
   | { kind: "superAdmin" };
 
 export interface NavItem {
@@ -78,17 +82,22 @@ export const navSections: readonly NavSection[] = [primary, platform] as const;
 export const navFooterSection: NavSection = footer;
 
 /**
- * Visibility gate. A non-impersonating super admin sees only items
- * opted into the super-admin sidebar (Platform + Help + Changelog);
- * tenant-scoped pages are reached by impersonating a tenant from
- * `/dashboard/platform/tenants`, which flips the viewer to `member`
- * with `role: 'admin'` and exposes the full primary nav. Admins see
- * every member-tagged item regardless of the role list. Employees
- * should not reach the dashboard at all but we scope defensively
- * anyway.
+ * Visibility gate.
+ *
+ *  - Pure super admin (no company_members row) sees only items opted
+ *    into the super-admin sidebar. Tenant-scoped pages are reached by
+ *    impersonating a tenant from `/dashboard/platform/tenants`, which
+ *    flips the viewer to a member with `role: 'admin'`.
+ *  - Member + super admin sees everything: their role's normal items
+ *    plus any `superAdmin: true` item (Platform, Help, Changelog).
+ *    This is the expected state for dev users who both belong to a
+ *    company and sit in `super_admins`.
+ *  - Admin sees every member-tagged item regardless of the role list.
+ *  - Manager / employee sees items that list their role explicitly.
  */
 export function canSee(item: NavItem, viewer: Viewer): boolean {
   if (viewer.kind === "superAdmin") return item.visibility.superAdmin === true;
+  if (viewer.isSuperAdmin && item.visibility.superAdmin === true) return true;
   if (viewer.role === "admin") return Boolean(item.visibility.member?.length);
   return item.visibility.member?.includes(viewer.role) ?? false;
 }
