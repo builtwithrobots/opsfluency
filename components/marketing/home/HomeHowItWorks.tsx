@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/marketing/Button";
 import { Container } from "@/components/marketing/Container";
 import { SectionHeader } from "@/components/marketing/SectionHeader";
-import { MotionSection } from "@/components/motion/MotionSection";
+import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 const HEADING_ID = "home-hiw-heading";
@@ -40,15 +40,15 @@ export function HomeHowItWorks() {
       className="py-16 md:py-24 bg-dc-raised"
     >
       <Container className="flex flex-col gap-12">
-        <MotionSection.Item>
+        <MotionSectionItem>
           <SectionHeader
             id={HEADING_ID}
             eyebrow="How it works"
             heading="From upload to mounted QR in under 15 minutes."
             subhead="No implementation calls. No consultants. No six-month rollouts."
           />
-        </MotionSection.Item>
-        <MotionSection.Item>
+        </MotionSectionItem>
+        <MotionSectionItem>
           <ol className="grid gap-10 md:grid-cols-3">
             {STEPS.map((step) => (
               <li key={step.number} className="flex flex-col gap-4">
@@ -71,8 +71,8 @@ export function HomeHowItWorks() {
               </li>
             ))}
           </ol>
-        </MotionSection.Item>
-        <MotionSection.Item className="flex justify-center">
+        </MotionSectionItem>
+        <MotionSectionItem className="flex justify-center">
           <Button
             href="/how-it-works"
             variant="secondary"
@@ -81,7 +81,7 @@ export function HomeHowItWorks() {
           >
             See the full walkthrough
           </Button>
-        </MotionSection.Item>
+        </MotionSectionItem>
       </Container>
     </MotionSection>
   );

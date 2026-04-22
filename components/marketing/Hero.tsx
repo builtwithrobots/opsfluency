@@ -14,7 +14,7 @@
 import type { ReactNode } from "react";
 
 import { Container } from "@/components/marketing/Container";
-import { MotionSection } from "@/components/motion/MotionSection";
+import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 type HeroProps = {
@@ -68,32 +68,32 @@ export function Hero({
           }
         >
           {eyebrow ? (
-            <MotionSection.Item>
+            <MotionSectionItem>
               <span
                 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {eyebrow}
               </span>
-            </MotionSection.Item>
+            </MotionSectionItem>
           ) : null}
-          <MotionSection.Item>
+          <MotionSectionItem>
             <h1
               className="max-w-3xl text-5xl font-bold tracking-tight text-dc-text md:text-6xl lg:text-7xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {headline}
             </h1>
-          </MotionSection.Item>
+          </MotionSectionItem>
           {subhead ? (
-            <MotionSection.Item>
+            <MotionSectionItem>
               <p className="max-w-2xl text-lg leading-relaxed text-dc-text-2 md:text-xl">
                 {subhead}
               </p>
-            </MotionSection.Item>
+            </MotionSectionItem>
           ) : null}
           {primary || secondary ? (
-            <MotionSection.Item
+            <MotionSectionItem
               className={
                 hasVisual
                   ? "flex flex-wrap items-center gap-3 pt-2"
@@ -102,10 +102,10 @@ export function Hero({
             >
               {primary}
               {secondary}
-            </MotionSection.Item>
+            </MotionSectionItem>
           ) : null}
         </div>
-        {hasVisual ? <MotionSection.Item>{visual}</MotionSection.Item> : null}
+        {hasVisual ? <MotionSectionItem>{visual}</MotionSectionItem> : null}
       </Container>
     </MotionSection>
   );

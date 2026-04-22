@@ -7,7 +7,7 @@ import { Languages, MessageSquare, QrCode } from "lucide-react";
 import { Container } from "@/components/marketing/Container";
 import { FeatureCard } from "@/components/marketing/FeatureCard";
 import { SectionHeader } from "@/components/marketing/SectionHeader";
-import { MotionSection } from "@/components/motion/MotionSection";
+import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 const HEADING_ID = "home-solution-heading";
@@ -20,15 +20,15 @@ export function HomeSolution() {
       className="py-16 md:py-24"
     >
       <Container className="flex flex-col gap-12">
-        <MotionSection.Item>
+        <MotionSectionItem>
           <SectionHeader
             id={HEADING_ID}
             eyebrow="The solution"
             heading="Three things nobody else offers together."
             subhead="Not a translation tool. Operations infrastructure for multilingual teams."
           />
-        </MotionSection.Item>
-        <MotionSection.Item>
+        </MotionSectionItem>
+        <MotionSectionItem>
           <div className="grid gap-6 md:grid-cols-3">
             <FeatureCard
               href="/features"
@@ -49,7 +49,7 @@ export function HomeSolution() {
               description="Announcements, TV monitors, and HR chat in one place. Managers broadcast without IT tickets. Workers reach HR without leaving the floor."
             />
           </div>
-        </MotionSection.Item>
+        </MotionSectionItem>
       </Container>
     </MotionSection>
   );

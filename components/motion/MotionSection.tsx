@@ -1,16 +1,19 @@
-// v1.1.0
+// v1.2.0
 // Default reveal-on-scroll primitive for marketing sections.
 // Reads from globals.css tokens via Tailwind utilities passed by callers;
 // this component contributes no styling of its own.
 //
 // Default behavior: fade-and-rise on first view, once only, with a viewport
 // margin that triggers slightly before the section is fully on screen.
-// Pass `variants={staggerContainer}` and wrap children in MotionSection.Item
+// Pass `variants={staggerContainer}` and wrap children in MotionSectionItem
 // when you want staggered reveals.
 //
 // Shape choices:
-//   - MotionSection always renders <motion.section>. For subgroups inside a
-//     section, use <MotionSection.Item> (renders <motion.div>).
+//   - MotionSection always renders <motion.section>. Use MotionSectionItem
+//     (a standalone named export) for stagger children.
+//   - The two are separate named exports, not an Object.assign sub-component,
+//     because static RSC serialization drops sub-component references during
+//     Next.js static prerender.
 //   - Other element types (ul, article, etc.) use framer-motion directly.
 //     Creating motion(as) at render time is a memory-leak pattern and is
 //     blocked by react-hooks lint.
@@ -39,7 +42,7 @@ type MotionSectionProps = {
   "aria-label"?: string;
 } & CommonMotionProps;
 
-function MotionSectionRoot({
+export function MotionSection({
   children,
   className,
   variants = fadeUp,
@@ -62,25 +65,21 @@ function MotionSectionRoot({
   );
 }
 
-type MotionItemProps = {
+type MotionSectionItemProps = {
   children: ReactNode;
   className?: string;
   variants?: Variants;
 } & Omit<MotionProps, "variants" | "children" | "className">;
 
-function MotionSectionItem({
+export function MotionSectionItem({
   children,
   className,
   variants = staggerItem,
   ...rest
-}: MotionItemProps) {
+}: MotionSectionItemProps) {
   return (
     <motion.div className={className} variants={variants} {...rest}>
       {children}
     </motion.div>
   );
 }
-
-export const MotionSection = Object.assign(MotionSectionRoot, {
-  Item: MotionSectionItem,
-});

@@ -8,7 +8,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/marketing/Button";
 import { Container } from "@/components/marketing/Container";
 import { SectionHeader } from "@/components/marketing/SectionHeader";
-import { MotionSection } from "@/components/motion/MotionSection";
+import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 const HEADING_ID = "home-pricing-heading";
@@ -59,15 +59,15 @@ export function HomePricingTeaser() {
       className="py-16 md:py-24"
     >
       <Container className="flex flex-col gap-12">
-        <MotionSection.Item>
+        <MotionSectionItem>
           <SectionHeader
             id={HEADING_ID}
             eyebrow="Pricing"
             heading="Flat rate. No per-user fees."
             subhead="Growth is $119 a month on annual, $149 month-to-month. Your manager can expense that without a committee."
           />
-        </MotionSection.Item>
-        <MotionSection.Item>
+        </MotionSectionItem>
+        <MotionSectionItem>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {TIERS.map((tier) => (
               <div
@@ -146,8 +146,8 @@ export function HomePricingTeaser() {
               </div>
             ))}
           </div>
-        </MotionSection.Item>
-        <MotionSection.Item className="flex justify-center">
+        </MotionSectionItem>
+        <MotionSectionItem className="flex justify-center">
           <Button
             href="/pricing"
             variant="secondary"
@@ -156,7 +156,7 @@ export function HomePricingTeaser() {
           >
             Compare every feature
           </Button>
-        </MotionSection.Item>
+        </MotionSectionItem>
       </Container>
     </MotionSection>
   );

@@ -6,7 +6,7 @@
 import { Container } from "@/components/marketing/Container";
 import { SectionHeader } from "@/components/marketing/SectionHeader";
 import { StatCallout } from "@/components/marketing/StatCallout";
-import { MotionSection } from "@/components/motion/MotionSection";
+import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 const HEADING_ID = "home-problem-heading";
@@ -19,15 +19,15 @@ export function HomeProblem() {
       className="py-16 md:py-24"
     >
       <Container className="flex flex-col gap-12">
-        <MotionSection.Item>
+        <MotionSectionItem>
           <SectionHeader
             id={HEADING_ID}
             eyebrow="The real problem"
             heading="Workers don't quit for fifty cents more per hour."
             subhead="They quit because they are frustrated and embarrassed. Nod-through training is the root cause, and the numbers below are what it costs you every single week."
           />
-        </MotionSection.Item>
-        <MotionSection.Item>
+        </MotionSectionItem>
+        <MotionSectionItem>
           <div className="grid gap-10 md:grid-cols-3">
             <StatCallout
               emphasis
@@ -46,7 +46,7 @@ export function HomeProblem() {
               caption="English-only onboarding leaves non-English speakers guessing from the start."
             />
           </div>
-        </MotionSection.Item>
+        </MotionSectionItem>
       </Container>
     </MotionSection>
   );
