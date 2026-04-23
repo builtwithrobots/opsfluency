@@ -89,12 +89,12 @@ function ContextLabel({ viewer }: { viewer: Viewer }) {
   }
   const SuperIcon = superAdminIcon;
   return (
-    <span className="flex flex-col gap-0.5 px-2 pt-1">
-      <span className="block truncate text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
+    <span className="flex items-center justify-between gap-2 px-2 pt-1">
+      <span className="truncate text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
         {viewer.companyName}
       </span>
       {viewer.isSuperAdmin ? (
-        <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
+        <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
           <SuperIcon className="size-3" strokeWidth={2} />
           Super admin
         </span>
@@ -151,8 +151,8 @@ function CollapseToggle() {
       onClick={toggle}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      className={`flex w-full items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised py-1.5 text-xs font-medium text-dc-text-2 transition-colors hover:bg-dc-overlay hover:text-dc-text ${
-        collapsed ? "justify-center px-0" : "px-3"
+      className={`inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised py-1.5 text-xs font-medium text-dc-text-2 transition-colors hover:bg-dc-overlay hover:text-dc-text ${
+        collapsed ? "justify-center px-2" : "px-3"
       }`}
     >
       {collapsed ? (
