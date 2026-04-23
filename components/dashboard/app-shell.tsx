@@ -2,7 +2,7 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, Eye, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -368,10 +368,22 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
           </SidebarSection>
         ) : null}
 
-        {/* Collapse toggle + theme toggle — desktop only */}
+        {/* Utility row — desktop only */}
         <SidebarSection className="max-lg:hidden">
           <div className="flex w-full items-center gap-2">
             {!collapsed && <ThemeToggle />}
+            {!collapsed && (
+              <a
+                href="/app/home"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Preview employee app"
+                title="Preview employee app"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-dc-edge bg-dc-surface text-dc-text transition-colors hover:bg-dc-raised"
+              >
+                <Eye className="h-5 w-5" strokeWidth={2} />
+              </a>
+            )}
             <CollapseToggle />
           </div>
         </SidebarSection>
