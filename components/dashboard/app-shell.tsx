@@ -69,8 +69,13 @@ function ContextLabel({ viewer }: { viewer: Viewer }) {
   const { collapsed } = useSidebarCollapsed();
   if (collapsed || viewer.kind !== "member") return null;
   return (
-    <span className="block truncate px-2 pb-0 text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
-      {viewer.companyName}
+    <span className="flex items-center justify-between gap-2 px-2 pb-0">
+      <span className="truncate text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
+        {viewer.companyName}
+      </span>
+      <span className="inline-flex shrink-0 items-center rounded border border-[color:var(--color-brand)]/20 bg-[color:var(--color-brand)]/10 px-1.5 py-0.5 text-[10px] font-semibold capitalize tracking-wide text-[color:var(--color-brand)]">
+        {viewer.role}
+      </span>
     </span>
   );
 }
@@ -109,11 +114,6 @@ function ViewerFooter({ viewer }: { viewer: Viewer }) {
               {email}
             </span>
           )}
-          <span className="mt-1 block">
-            <span className="inline-flex items-center rounded border border-[color:var(--color-brand)]/20 bg-[color:var(--color-brand)]/10 px-1.5 py-0.5 text-[10px] font-semibold capitalize tracking-wide text-[color:var(--color-brand)]">
-              {roleLabel}
-            </span>
-          </span>
         </span>
       )}
     </div>
