@@ -69,8 +69,8 @@ export function SidebarLayout({
     })
   }
 
-  const sidebarW = collapsed ? 'w-[72px]' : 'w-52'
-  const mainPl  = collapsed ? 'lg:pl-[72px]' : 'lg:pl-52'
+  const sidebarW = collapsed ? 'w-[72px]' : 'w-56'
+  const mainPl  = collapsed ? 'lg:pl-[72px]' : 'lg:pl-56'
 
   return (
     <SidebarCollapsedContext.Provider value={{ collapsed, toggle }}>
@@ -78,7 +78,7 @@ export function SidebarLayout({
         {/* Desktop sidebar */}
         <div
           className={clsx(
-            'fixed inset-y-0 left-0 max-lg:hidden transition-[width] duration-200 ease-in-out',
+            'fixed inset-y-0 left-0 max-lg:hidden overflow-hidden transition-[width] duration-200 ease-in-out',
             sidebarW,
           )}
         >
