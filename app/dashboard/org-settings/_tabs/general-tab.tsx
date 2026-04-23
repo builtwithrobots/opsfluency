@@ -6,6 +6,7 @@ import {
   uploadLogo,
 } from "@/app/dashboard/org-settings/_actions/general";
 import { Heading } from "@/components/ui/heading";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Text } from "@/components/ui/text";
 import { getCompanyContext } from "@/lib/auth/company-context";
 
@@ -134,12 +135,9 @@ export async function GeneralTab({ saved }: Props) {
           {/* Phone */}
           <label className="flex flex-col gap-1.5">
             <span className={labelClass}>Phone</span>
-            <input
+            <PhoneInput
               name="phone"
-              type="tel"
-              defaultValue={company.phone ?? ""}
-              maxLength={50}
-              placeholder="(555) 123-4567"
+              defaultValue={company.phone}
               className={inputClass}
             />
           </label>
