@@ -1,3 +1,4 @@
+import { clerkClient } from "@clerk/nextjs/server";
 import { UserRoundPlus, UserRoundX, UsersRound } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -30,6 +31,11 @@ interface MemberRow {
   role: string;
 }
 
+interface EnrichedMember extends MemberRow {
+  email: string;
+  displayName: string | null;
+}
+
 async function loadDepts(
   supabase: SupabaseClient,
   company_id: string,
@@ -47,7 +53,7 @@ async function loadMembersPanel(
   supabase: SupabaseClient,
   company_id: string,
   department_id: string,
-): Promise<{ assigned: MemberRow[]; unassigned: MemberRow[] }> {
+): Promise<{ assigned: EnrichedMember[]; unassigned: EnrichedMember[] }> {
   const [{ data: allMembers }, { data: memberships }] = await Promise.all([
     supabase
       .from("company_members")
@@ -62,11 +68,26 @@ async function loadMembersPanel(
   ]);
 
   const assignedIds = new Set((memberships ?? []).map((m) => m.member_id));
-  const all: MemberRow[] = allMembers ?? [];
+  const rows: MemberRow[] = allMembers ?? [];
+
+  const clerk = await clerkClient();
+  const enriched = await Promise.all(
+    rows.map(async (m): Promise<EnrichedMember> => {
+      try {
+        const user = await clerk.users.getUser(m.clerk_user_id);
+        const email = user.emailAddresses[0]?.emailAddress ?? m.clerk_user_id;
+        const displayName =
+          [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+        return { ...m, email, displayName };
+      } catch {
+        return { ...m, email: m.clerk_user_id, displayName: null };
+      }
+    }),
+  );
 
   return {
-    assigned: all.filter((m) => assignedIds.has(m.id)),
-    unassigned: all.filter((m) => !assignedIds.has(m.id)),
+    assigned: enriched.filter((m) => assignedIds.has(m.id)),
+    unassigned: enriched.filter((m) => !assignedIds.has(m.id)),
   };
 }
 
@@ -180,13 +201,16 @@ export async function MembersTab({ selectedDeptId }: Props) {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--dc-edge)] bg-dc-raised text-xs font-semibold text-dc-text-3 uppercase">
-                          {member.clerk_user_id.slice(5, 7)}
+                          {(member.displayName ?? member.email).slice(0, 2)}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm text-dc-text-2 font-mono text-[11px]">
-                            {member.clerk_user_id}
+                          <p className="truncate text-sm font-medium text-dc-text">
+                            {member.displayName ?? member.email}
                           </p>
-                          <p className="text-xs text-dc-text-3 capitalize">{member.role}</p>
+                          <p className="mt-0.5 truncate text-xs text-dc-text-3">
+                            {member.displayName ? `${member.email} · ` : ""}
+                            <span className="capitalize">{member.role}</span>
+                          </p>
                         </div>
                       </div>
 
@@ -232,7 +256,10 @@ export async function MembersTab({ selectedDeptId }: Props) {
                       <option value="">Choose a member…</option>
                       {panel!.unassigned.map((member) => (
                         <option key={member.id} value={member.id}>
-                          {member.clerk_user_id} ({member.role})
+                          {member.displayName
+                            ? `${member.displayName} — ${member.email}`
+                            : member.email}{" "}
+                          ({member.role})
                         </option>
                       ))}
                     </select>
