@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useTransition } from "react";
+import { useState } from "react";
 import { GripVertical, Pencil, Trash2, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   deleteDepartment,
@@ -58,12 +60,22 @@ function IconPicker({ defaultValue }: { defaultValue: string }) {
   );
 }
 
-export function DepartmentListClient({ depts: initialDepts, countByDeptId, initialEditingId }: Props) {
-  const [depts, setDepts] = useState(initialDepts);
+export function DepartmentListClient({
+  depts: serverDepts,
+  countByDeptId,
+  initialEditingId,
+}: Props) {
+  const router = useRouter();
+  const [depts, setDepts] = useState(serverDepts);
   const [editingId, setEditingId] = useState<string | null>(initialEditingId ?? null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // Sync local state when the server re-renders with fresh data (e.g. after a create).
+  useEffect(() => {
+    setDepts(serverDepts);
+  }, [serverDepts]);
 
   function handleDragStart(id: string) {
     setDraggingId(id);
@@ -182,7 +194,14 @@ export function DepartmentListClient({ depts: initialDepts, countByDeptId, initi
                     <Pencil className="size-3" strokeWidth={2} />
                     Edit
                   </button>
-                  <form action={deleteDepartment}>
+                  <form
+                    action={async (fd) => {
+                      await deleteDepartment(fd);
+                      // Remove from local state so the row disappears immediately
+                      setDepts((prev) => prev.filter((d) => d.id !== dept.id));
+                      router.refresh();
+                    }}
+                  >
                     <input type="hidden" name="id" value={dept.id} />
                     <button
                       type="submit"
@@ -215,10 +234,21 @@ export function DepartmentListClient({ depts: initialDepts, countByDeptId, initi
             {/* ── Inline edit form ─────────────────────────────────────────── */}
             {isEditing ? (
               <form
-                // Await the action then close the panel; updateDepartment no longer redirects.
                 action={async (fd) => {
                   await updateDepartment(fd);
+                  // Update local state so badge colour/icon reflect the change immediately
+                  const newHex = fd.get("color_hex") as string;
+                  const newIcon = fd.get("icon_key") as string;
+                  const newName = fd.get("name") as string;
+                  setDepts((prev) =>
+                    prev.map((d) =>
+                      d.id === dept.id
+                        ? { ...d, color_hex: newHex, icon_key: newIcon, name: newName }
+                        : d,
+                    ),
+                  );
                   setEditingId(null);
+                  router.refresh();
                 }}
                 className="flex flex-col gap-5 border-t border-[color:var(--dc-edge)] bg-dc-raised/40 px-5 py-5"
               >
