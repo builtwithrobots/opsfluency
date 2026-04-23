@@ -1,7 +1,6 @@
 import {
   Award,
   BookOpen,
-  Boxes,
   Briefcase,
   Building2,
   ChefHat,
@@ -69,7 +68,6 @@ export const DEPT_ICONS: Record<string, { label: string; Icon: LucideIcon }> = {
   "factory":        { label: "Factory",        Icon: Factory       },
   "truck":          { label: "Truck",          Icon: Truck         },
   "package":        { label: "Package",        Icon: Package       },
-  "boxes":          { label: "Boxes",          Icon: Boxes         },
   "shopping-cart":  { label: "Procurement",    Icon: ShoppingCart  },
   "zap":            { label: "Zap",            Icon: Zap           },
 

@@ -223,6 +223,8 @@ export function DepartmentListClient({ depts: initialDepts, countByDeptId, initi
                 className="flex flex-col gap-5 border-t border-[color:var(--dc-edge)] bg-dc-raised/40 px-5 py-5"
               >
                 <input type="hidden" name="id" value={dept.id} />
+                {/* Disabled inputs don't submit — send the locked name via hidden field */}
+                {isHR && <input type="hidden" name="name" value={dept.name} />}
 
                 <label className="flex flex-col gap-1.5">
                   <span className={labelClass}>
@@ -230,9 +232,9 @@ export function DepartmentListClient({ depts: initialDepts, countByDeptId, initi
                     <span className="ml-1 text-(--color-signal-urgent)">*</span>
                   </span>
                   <input
-                    name="name"
+                    name={isHR ? undefined : "name"}
                     type="text"
-                    required
+                    required={!isHR}
                     defaultValue={dept.name}
                     maxLength={80}
                     disabled={isHR}
