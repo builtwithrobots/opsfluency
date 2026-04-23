@@ -8,6 +8,7 @@ import {
   Languages,
   MonitorSpeaker,
   QrCode,
+  Settings2,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -75,8 +76,9 @@ const platform: NavSection = {
 
 const footer: NavSection = {
   items: [
-    { href: "/dashboard/help",      label: "Help",       icon: HelpCircle, match: "prefix", visibility: { member: ["manager"], superAdmin: true } },
-    { href: "/dashboard/changelog", label: "Changelog",  icon: Sparkles,   match: "prefix", visibility: { member: ["manager"], superAdmin: true } },
+    { href: "/dashboard/org-settings", label: "Settings",  icon: Settings2,  match: "prefix", visibility: { member: ["admin"] } },
+    { href: "/dashboard/help",         label: "Help",       icon: HelpCircle, match: "prefix", visibility: { member: ["manager"], superAdmin: true } },
+    { href: "/dashboard/changelog",    label: "Changelog",  icon: Sparkles,   match: "prefix", visibility: { member: ["manager"], superAdmin: true } },
   ],
 };
 
