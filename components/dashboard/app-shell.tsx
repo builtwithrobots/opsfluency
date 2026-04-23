@@ -2,13 +2,12 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, ChevronLeft, ChevronRight, Eye, GripVertical } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, CircleHelp, Eye, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/ui/navbar";
 import {
   Sidebar,
@@ -116,21 +115,25 @@ function ViewerFooter({ viewer }: { viewer: Viewer }) {
 
 // ── Collapse toggle ──────────────────────────────────────────────────────────
 
+const utilityButtonClass =
+  "relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-dc-edge bg-dc-surface text-dc-text transition-colors hover:bg-dc-raised";
+
 function CollapseToggle() {
   const { collapsed, toggle } = useSidebarCollapsed();
   return (
-    <Button
-      className="h-11 w-11"
+    <button
+      type="button"
       onClick={toggle}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      className={utilityButtonClass}
     >
       {collapsed ? (
-        <ChevronRight data-slot="icon" strokeWidth={2} />
+        <ChevronRight className="h-5 w-5" strokeWidth={2} />
       ) : (
-        <ChevronLeft data-slot="icon" strokeWidth={2} />
+        <ChevronLeft className="h-5 w-5" strokeWidth={2} />
       )}
-    </Button>
+    </button>
   );
 }
 
@@ -379,9 +382,19 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
                 rel="noopener noreferrer"
                 aria-label="Preview employee app"
                 title="Preview employee app"
-                className="relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-dc-edge bg-dc-surface text-dc-text transition-colors hover:bg-dc-raised"
+                className={utilityButtonClass}
               >
                 <Eye className="h-5 w-5" strokeWidth={2} />
+              </a>
+            )}
+            {!collapsed && (
+              <a
+                href="#"
+                aria-label="Help & documentation"
+                title="Help & documentation"
+                className={utilityButtonClass}
+              >
+                <CircleHelp className="h-5 w-5" strokeWidth={2} />
               </a>
             )}
             <CollapseToggle />
