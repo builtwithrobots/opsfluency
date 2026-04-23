@@ -1,17 +1,10 @@
 import {
-  BarChart3,
-  Bell,
   Building2,
-  FileText,
-  HelpCircle,
   Home,
-  Languages,
-  MonitorSpeaker,
   QrCode,
   Settings2,
   ShieldCheck,
-  Sparkles,
-  Upload,
+  User,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -49,24 +42,39 @@ export interface NavItem {
 
 export interface NavSection {
   heading?: string;
+  // Sections with `reorderable: true` have their item order persisted to localStorage.
+  reorderable?: boolean;
   items: NavItem[];
 }
 
+// Primary — workspace tools with live pages
 const primary: NavSection = {
+  reorderable: true,
   items: [
-    { href: "/dashboard",               label: "Home",          icon: Home,           match: "exact",  visibility: { member: ["manager"] } },
-    { href: "/dashboard/sops",          label: "SOPs",          icon: FileText,       match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/import",        label: "Import",        icon: Upload,         match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/glossary",      label: "Glossary",      icon: Languages,      match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/employees",     label: "Employees",     icon: Users,          match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/announcements", label: "Announcements", icon: Bell,           match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/departments",   label: "Departments",   icon: Building2,      match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/qr",            label: "QR Codes",      icon: QrCode,         match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/monitors",      label: "Monitors",      icon: MonitorSpeaker, match: "prefix", visibility: { member: ["manager"] } },
-    { href: "/dashboard/analytics",     label: "Analytics",     icon: BarChart3,      match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard",    label: "Home",      icon: Home,          match: "exact",  visibility: { member: ["manager"] } },
+    { href: "/dashboard/qr", label: "QR Codes",  icon: QrCode,        match: "prefix", visibility: { member: ["manager"] } },
+    // Items below are planned but not yet built; uncomment as pages ship:
+    // { href: "/dashboard/sops",          label: "SOPs",          icon: FileText,       match: "prefix", visibility: { member: ["manager"] } },
+    // { href: "/dashboard/import",        label: "Import",        icon: Upload,         match: "prefix", visibility: { member: ["manager"] } },
+    // { href: "/dashboard/glossary",      label: "Glossary",      icon: Languages,      match: "prefix", visibility: { member: ["manager"] } },
+    // { href: "/dashboard/announcements", label: "Announcements", icon: Bell,           match: "prefix", visibility: { member: ["manager"] } },
+    // { href: "/dashboard/monitors",      label: "Monitors",      icon: MonitorSpeaker, match: "prefix", visibility: { member: ["manager"] } },
+    // { href: "/dashboard/analytics",     label: "Analytics",     icon: BarChart3,      match: "prefix", visibility: { member: ["manager"] } },
   ],
 };
 
+// Settings — org and user configuration
+const settings: NavSection = {
+  heading: "Settings",
+  items: [
+    { href: "/dashboard/org-settings", label: "Org Settings", icon: Settings2,      match: "prefix", visibility: { member: ["admin"] } },
+    { href: "/dashboard/my-settings",  label: "My Settings",  icon: User,           match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard/employees",    label: "Employees",    icon: Users,          match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard/departments",  label: "Departments",  icon: Building2,      match: "prefix", visibility: { member: ["manager"] } },
+  ],
+};
+
+// Platform — super admin only
 const platform: NavSection = {
   heading: "Platform",
   items: [
@@ -74,16 +82,11 @@ const platform: NavSection = {
   ],
 };
 
-const footer: NavSection = {
-  items: [
-    { href: "/dashboard/org-settings", label: "Settings",  icon: Settings2,  match: "prefix", visibility: { member: ["admin"] } },
-    { href: "/dashboard/help",         label: "Help",       icon: HelpCircle, match: "prefix", visibility: { member: ["manager"], superAdmin: true } },
-    { href: "/dashboard/changelog",    label: "Changelog",  icon: Sparkles,   match: "prefix", visibility: { member: ["manager"], superAdmin: true } },
-  ],
-};
+export const navSections: readonly NavSection[] = [primary, settings, platform] as const;
 
-export const navSections: readonly NavSection[] = [primary, platform] as const;
-export const navFooterSection: NavSection = footer;
+// Footer section: empty — Settings moved to its own section; Help/Changelog
+// pages not yet built. Restore items here as stubs ship.
+export const navFooterSection: NavSection = { items: [] };
 
 /**
  * Visibility gate. Super admins are god mode: both the pure-super-admin
@@ -104,9 +107,7 @@ export function canSee(item: NavItem, viewer: Viewer): boolean {
 }
 
 /**
- * Resolves whether a given pathname activates a nav item. The distinction
- * between `exact` and `prefix` avoids the Home item highlighting on every
- * sub-route.
+ * Resolves whether a given pathname activates a nav item.
  */
 export function isActive(item: NavItem, pathname: string): boolean {
   if (item.match === "exact") return pathname === item.href;
@@ -115,8 +116,6 @@ export function isActive(item: NavItem, pathname: string): boolean {
 
 /**
  * Returns only sections that have at least one visible item for the viewer.
- * Keeps empty headings (like an admin-free "Platform" section for a
- * regular manager) from rendering as dead space.
  */
 export function visibleSections(viewer: Viewer): NavSection[] {
   return navSections
@@ -131,5 +130,4 @@ export const appDisplayName = "OpsFluency";
 
 export const brandNameClasses = "font-display tracking-[0.05em] uppercase";
 
-/** Icon for the Platform section tagline / badge. */
 export const superAdminIcon = ShieldCheck;

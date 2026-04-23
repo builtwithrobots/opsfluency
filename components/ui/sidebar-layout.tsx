@@ -1,8 +1,10 @@
 'use client'
 
 import * as Headless from '@headlessui/react'
-import React, { useState } from 'react'
+import clsx from 'clsx'
+import React, { useEffect, useState } from 'react'
 import { NavbarItem } from './navbar'
+import { SidebarCollapsedContext } from './sidebar-collapsed-context'
 
 function OpenMenuIcon() {
   return (
@@ -50,33 +52,67 @@ export function SidebarLayout({
   children,
 }: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
   const [showSidebar, setShowSidebar] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+
+  // Sync collapsed state from localStorage after mount (avoids SSR mismatch)
+  useEffect(() => {
+    if (localStorage.getItem('sidebar-collapsed') === 'true') {
+      setCollapsed(true)
+    }
+  }, [])
+
+  const toggle = () => {
+    setCollapsed((c) => {
+      const next = !c
+      localStorage.setItem('sidebar-collapsed', String(next))
+      return next
+    })
+  }
+
+  const sidebarW = collapsed ? 'w-14' : 'w-64'
+  const mainPl  = collapsed ? 'lg:pl-14' : 'lg:pl-64'
 
   return (
-    <div className="relative isolate flex min-h-svh w-full bg-dc-surface max-lg:flex-col lg:bg-dc-bg">
-      {/* Sidebar on desktop */}
-      <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
-
-      {/* Sidebar on mobile */}
-      <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
-        {sidebar}
-      </MobileSidebar>
-
-      {/* Navbar on mobile */}
-      <header className="flex items-center px-4 lg:hidden">
-        <div className="py-2.5">
-          <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
-            <OpenMenuIcon />
-          </NavbarItem>
+    <SidebarCollapsedContext.Provider value={{ collapsed, toggle }}>
+      <div className="relative isolate flex min-h-svh w-full bg-dc-surface max-lg:flex-col lg:bg-dc-bg">
+        {/* Desktop sidebar */}
+        <div
+          className={clsx(
+            'fixed inset-y-0 left-0 max-lg:hidden transition-[width] duration-200 ease-in-out',
+            sidebarW,
+          )}
+        >
+          {sidebar}
         </div>
-        <div className="min-w-0 flex-1">{navbar}</div>
-      </header>
 
-      {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-        <div className="grow p-6 lg:rounded-lg lg:bg-dc-surface lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-[color:var(--dc-edge)]">
-          <div className="mx-auto max-w-6xl">{children}</div>
-        </div>
-      </main>
-    </div>
+        {/* Mobile sidebar */}
+        <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
+          {sidebar}
+        </MobileSidebar>
+
+        {/* Mobile navbar */}
+        <header className="flex items-center px-4 lg:hidden">
+          <div className="py-2.5">
+            <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
+              <OpenMenuIcon />
+            </NavbarItem>
+          </div>
+          <div className="min-w-0 flex-1">{navbar}</div>
+        </header>
+
+        {/* Main content */}
+        <main
+          className={clsx(
+            'flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2',
+            'transition-[padding-left] duration-200 ease-in-out',
+            mainPl,
+          )}
+        >
+          <div className="grow p-6 lg:rounded-lg lg:bg-dc-surface lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-[color:var(--dc-edge)]">
+            <div className="mx-auto max-w-6xl">{children}</div>
+          </div>
+        </main>
+      </div>
+    </SidebarCollapsedContext.Provider>
   )
 }
