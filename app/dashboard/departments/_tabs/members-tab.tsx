@@ -34,6 +34,7 @@ interface MemberRow {
 interface EnrichedMember extends MemberRow {
   email: string;
   displayName: string | null;
+  imageUrl: string | null;
 }
 
 async function loadDepts(
@@ -78,9 +79,10 @@ async function loadMembersPanel(
         const email = user.emailAddresses[0]?.emailAddress ?? m.clerk_user_id;
         const displayName =
           [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
-        return { ...m, email, displayName };
+        const imageUrl = user.imageUrl ?? null;
+        return { ...m, email, displayName, imageUrl };
       } catch {
-        return { ...m, email: m.clerk_user_id, displayName: null };
+        return { ...m, email: m.clerk_user_id, displayName: null, imageUrl: null };
       }
     }),
   );
@@ -200,9 +202,18 @@ export async function MembersTab({ selectedDeptId }: Props) {
                       className="flex flex-wrap items-center justify-between gap-4 px-5 py-3"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--dc-edge)] bg-dc-raised text-xs font-semibold text-dc-text-3 uppercase">
-                          {(member.displayName ?? member.email).slice(0, 2)}
-                        </div>
+                        {member.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={member.imageUrl}
+                            alt={member.displayName ?? member.email}
+                            className="size-8 shrink-0 rounded-full border border-[color:var(--dc-edge)] object-cover"
+                          />
+                        ) : (
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--dc-edge)] bg-dc-raised text-xs font-semibold text-dc-text-3 uppercase">
+                            {(member.displayName ?? member.email).slice(0, 2)}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-dc-text">
                             {member.displayName ?? member.email}
