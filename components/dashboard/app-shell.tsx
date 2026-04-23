@@ -129,6 +129,7 @@ function CollapseToggle() {
   return (
     <Button
       outline
+      className="h-11"
       onClick={toggle}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -398,17 +399,17 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
           </SidebarSection>
         ) : null}
 
-        {/* Collapse toggle — desktop only */}
+        {/* Collapse toggle + theme toggle — desktop only */}
         <SidebarSection className="max-lg:hidden">
-          <CollapseToggle />
+          <div className="flex items-center gap-2">
+            {!collapsed && <ThemeToggle />}
+            <CollapseToggle />
+          </div>
         </SidebarSection>
       </SidebarBody>
 
       <SidebarFooter className="max-lg:hidden">
         <ContextLabel viewer={viewer} />
-        <div className={`flex px-2 pb-1 ${collapsed ? "justify-center" : "justify-end"}`}>
-          <ThemeToggle />
-        </div>
         <ViewerFooter viewer={viewer} />
       </SidebarFooter>
     </Sidebar>
