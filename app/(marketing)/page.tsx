@@ -35,7 +35,7 @@ async function routeAuthedUserAway() {
   const supabase = await getRequestClient();
 
   const { data: isSuper } = await supabase.rpc("is_super_admin");
-  if (isSuper) redirect("/dashboard/platform/tenants");
+  if (isSuper) redirect("/dashboard/platform");
 
   const { data: member } = await supabase
     .from("company_members")

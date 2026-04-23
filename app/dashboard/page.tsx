@@ -24,7 +24,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     // meaningful on the member-scoped home page. Route them to their
     // own landing.
     if (e instanceof AuthError && e.code === "NO_COMPANY") {
-      if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform/tenants");
+      if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform");
     }
     throw e;
   }

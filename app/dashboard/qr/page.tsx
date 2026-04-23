@@ -34,7 +34,7 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
       // Super admins have no company_members row — send them to the
       // platform view. Employees are already redirected by the layout.
       if (e.code === 'NO_COMPANY' && (await isCurrentUserSuperAdmin())) {
-        redirect('/dashboard/platform/tenants');
+        redirect('/dashboard/platform');
       }
       if (e.code === 'UNAUTHENTICATED') redirect('/sign-in');
     }

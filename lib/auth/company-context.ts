@@ -53,7 +53,7 @@ export interface CompanyContext {
  *
  * Super admins are stored in the separate `super_admins` table and are
  * resolved by `getSuperAdminContext()`. When a super admin has started
- * an impersonation session from `/dashboard/platform/tenants`, this
+ * an impersonation session from `/dashboard/platform`, this
  * function transparently returns the impersonated tenant's context
  * with `role: 'admin'` and `impersonating: true`. Every downstream
  * server query sees the impersonated `company_id` and RLS lets the

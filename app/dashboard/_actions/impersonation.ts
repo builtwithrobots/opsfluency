@@ -79,5 +79,5 @@ export async function stopImpersonation() {
     });
   }
   await clearImpersonationCookie();
-  redirect("/dashboard/platform/tenants");
+  redirect("/dashboard/platform?tab=tenants");
 }
