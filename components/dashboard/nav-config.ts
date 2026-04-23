@@ -69,7 +69,7 @@ const primary: NavSection = {
 const platform: NavSection = {
   heading: "Platform",
   items: [
-    { href: "/dashboard/platform/tenants", label: "Tenants", icon: Building2,    match: "prefix", visibility: { superAdmin: true } },
+    { href: "/dashboard/platform", label: "Console", icon: ShieldCheck, match: "prefix", visibility: { superAdmin: true } },
   ],
 };
 

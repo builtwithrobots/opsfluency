@@ -10,7 +10,7 @@ export default async function OnboardingPage() {
   // Super admins don't belong in any company — bootstrapping one for
   // them would create a shell tenant. Send them to the Platform surface
   // inside the dashboard shell.
-  if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform/tenants");
+  if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform");
 
   try {
     await getCompanyContext();
