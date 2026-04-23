@@ -45,7 +45,9 @@ export async function updateCompanyProfile(formData: FormData): Promise<void> {
     const {
       data: { publicUrl },
     } = admin.storage.from("company-logos").getPublicUrl(`${company_id}/logo`);
-    logo_url = publicUrl;
+    // Cache-bust: the storage path never changes (upsert), so append a
+    // timestamp so the browser fetches fresh content after every upload.
+    logo_url = `${publicUrl}?v=${Date.now()}`;
   }
 
   const update: Record<string, unknown> = {
@@ -57,6 +59,26 @@ export async function updateCompanyProfile(formData: FormData): Promise<void> {
   const { error } = await admin
     .from("companies")
     .update(update)
+    .eq("id", company_id);
+  if (error) throw error;
+
+  revalidatePath("/dashboard/org-settings");
+  redirect("/dashboard/org-settings?tab=general&saved=1");
+}
+
+export async function removeLogo(): Promise<void> {
+  const { company_id } = await getCompanyContext("admin");
+  const admin = getAdminClient();
+
+  // Best-effort storage removal — if the file doesn't exist we still
+  // clear the DB column so the UI is consistent.
+  await admin.storage
+    .from("company-logos")
+    .remove([`${company_id}/logo`]);
+
+  const { error } = await admin
+    .from("companies")
+    .update({ logo_url: null })
     .eq("id", company_id);
   if (error) throw error;
 
