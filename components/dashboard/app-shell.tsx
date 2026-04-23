@@ -32,6 +32,8 @@ import {
 import { useSidebarCollapsed } from "@/components/ui/sidebar-collapsed-context";
 import { SidebarLayout } from "@/components/ui/sidebar-layout";
 
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+
 import {
   brandNameClasses,
   canSee,
@@ -404,6 +406,9 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
 
       <SidebarFooter className="max-lg:hidden">
         <ContextLabel viewer={viewer} />
+        <div className={`flex px-2 pb-1 ${collapsed ? "justify-center" : "justify-end"}`}>
+          <ThemeToggle />
+        </div>
         <ViewerFooter viewer={viewer} />
       </SidebarFooter>
     </Sidebar>
@@ -434,6 +439,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
         <Navbar>
           <NavbarSpacer />
           <NavbarSection>
+            <ThemeToggle />
             <NavbarItem aria-label="Account">
               <UserButton />
             </NavbarItem>
