@@ -1,6 +1,9 @@
 import { AlertCircle, ExternalLink, Image as ImageIcon, QrCode, ScanLine, Search, Settings2 } from 'lucide-react';
 
-import { getCompanyContext } from '@/lib/auth/company-context';
+import { redirect } from 'next/navigation';
+
+import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
+import { isCurrentUserSuperAdmin } from '@/lib/auth/super-admin-context';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
@@ -23,7 +26,21 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
   const { tab: rawTab, q = '' } = await searchParams;
   const tab = rawTab === 'settings' ? 'settings' : 'all';
 
-  const { supabase, company_id, role } = await getCompanyContext('manager');
+  let ctx;
+  try {
+    ctx = await getCompanyContext('manager');
+  } catch (e) {
+    if (e instanceof AuthError) {
+      // Super admins have no company_members row — send them to the
+      // platform view. Employees are already redirected by the layout.
+      if (e.code === 'NO_COMPANY' && (await isCurrentUserSuperAdmin())) {
+        redirect('/dashboard/platform/tenants');
+      }
+      if (e.code === 'UNAUTHENTICATED') redirect('/sign-in');
+    }
+    throw e;
+  }
+  const { supabase, company_id, role } = ctx;
   const isAdmin = role === 'admin';
 
   const tabs: TabDef[] = [
