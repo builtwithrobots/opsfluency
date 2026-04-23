@@ -75,9 +75,10 @@ export const SidebarItem = forwardRef(function SidebarItem(
   {
     current,
     className,
+    centered,
     children,
     ...props
-  }: { current?: boolean; className?: string; children: React.ReactNode } & (
+  }: { current?: boolean; className?: string; centered?: boolean; children: React.ReactNode } & (
     | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
     | ({ href: string } & Omit<Headless.ButtonProps<typeof Link>, 'as' | 'className'>)
   ),
@@ -86,6 +87,8 @@ export const SidebarItem = forwardRef(function SidebarItem(
   const classes = clsx(
     // Base
     'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-zinc-950 sm:py-2 sm:text-sm/5',
+    // Collapsed / icon-only mode
+    centered && '!justify-center !px-0 !gap-0',
     // Leading icon/icon-only — use text-* (currentColor) so Lucide's stroked
     // icons pick up color; fill-* only colors Heroicons-style solid icons.
     '*:data-[slot=icon]:size-6 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:text-zinc-500 sm:*:data-[slot=icon]:size-5',

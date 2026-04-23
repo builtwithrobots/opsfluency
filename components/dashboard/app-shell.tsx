@@ -2,7 +2,7 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ChevronDown, GripVertical, LogOut } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, LogOut } from "lucide-react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -59,7 +59,7 @@ function BrandMark() {
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <span className="font-display text-[10px] font-bold text-white">OF</span>
+      <Building2 className="size-4 text-white" strokeWidth={2} />
     </motion.span>
   );
 }
@@ -143,8 +143,8 @@ function CollapseToggle() {
       onClick={toggle}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      className={`flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-dc-text-3 hover:bg-zinc-950/5 hover:text-dc-text transition-colors ${
-        collapsed ? "w-full justify-center" : "w-full"
+      className={`flex w-full items-center gap-2 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-2 py-2 text-xs font-medium text-dc-text-3 transition-colors hover:bg-dc-overlay hover:text-dc-text ${
+        collapsed ? "justify-center" : ""
       }`}
     >
       {collapsed ? (
@@ -248,7 +248,7 @@ function DraggableNavList({
             }`}
             title={collapsed ? item.label : undefined}
           >
-            <SidebarItem href={item.href} current={active}>
+            <SidebarItem href={item.href} current={active} centered={collapsed}>
               <Icon data-slot="icon" strokeWidth={2} />
               {!collapsed && (
                 <>
@@ -291,7 +291,7 @@ function StaticNavList({
             transition={{ duration: 0.22, delay: index * 0.02, ease: "easeOut" }}
             title={collapsed ? item.label : undefined}
           >
-            <SidebarItem href={item.href} current={active}>
+            <SidebarItem href={item.href} current={active} centered={collapsed}>
               <Icon data-slot="icon" strokeWidth={2} />
               {!collapsed && <SidebarLabel>{item.label}</SidebarLabel>}
             </SidebarItem>
@@ -314,7 +314,7 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
     <Sidebar>
       <SidebarHeader>
         <Dropdown>
-          <DropdownButton as={SidebarItem} aria-label="Workspace menu">
+          <DropdownButton as={SidebarItem} centered={collapsed} aria-label="Workspace menu">
             <BrandMark />
             {!collapsed && (
               <>
@@ -367,7 +367,7 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
                   key={item.href}
                   title={collapsed ? item.label : undefined}
                 >
-                  <SidebarItem href={item.href}>
+                  <SidebarItem href={item.href} centered={collapsed}>
                     <Icon data-slot="icon" strokeWidth={2} />
                     {!collapsed && <SidebarLabel>{item.label}</SidebarLabel>}
                   </SidebarItem>

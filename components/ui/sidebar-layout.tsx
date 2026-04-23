@@ -69,8 +69,8 @@ export function SidebarLayout({
     })
   }
 
-  const sidebarW = collapsed ? 'w-14' : 'w-64'
-  const mainPl  = collapsed ? 'lg:pl-14' : 'lg:pl-64'
+  const sidebarW = collapsed ? 'w-[72px]' : 'w-64'
+  const mainPl  = collapsed ? 'lg:pl-[72px]' : 'lg:pl-64'
 
   return (
     <SidebarCollapsedContext.Provider value={{ collapsed, toggle }}>
