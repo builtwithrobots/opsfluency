@@ -127,10 +127,6 @@ export async function DepartmentsTab({ editing }: Props) {
         <Heading level={2} className="font-display text-xl">
           All departments
         </Heading>
-        <Text className="mt-1 text-sm max-w-2xl">
-          Assign employees and SOPs to departments. HR is a protected system
-          department — it cannot be renamed or deleted.
-        </Text>
 
         {!depts.length ? (
           <div className="mt-4 rounded-xl border border-dashed border-[color:var(--dc-edge)] bg-dc-surface px-6 py-10 text-center">
