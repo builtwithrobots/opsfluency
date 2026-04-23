@@ -2,20 +2,12 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, LogOut } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownDivider,
-  DropdownItem,
-  DropdownLabel,
-  DropdownMenu,
-} from "@/components/ui/dropdown";
 import { Button } from "@/components/ui/button";
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/ui/navbar";
 import {
@@ -128,8 +120,7 @@ function CollapseToggle() {
   const { collapsed, toggle } = useSidebarCollapsed();
   return (
     <Button
-      outline
-      className="h-11"
+      className="h-11 flex-1"
       onClick={toggle}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -324,33 +315,14 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
   return (
     <Sidebar>
       <SidebarHeader>
-        <Dropdown>
-          <DropdownButton as={SidebarItem} aria-label="Workspace menu">
-            <BrandMark />
-            {!collapsed && (
-              <>
-                <SidebarLabel>
-                  <span className={brandNameClasses}>
-                    OPS<span className="text-(--color-brand)">FLUENCY</span>
-                  </span>
-                </SidebarLabel>
-                <ChevronDown data-slot="icon" strokeWidth={2} />
-              </>
-            )}
-          </DropdownButton>
-          <DropdownMenu className="min-w-64" anchor="bottom start">
-            {viewer.kind === "member" ? (
-              <DropdownItem href="/dashboard/org-settings">
-                <DropdownLabel>Workspace settings</DropdownLabel>
-              </DropdownItem>
-            ) : null}
-            <DropdownDivider />
-            <DropdownItem href="/sign-out">
-              <LogOut data-slot="icon" strokeWidth={2} />
-              <DropdownLabel>Sign out</DropdownLabel>
-            </DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+        <div className="flex items-center gap-3 px-2 py-2">
+          <BrandMark />
+          {!collapsed && (
+            <span className={brandNameClasses}>
+              OPS<span className="text-(--color-brand)">FLUENCY</span>
+            </span>
+          )}
+        </div>
       </SidebarHeader>
 
       <SidebarBody>
@@ -401,7 +373,7 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
 
         {/* Collapse toggle + theme toggle — desktop only */}
         <SidebarSection className="max-lg:hidden">
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2">
             {!collapsed && <ThemeToggle />}
             <CollapseToggle />
           </div>
