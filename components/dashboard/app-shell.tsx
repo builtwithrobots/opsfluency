@@ -16,6 +16,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from "@/components/ui/dropdown";
+import { Button } from "@/components/ui/button";
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/ui/navbar";
 import {
   Sidebar,
@@ -52,12 +53,12 @@ function BrandMark() {
   return (
     <motion.span
       aria-hidden
-      className="relative flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)"
+      className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)"
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <Building2 className="size-4 text-white" strokeWidth={2} />
+      <Building2 className="size-5 text-white" strokeWidth={2} />
     </motion.span>
   );
 }
@@ -108,8 +109,10 @@ function ViewerFooter({ viewer }: { viewer: Viewer }) {
               {email}
             </span>
           )}
-          <span className="block truncate text-xs/5 capitalize text-dc-text-3">
-            {roleLabel}
+          <span className="mt-1 block">
+            <span className="inline-flex items-center rounded border border-[color:var(--color-brand)]/20 bg-[color:var(--color-brand)]/10 px-1.5 py-0.5 text-[10px] font-semibold capitalize tracking-wide text-[color:var(--color-brand)]">
+              {roleLabel}
+            </span>
           </span>
         </span>
       )}
@@ -122,24 +125,21 @@ function ViewerFooter({ viewer }: { viewer: Viewer }) {
 function CollapseToggle() {
   const { collapsed, toggle } = useSidebarCollapsed();
   return (
-    <button
-      type="button"
+    <Button
+      outline
       onClick={toggle}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      className={`inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised py-1.5 text-xs font-medium text-dc-text-2 transition-colors hover:bg-dc-overlay hover:text-dc-text ${
-        collapsed ? "justify-center px-2" : "px-3"
-      }`}
     >
       {collapsed ? (
-        <ChevronRight className="size-3.5 shrink-0" strokeWidth={2} />
+        <ChevronRight data-slot="icon" strokeWidth={2} />
       ) : (
         <>
-          <ChevronLeft className="size-3.5 shrink-0" strokeWidth={2} />
-          <span>Collapse</span>
+          <ChevronLeft data-slot="icon" strokeWidth={2} />
+          Collapse
         </>
       )}
-    </button>
+    </Button>
   );
 }
 
