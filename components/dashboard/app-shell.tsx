@@ -32,12 +32,10 @@ import { useSidebarCollapsed } from "@/components/ui/sidebar-collapsed-context";
 import { SidebarLayout } from "@/components/ui/sidebar-layout";
 
 import {
-  appDisplayName,
   brandNameClasses,
   canSee,
   isActive,
   navFooterSection,
-  superAdminIcon,
   visibleSections,
   type NavItem,
   type Viewer,
@@ -51,54 +49,27 @@ interface AppShellProps {
 // ── Brand mark ──────────────────────────────────────────────────────────────
 
 function BrandMark() {
-  const { collapsed } = useSidebarCollapsed();
   return (
     <motion.span
       aria-hidden
-      // Only set data-slot="avatar" when expanded; in collapsed mode the
-      // SidebarItem's *:data-[slot=avatar]:size-7 rule would force 28px
-      // which overflows the narrow sidebar. Without the slot, we control
-      // size explicitly.
-      {...(!collapsed ? { "data-slot": "avatar" } : {})}
-      className={`relative flex items-center justify-center rounded-lg bg-(--color-brand) ${
-        collapsed ? "size-6" : ""
-      }`}
+      className="relative flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)"
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <Building2 className={collapsed ? "size-3 text-white" : "size-4 text-white"} strokeWidth={2} />
+      <Building2 className="size-4 text-white" strokeWidth={2} />
     </motion.span>
   );
 }
 
-// ── Company context label (below header divider) ─────────────────────────────
+// ── Company context label (above user footer, below footer divider) ──────────
 
 function ContextLabel({ viewer }: { viewer: Viewer }) {
   const { collapsed } = useSidebarCollapsed();
-  if (collapsed) return null;
-
-  if (viewer.kind === "superAdmin") {
-    const Icon = superAdminIcon;
-    return (
-      <span className="flex items-center gap-1.5 px-2 pt-1 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
-        <Icon className="size-3" strokeWidth={2} />
-        Super admin
-      </span>
-    );
-  }
-  const SuperIcon = superAdminIcon;
+  if (collapsed || viewer.kind !== "member") return null;
   return (
-    <span className="flex items-center justify-between gap-2 px-2 pt-1">
-      <span className="truncate text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
-        {viewer.companyName}
-      </span>
-      {viewer.isSuperAdmin ? (
-        <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium tracking-wide text-(--color-brand) uppercase">
-          <SuperIcon className="size-3" strokeWidth={2} />
-          Super admin
-        </span>
-      ) : null}
+    <span className="block truncate px-2 pb-0 text-[11px] font-medium tracking-wide text-dc-text-3 uppercase">
+      {viewer.companyName}
     </span>
   );
 }
@@ -132,8 +103,13 @@ function ViewerFooter({ viewer }: { viewer: Viewer }) {
           <span className="block truncate text-sm/5 font-medium text-dc-text">
             {name ?? email ?? roleLabel}
           </span>
-          <span className="block truncate text-xs/5 text-dc-text-2">
-            {email ?? <span className="capitalize">{roleLabel}</span>}
+          {email && (
+            <span className="block truncate text-xs/5 text-dc-text-2">
+              {email}
+            </span>
+          )}
+          <span className="block truncate text-xs/5 capitalize text-dc-text-3">
+            {roleLabel}
           </span>
         </span>
       )}
@@ -372,7 +348,6 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
             </DropdownItem>
           </DropdownMenu>
         </Dropdown>
-        <ContextLabel viewer={viewer} />
       </SidebarHeader>
 
       <SidebarBody>
@@ -428,6 +403,7 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
       </SidebarBody>
 
       <SidebarFooter className="max-lg:hidden">
+        <ContextLabel viewer={viewer} />
         <ViewerFooter viewer={viewer} />
       </SidebarFooter>
     </Sidebar>
