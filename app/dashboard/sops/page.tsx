@@ -169,7 +169,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
       const { data, error } = await query;
       if (error) libraryError = error.message;
-      else librarySops = (data ?? []) as SopRow[];
+      else librarySops = (data ?? []) as unknown as SopRow[];
     } catch {
       libraryError = 'Unable to load SOPs.';
     }
@@ -190,7 +190,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
         .order('updated_at', { ascending: false });
 
       if (error) buildError = error.message;
-      else buildSops = (data ?? []) as SopRow[];
+      else buildSops = (data ?? []) as unknown as SopRow[];
     } catch {
       buildError = 'Unable to load in-progress SOPs.';
     }
@@ -222,7 +222,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
       const { data, error } = await query;
       if (error) archiveError = error.message;
-      else archiveSops = (data ?? []) as SopRow[];
+      else archiveSops = (data ?? []) as unknown as SopRow[];
     } catch {
       archiveError = 'Unable to load archived SOPs.';
     }
