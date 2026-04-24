@@ -9,7 +9,6 @@ import {
   Hammer,
   Hash,
   List,
-  Palette,
   Search,
   Users,
 } from 'lucide-react';
@@ -301,6 +300,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
       {tab === 'template' && (
         <TemplateTab
           currentTemplate={company?.default_sop_template as SopTemplate | null ?? null}
+          currentPackage={industryPackage}
           templateLocked={templateLocked}
           isAdmin={isAdmin}
         />
@@ -475,7 +475,6 @@ function BuildTab({ sops, fetchError, defaultTemplate, templateLocked }: BuildTa
           </div>
         </div>
         <Button href="/dashboard/sops?tab=template" plain className="shrink-0 text-sm">
-          <Palette data-slot="icon" className="size-4" strokeWidth={1.5} />
           Change
         </Button>
       </div>
@@ -636,38 +635,20 @@ function ArchiveTab({ sops, fetchError, departments, q, deptFilter, sort, dir }:
 
 interface TemplateTabProps {
   currentTemplate: SopTemplate | null;
+  currentPackage: string;
   templateLocked: boolean;
   isAdmin: boolean;
 }
 
-function TemplateTab({ currentTemplate, templateLocked, isAdmin }: TemplateTabProps) {
+function TemplateTab({ currentTemplate, currentPackage, templateLocked, isAdmin }: TemplateTabProps) {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
-        <div className="flex items-start gap-4">
-          <span
-            aria-hidden
-            className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
-          >
-            <Palette className="size-5" strokeWidth={1.5} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-dc-text">SOP Template Style</h2>
-            <p className="mt-1 max-w-lg text-sm text-dc-text-2">
-              Choose the default template all new SOPs will use. Lock it to enforce consistency
-              across your team — only admins can unlock it.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <SopTemplateTabClient
-            currentTemplate={currentTemplate}
-            templateLocked={templateLocked}
-            isAdmin={isAdmin}
-          />
-        </div>
-      </div>
+    <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
+      <SopTemplateTabClient
+        currentPackage={currentPackage as 'general' | 'iso9001' | 'food-safety' | 'healthcare'}
+        currentTemplate={currentTemplate}
+        templateLocked={templateLocked}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }

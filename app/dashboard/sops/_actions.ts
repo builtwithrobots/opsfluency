@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { getCompanyContext, AuthError } from '@/lib/auth/company-context';
 import { SOP_TEMPLATE } from '@/lib/types/sop';
 
+const INDUSTRY_PACKAGE = ['general', 'iso9001', 'food-safety', 'healthcare'] as const;
+
 // ── Create SOP draft ─────────────────────────────────────────────────────────
 
 const CreateSopSchema = z.object({
@@ -68,6 +70,35 @@ export async function updateDefaultTemplate(raw: unknown) {
     const { error } = await supabase
       .from('companies')
       .update({ default_sop_template: input.template })
+      .eq('id', company_id);
+
+    if (error) return { ok: false as const, error: { code: 'INTERNAL', message: error.message } };
+
+    revalidatePath('/dashboard/sops');
+    return { ok: true as const };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false as const, error: { code: 'INVALID_INPUT' } };
+    if (e instanceof AuthError) return { ok: false as const, error: { code: e.code } };
+    throw e;
+  }
+}
+
+// ── Update industry package ───────────────────────────────────────────────────
+
+const UpdatePackageSchema = z.object({
+  package: z.enum(INDUSTRY_PACKAGE),
+});
+
+export async function updateIndustryPackage(raw: unknown) {
+  try {
+    const { supabase, company_id, role } = await getCompanyContext('admin');
+    if (role !== 'admin') return { ok: false as const, error: { code: 'FORBIDDEN' } };
+
+    const input = UpdatePackageSchema.parse(raw);
+
+    const { error } = await supabase
+      .from('companies')
+      .update({ industry_package: input.package })
       .eq('id', company_id);
 
     if (error) return { ok: false as const, error: { code: 'INTERNAL', message: error.message } };
