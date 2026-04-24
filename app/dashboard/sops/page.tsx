@@ -1,15 +1,19 @@
 import {
   AlertCircle,
   Archive,
+  Award,
   BookOpen,
   CheckSquare,
   ChevronDown,
   Clock,
+  Factory,
   FileText,
   Hammer,
   Hash,
+  HeartPulse,
   List,
   Search,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { redirect } from 'next/navigation';
@@ -42,6 +46,20 @@ const TEMPLATE_ICONS: Record<SopTemplate, React.ComponentType<{ className?: stri
   'reference': FileText,
   'safety-checklist': CheckSquare,
   'onboarding': Users,
+};
+
+const PACKAGE_ICONS: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
+  'general': Factory,
+  'iso9001': Award,
+  'food-safety': ShieldCheck,
+  'healthcare': HeartPulse,
+};
+
+const PACKAGE_LABELS: Record<string, string> = {
+  'general': 'General',
+  'iso9001': 'ISO 9001',
+  'food-safety': 'Food Safety',
+  'healthcare': 'Healthcare',
 };
 
 const STATUS_BADGE: Record<SopStatus, { label: string; color: string }> = {
@@ -135,7 +153,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('active_sop_templates, industry_package')
+    .select('active_sop_templates, industry_packages')
     .eq('id', company_id)
     .single();
 
@@ -143,7 +161,12 @@ export default async function SopsPage({ searchParams }: PageProps) {
   const activeTemplates: SopTemplate[] = Array.isArray(company?.active_sop_templates) && company.active_sop_templates.length > 0
     ? (company.active_sop_templates as SopTemplate[]).filter((t) => ALL_TEMPLATES.includes(t))
     : ALL_TEMPLATES;
-  const industryPackage: string = (company?.industry_package as string) ?? 'general';
+
+  const ALL_PACKAGES = ['general', 'iso9001', 'food-safety', 'healthcare'] as const;
+  type IndustryPackageKey = typeof ALL_PACKAGES[number];
+  const activePackages: IndustryPackageKey[] = Array.isArray(company?.industry_packages) && company.industry_packages.length > 0
+    ? (company.industry_packages as IndustryPackageKey[]).filter((p) => (ALL_PACKAGES as readonly string[]).includes(p))
+    : ['general'];
 
   // ── Library tab data ──────────────────────────────────────────────────────
 
@@ -250,7 +273,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
           <CreateSopClient
             departments={(departments ?? []) as Department[]}
             activeTemplates={activeTemplates}
-            industryPackage={industryPackage}
+            industryPackages={activePackages}
           />
         )}
         {tab === 'library' && (
@@ -282,6 +305,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
           sops={buildSops}
           fetchError={buildError}
           activeTemplates={activeTemplates}
+          activePackages={activePackages}
         />
       )}
 
@@ -299,7 +323,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
       {tab === 'template' && (
         <TemplateTab
-          currentPackage={industryPackage}
+          currentPackages={activePackages}
           activeTemplates={activeTemplates}
           isAdmin={isAdmin}
         />
@@ -433,9 +457,10 @@ interface BuildTabProps {
   sops: SopRow[];
   fetchError: string | null;
   activeTemplates: SopTemplate[];
+  activePackages: string[];
 }
 
-function BuildTab({ sops, fetchError, activeTemplates }: BuildTabProps) {
+function BuildTab({ sops, fetchError, activeTemplates, activePackages }: BuildTabProps) {
   if (fetchError) return <FetchError message={fetchError} />;
 
   // Group by pipeline stage
@@ -448,30 +473,55 @@ function BuildTab({ sops, fetchError, activeTemplates }: BuildTabProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Active templates context banner */}
+      {/* Org settings context banner */}
       <div className="flex items-center justify-between gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex -space-x-1 shrink-0">
-            {activeTemplates.slice(0, 3).map((t) => {
-              const Icon = TEMPLATE_ICONS[t];
-              return (
-                <span key={t} className="flex size-7 items-center justify-center rounded-full border border-dc-surface bg-(--color-brand)/10 text-(--color-brand)">
-                  <Icon className="size-3.5" strokeWidth={2} />
-                </span>
-              );
-            })}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 min-w-0">
+          {/* Packages */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex -space-x-1 shrink-0">
+              {activePackages.slice(0, 3).map((p) => {
+                const Icon = PACKAGE_ICONS[p];
+                return Icon ? (
+                  <span key={p} className="flex size-7 items-center justify-center rounded-full border border-dc-surface bg-dc-raised text-dc-text-2">
+                    <Icon className="size-3.5" strokeWidth={1.5} />
+                  </span>
+                ) : null;
+              })}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-dc-text-3 uppercase tracking-wide">Packages</p>
+              <p className="truncate text-sm font-semibold text-dc-text">
+                {activePackages.map((p) => PACKAGE_LABELS[p] ?? p).join(', ')}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-dc-text">
-              {activeTemplates.length === 4
-                ? 'All templates available'
-                : `${activeTemplates.length} template${activeTemplates.length === 1 ? '' : 's'} active`}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-dc-text-3">
-              {activeTemplates.map((t) => TEMPLATE_LABELS[t]).join(', ')}
-            </p>
+
+          {/* Divider */}
+          <div aria-hidden className="hidden sm:block h-8 w-px bg-[color:var(--dc-edge)]" />
+
+          {/* Templates */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex -space-x-1 shrink-0">
+              {activeTemplates.slice(0, 3).map((t) => {
+                const Icon = TEMPLATE_ICONS[t];
+                return (
+                  <span key={t} className="flex size-7 items-center justify-center rounded-full border border-dc-surface bg-(--color-brand)/10 text-(--color-brand)">
+                    <Icon className="size-3.5" strokeWidth={2} />
+                  </span>
+                );
+              })}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-dc-text-3 uppercase tracking-wide">Templates</p>
+              <p className="truncate text-sm font-semibold text-dc-text">
+                {activeTemplates.length === 4
+                  ? 'All available'
+                  : activeTemplates.map((t) => TEMPLATE_LABELS[t]).join(', ')}
+              </p>
+            </div>
           </div>
         </div>
+
         <Button href="/dashboard/sops?tab=template" plain className="shrink-0 text-sm">
           Manage
         </Button>
@@ -632,16 +682,16 @@ function ArchiveTab({ sops, fetchError, departments, q, deptFilter, sort, dir }:
 // ── Template tab ──────────────────────────────────────────────────────────────
 
 interface TemplateTabProps {
-  currentPackage: string;
+  currentPackages: string[];
   activeTemplates: SopTemplate[];
   isAdmin: boolean;
 }
 
-function TemplateTab({ currentPackage, activeTemplates, isAdmin }: TemplateTabProps) {
+function TemplateTab({ currentPackages, activeTemplates, isAdmin }: TemplateTabProps) {
   return (
     <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
       <SopTemplateTabClient
-        currentPackage={currentPackage as 'general' | 'iso9001' | 'food-safety' | 'healthcare'}
+        currentPackages={currentPackages as ('general' | 'iso9001' | 'food-safety' | 'healthcare')[]}
         activeTemplates={activeTemplates}
         isAdmin={isAdmin}
       />

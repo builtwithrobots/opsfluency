@@ -15,7 +15,7 @@ import clsx from 'clsx';
 import { Button } from '@/components/ui/button';
 import type { SopTemplate } from '@/lib/types/sop';
 import { SOP_TEMPLATE } from '@/lib/types/sop';
-import { updateIndustryPackage, updateActiveTemplates } from '../_actions';
+import { updateIndustryPackages, updateActiveTemplates } from '../_actions';
 
 // ── Industry package metadata ─────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ const TEMPLATES: {
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface SopTemplateTabClientProps {
-  currentPackage: IndustryPackage;
+  currentPackages: IndustryPackage[];
   activeTemplates: SopTemplate[];
   isAdmin: boolean;
 }
@@ -108,12 +108,14 @@ interface SopTemplateTabClientProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SopTemplateTabClient({
-  currentPackage,
+  currentPackages,
   activeTemplates,
   isAdmin,
 }: SopTemplateTabClientProps) {
   // ── Package state ──────────────────────────────────────────────────────────
-  const [selectedPackage, setSelectedPackage] = useState<IndustryPackage>(currentPackage);
+  const [selectedPackages, setSelectedPackages] = useState<Set<IndustryPackage>>(
+    new Set(currentPackages.length > 0 ? currentPackages : ['general']),
+  );
   const [packagePending, startPackageTransition] = useTransition();
   const [packageFeedback, setPackageFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -126,13 +128,25 @@ export function SopTemplateTabClient({
 
   // ── Package handlers ───────────────────────────────────────────────────────
 
-  function handleSavePackage() {
+  function handleTogglePackage(key: IndustryPackage) {
+    if (!isAdmin) return;
+    setSelectedPackages((prev) => {
+      if (prev.has(key) && prev.size === 1) return prev;
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function handleSavePackages() {
     startPackageTransition(async () => {
-      const result = await updateIndustryPackage({ package: selectedPackage });
+      const ordered = PACKAGES.map((p) => p.key).filter((k) => selectedPackages.has(k));
+      const result = await updateIndustryPackages({ packages: ordered });
       setPackageFeedback(
         result.ok
-          ? { ok: true, message: 'Industry package saved.' }
-          : { ok: false, message: 'Could not save package. Please try again.' },
+          ? { ok: true, message: 'Industry packages saved.' }
+          : { ok: false, message: 'Could not save packages. Please try again.' },
       );
       setTimeout(() => setPackageFeedback(null), 3000);
     });
@@ -143,7 +157,6 @@ export function SopTemplateTabClient({
   function handleToggle(key: SopTemplate) {
     if (!isAdmin) return;
     setEnabled((prev) => {
-      // Cannot disable the last active template.
       if (prev.has(key) && prev.size === 1) return prev;
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -154,7 +167,6 @@ export function SopTemplateTabClient({
 
   function handleSaveTemplates() {
     startTemplatesTransition(async () => {
-      // Preserve the canonical ordering from SOP_TEMPLATE.
       const ordered = SOP_TEMPLATE.filter((t) => enabled.has(t));
       const result = await updateActiveTemplates({ templates: ordered });
       setTemplatesFeedback(
@@ -166,7 +178,11 @@ export function SopTemplateTabClient({
     });
   }
 
-  const hasUnsavedPackage = isAdmin && selectedPackage !== currentPackage;
+  const hasUnsavedPackages =
+    isAdmin &&
+    (selectedPackages.size !== currentPackages.length ||
+      PACKAGES.some((p) => selectedPackages.has(p.key) !== currentPackages.includes(p.key)));
+
   const hasUnsavedTemplates =
     isAdmin &&
     (enabled.size !== activeTemplates.length ||
@@ -177,56 +193,68 @@ export function SopTemplateTabClient({
   return (
     <div className="flex flex-col gap-10">
 
-      {/* ── Section 1: Industry Package ──────────────────────────────────── */}
+      {/* ── Section 1: Industry Packages ─────────────────────────────────── */}
       <section aria-labelledby="pkg-heading">
         <div className="mb-5">
           <h2 id="pkg-heading" className="text-base font-semibold text-dc-text">
-            Industry Package
+            Industry Packages
           </h2>
           <p className="mt-1 text-sm text-dc-text-2">
-            Sets your org's department structure and drives template recommendations
-            when managers create new SOPs. Changing this does not affect departments
-            that already exist.
+            Select one or more packages that match your facility. Each package drives department
+            structure suggestions and template recommendations when managers create new SOPs.
+            {isAdmin && ' At least one must remain active.'}
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {PACKAGES.map((pkg) => {
-            const isSelected = selectedPackage === pkg.key;
+            const isSelected = selectedPackages.has(pkg.key);
+            const isLastSelected = isSelected && selectedPackages.size === 1;
             const Icon = pkg.icon;
 
             return (
               <button
                 key={pkg.key}
                 type="button"
-                onClick={() => isAdmin && setSelectedPackage(pkg.key)}
-                disabled={!isAdmin}
+                onClick={() => handleTogglePackage(pkg.key)}
+                disabled={!isAdmin || isLastSelected}
                 aria-pressed={isSelected}
+                title={isLastSelected ? 'At least one package must remain active' : undefined}
                 className={clsx(
                   'group relative flex flex-col gap-3 rounded-xl border p-5 text-left transition-all',
                   isSelected
-                    ? 'border-(--color-brand) bg-(--color-brand)/5 shadow-sm ring-2 ring-(--color-brand)/20'
-                    : 'border-[color:var(--dc-edge)] bg-dc-surface hover:border-(--color-brand)/40 hover:shadow-sm',
-                  !isAdmin && 'cursor-default',
+                    ? 'border-(--color-brand) bg-(--color-brand)/5 shadow-sm'
+                    : 'border-[color:var(--dc-edge)] bg-dc-surface opacity-50',
+                  isAdmin && !isLastSelected && 'cursor-pointer hover:shadow-sm',
+                  (!isAdmin || isLastSelected) && 'cursor-default',
                 )}
               >
-                {isSelected && (
-                  <span className="absolute right-4 top-4 flex size-5 items-center justify-center rounded-full bg-(--color-brand) text-white">
-                    <svg className="size-3" viewBox="0 0 12 12" fill="none" aria-hidden>
+                {/* Active indicator */}
+                <span
+                  aria-hidden
+                  className={clsx(
+                    'absolute right-4 top-4 flex size-5 items-center justify-center rounded-full border-2 transition-colors',
+                    isSelected
+                      ? 'border-(--color-brand) bg-(--color-brand)'
+                      : 'border-[color:var(--dc-edge-2)] bg-transparent',
+                  )}
+                >
+                  {isSelected && (
+                    <svg className="size-3 text-white" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                  </span>
-                )}
+                  )}
+                </span>
 
                 <div className="flex items-center gap-3">
                   <span className={clsx(
                     'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                    isSelected ? 'bg-(--color-brand) text-white' : 'bg-(--color-brand)/10 text-(--color-brand)',
+                    isSelected ? 'bg-(--color-brand)/10 text-(--color-brand)' : 'bg-dc-raised text-dc-text-3',
                   )}>
                     <Icon className="size-5" strokeWidth={1.5} />
                   </span>
                   <div>
-                    <p className="font-semibold text-dc-text">{pkg.label}</p>
+                    <p className={clsx('font-semibold', isSelected ? 'text-dc-text' : 'text-dc-text-3')}>{pkg.label}</p>
                     <p className="text-xs text-dc-text-3">{pkg.subtitle}</p>
                   </div>
                 </div>
@@ -243,10 +271,10 @@ export function SopTemplateTabClient({
           })}
         </div>
 
-        {isAdmin && (
+        {isAdmin ? (
           <div className="mt-5 flex items-center gap-4">
-            <Button color="brand" onClick={handleSavePackage} disabled={isPending || !hasUnsavedPackage}>
-              {packagePending ? 'Saving…' : 'Save industry package'}
+            <Button color="brand" onClick={handleSavePackages} disabled={isPending || !hasUnsavedPackages}>
+              {packagePending ? 'Saving…' : 'Save industry packages'}
             </Button>
             {packageFeedback && (
               <p role="status" className={clsx('text-sm font-medium', packageFeedback.ok ? 'text-(--color-signal-ok)' : 'text-(--color-signal-urgent)')}>
@@ -254,6 +282,10 @@ export function SopTemplateTabClient({
               </p>
             )}
           </div>
+        ) : (
+          <p className="mt-5 text-sm text-dc-text-3">
+            Package settings can only be changed by an org admin.
+          </p>
         )}
       </section>
 

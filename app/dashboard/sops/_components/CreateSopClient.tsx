@@ -6,7 +6,7 @@ import { Info, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { SopTemplate } from '@/lib/types/sop';
-import { getRecommendedTemplate } from '@/lib/sop/template-recommendations';
+import { getRecommendedTemplateForPackages } from '@/lib/sop/template-recommendations';
 import { createSop } from '../_actions';
 
 const TEMPLATE_LABELS: Record<SopTemplate, string> = {
@@ -24,13 +24,13 @@ interface Department {
 interface CreateSopClientProps {
   departments: Department[];
   activeTemplates: SopTemplate[];
-  industryPackage: string;
+  industryPackages: string[];
 }
 
 export function CreateSopClient({
   departments,
   activeTemplates,
-  industryPackage,
+  industryPackages,
 }: CreateSopClientProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -64,7 +64,7 @@ export function CreateSopClient({
 
     const deptName = departments.find((d) => d.id === id)?.name ?? '';
     const fallback = activeTemplates[0] ?? 'step-by-step';
-    const recommended = getRecommendedTemplate(industryPackage, deptName, fallback);
+    const recommended = getRecommendedTemplateForPackages(industryPackages, deptName, fallback);
 
     // Only apply the recommendation if the recommended template is active.
     const effective = activeTemplates.includes(recommended) ? recommended : fallback;
@@ -183,7 +183,7 @@ export function CreateSopClient({
                   aria-live="polite"
                 >
                   <Info className="mt-px size-3.5 shrink-0 text-(--color-signal-info)" aria-hidden strokeWidth={2} />
-                  Recommended for this department based on your industry package
+                  Recommended for this department based on your industry packages
                 </p>
               )}
             </div>

@@ -44,22 +44,22 @@ export async function createSop(raw: unknown) {
   }
 }
 
-// ── Update industry package ───────────────────────────────────────────────────
+// ── Update industry packages ──────────────────────────────────────────────────
 
-const UpdatePackageSchema = z.object({
-  package: z.enum(INDUSTRY_PACKAGE),
+const UpdatePackagesSchema = z.object({
+  packages: z.array(z.enum(INDUSTRY_PACKAGE)).min(1, 'At least one package must remain active.'),
 });
 
-export async function updateIndustryPackage(raw: unknown) {
+export async function updateIndustryPackages(raw: unknown) {
   try {
     const { supabase, company_id, role } = await getCompanyContext('admin');
     if (role !== 'admin') return { ok: false as const, error: { code: 'FORBIDDEN' } };
 
-    const input = UpdatePackageSchema.parse(raw);
+    const input = UpdatePackagesSchema.parse(raw);
 
     const { error } = await supabase
       .from('companies')
-      .update({ industry_package: input.package })
+      .update({ industry_packages: input.packages })
       .eq('id', company_id);
 
     if (error) return { ok: false as const, error: { code: 'INTERNAL', message: error.message } };
