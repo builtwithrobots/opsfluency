@@ -8,22 +8,14 @@ import {
   FileText,
   HeartPulse,
   List,
-  Lock,
   ShieldCheck,
-  Unlock,
   Users,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import type { SopTemplate } from '@/lib/types/sop';
-import { updateDefaultTemplate, updateIndustryPackage, setTemplateLock } from '../_actions';
+import { SOP_TEMPLATE } from '@/lib/types/sop';
+import { updateIndustryPackage, updateActiveTemplates } from '../_actions';
 
 // ── Industry package metadata ─────────────────────────────────────────────────
 
@@ -85,14 +77,14 @@ const TEMPLATES: {
   {
     key: 'reference',
     label: 'Reference',
-    description: 'Section headers, sub-sections, and an auto-generated table of contents. Best for dense reference material.',
+    description: 'Section headers, sub-sections, and an auto-generated table of contents.',
     icon: FileText,
     preview: ['## Overview', '### Section 1', '### Section 2', '---'],
   },
   {
     key: 'safety-checklist',
     label: 'Safety Checklist',
-    description: 'Checkbox list with hazard icons and prominent warnings. Best for daily safety checks and audits.',
+    description: 'Checkbox list with hazard icons and prominent warnings. Best for daily safety checks.',
     icon: CheckSquare,
     preview: ['☐ Inspect fire extinguisher', '☐ Clear emergency exits', '🚨 Report issues immediately'],
   },
@@ -109,8 +101,7 @@ const TEMPLATES: {
 
 interface SopTemplateTabClientProps {
   currentPackage: IndustryPackage;
-  currentTemplate: SopTemplate | null;
-  templateLocked: boolean;
+  activeTemplates: SopTemplate[];
   isAdmin: boolean;
 }
 
@@ -118,8 +109,7 @@ interface SopTemplateTabClientProps {
 
 export function SopTemplateTabClient({
   currentPackage,
-  currentTemplate,
-  templateLocked,
+  activeTemplates,
   isAdmin,
 }: SopTemplateTabClientProps) {
   // ── Package state ──────────────────────────────────────────────────────────
@@ -127,77 +117,60 @@ export function SopTemplateTabClient({
   const [packagePending, startPackageTransition] = useTransition();
   const [packageFeedback, setPackageFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
-  // ── Template state ─────────────────────────────────────────────────────────
-  const [selectedTemplate, setSelectedTemplate] = useState<SopTemplate>(currentTemplate ?? 'step-by-step');
-  const [locked, setLocked] = useState(templateLocked);
-  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
-  const [templatePending, startTemplateTransition] = useTransition();
-  const [templateFeedback, setTemplateFeedback] = useState<{ ok: boolean; message: string } | null>(null);
+  // ── Active templates state ─────────────────────────────────────────────────
+  const [enabled, setEnabled] = useState<Set<SopTemplate>>(new Set(activeTemplates));
+  const [templatesPending, startTemplatesTransition] = useTransition();
+  const [templatesFeedback, setTemplatesFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const isPending = packagePending || templatePending;
+  const isPending = packagePending || templatesPending;
 
   // ── Package handlers ───────────────────────────────────────────────────────
 
   function handleSavePackage() {
     startPackageTransition(async () => {
       const result = await updateIndustryPackage({ package: selectedPackage });
-      if (result.ok) {
-        setPackageFeedback({ ok: true, message: 'Industry package saved.' });
-      } else {
-        setPackageFeedback({ ok: false, message: 'Could not save package. Please try again.' });
-      }
+      setPackageFeedback(
+        result.ok
+          ? { ok: true, message: 'Industry package saved.' }
+          : { ok: false, message: 'Could not save package. Please try again.' },
+      );
       setTimeout(() => setPackageFeedback(null), 3000);
     });
   }
 
-  // ── Template handlers ──────────────────────────────────────────────────────
+  // ── Template toggle handlers ───────────────────────────────────────────────
 
-  function handleSelectTemplate(key: SopTemplate) {
-    if (locked || !isAdmin) return;
-    setSelectedTemplate(key);
-  }
-
-  function handleSaveTemplate() {
-    startTemplateTransition(async () => {
-      const result = await updateDefaultTemplate({ template: selectedTemplate });
-      if (result.ok) {
-        setTemplateFeedback({ ok: true, message: 'Default template saved.' });
-      } else {
-        setTemplateFeedback({ ok: false, message: 'Could not save template. Please try again.' });
-      }
-      setTimeout(() => setTemplateFeedback(null), 3000);
+  function handleToggle(key: SopTemplate) {
+    if (!isAdmin) return;
+    setEnabled((prev) => {
+      // Cannot disable the last active template.
+      if (prev.has(key) && prev.size === 1) return prev;
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   }
 
-  function handleLock() {
-    startTemplateTransition(async () => {
-      const result = await setTemplateLock(true);
-      if (result.ok) {
-        setLocked(true);
-        setTemplateFeedback({ ok: true, message: 'Template locked.' });
-      } else {
-        setTemplateFeedback({ ok: false, message: 'Could not lock template.' });
-      }
-      setTimeout(() => setTemplateFeedback(null), 3000);
-    });
-  }
-
-  function handleUnlock() {
-    startTemplateTransition(async () => {
-      const result = await setTemplateLock(false);
-      if (result.ok) {
-        setLocked(false);
-        setUnlockDialogOpen(false);
-        setTemplateFeedback({ ok: true, message: 'Template unlocked. Managers can now choose any template.' });
-      } else {
-        setTemplateFeedback({ ok: false, message: 'Could not unlock template.' });
-      }
-      setTimeout(() => setTemplateFeedback(null), 4000);
+  function handleSaveTemplates() {
+    startTemplatesTransition(async () => {
+      // Preserve the canonical ordering from SOP_TEMPLATE.
+      const ordered = SOP_TEMPLATE.filter((t) => enabled.has(t));
+      const result = await updateActiveTemplates({ templates: ordered });
+      setTemplatesFeedback(
+        result.ok
+          ? { ok: true, message: 'Available templates saved.' }
+          : { ok: false, message: 'Could not save templates. Please try again.' },
+      );
+      setTimeout(() => setTemplatesFeedback(null), 3000);
     });
   }
 
   const hasUnsavedPackage = isAdmin && selectedPackage !== currentPackage;
-  const hasUnsavedTemplate = isAdmin && !locked && selectedTemplate !== (currentTemplate ?? 'step-by-step');
+  const hasUnsavedTemplates =
+    isAdmin &&
+    (enabled.size !== activeTemplates.length ||
+      SOP_TEMPLATE.some((t) => enabled.has(t) !== activeTemplates.includes(t)));
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -221,24 +194,22 @@ export function SopTemplateTabClient({
           {PACKAGES.map((pkg) => {
             const isSelected = selectedPackage === pkg.key;
             const Icon = pkg.icon;
-            const isInteractive = isAdmin;
 
             return (
               <button
                 key={pkg.key}
                 type="button"
-                onClick={() => isInteractive && setSelectedPackage(pkg.key)}
-                disabled={!isInteractive}
+                onClick={() => isAdmin && setSelectedPackage(pkg.key)}
+                disabled={!isAdmin}
                 aria-pressed={isSelected}
                 className={clsx(
                   'group relative flex flex-col gap-3 rounded-xl border p-5 text-left transition-all',
                   isSelected
                     ? 'border-(--color-brand) bg-(--color-brand)/5 shadow-sm ring-2 ring-(--color-brand)/20'
                     : 'border-[color:var(--dc-edge)] bg-dc-surface hover:border-(--color-brand)/40 hover:shadow-sm',
-                  !isInteractive && 'cursor-default',
+                  !isAdmin && 'cursor-default',
                 )}
               >
-                {/* Selected check */}
                 {isSelected && (
                   <span className="absolute right-4 top-4 flex size-5 items-center justify-center rounded-full bg-(--color-brand) text-white">
                     <svg className="size-3" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -247,13 +218,10 @@ export function SopTemplateTabClient({
                   </span>
                 )}
 
-                {/* Icon + labels */}
                 <div className="flex items-center gap-3">
                   <span className={clsx(
                     'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                    isSelected
-                      ? 'bg-(--color-brand) text-white'
-                      : 'bg-(--color-brand)/10 text-(--color-brand)',
+                    isSelected ? 'bg-(--color-brand) text-white' : 'bg-(--color-brand)/10 text-(--color-brand)',
                   )}>
                     <Icon className="size-5" strokeWidth={1.5} />
                   </span>
@@ -263,13 +231,9 @@ export function SopTemplateTabClient({
                   </div>
                 </div>
 
-                {/* Department pills */}
                 <div className="flex flex-wrap gap-1.5">
                   {pkg.departments.map((d) => (
-                    <span
-                      key={d}
-                      className="rounded-full bg-dc-raised px-2 py-0.5 text-xs text-dc-text-3"
-                    >
+                    <span key={d} className="rounded-full bg-dc-raised px-2 py-0.5 text-xs text-dc-text-3">
                       {d}
                     </span>
                   ))}
@@ -279,24 +243,13 @@ export function SopTemplateTabClient({
           })}
         </div>
 
-        {/* Package save row */}
         {isAdmin && (
           <div className="mt-5 flex items-center gap-4">
-            <Button
-              color="brand"
-              onClick={handleSavePackage}
-              disabled={isPending || !hasUnsavedPackage}
-            >
+            <Button color="brand" onClick={handleSavePackage} disabled={isPending || !hasUnsavedPackage}>
               {packagePending ? 'Saving…' : 'Save industry package'}
             </Button>
             {packageFeedback && (
-              <p
-                className={clsx(
-                  'text-sm font-medium',
-                  packageFeedback.ok ? 'text-(--color-signal-ok)' : 'text-(--color-signal-urgent)',
-                )}
-                role="status"
-              >
+              <p role="status" className={clsx('text-sm font-medium', packageFeedback.ok ? 'text-(--color-signal-ok)' : 'text-(--color-signal-urgent)')}>
                 {packageFeedback.message}
               </p>
             )}
@@ -307,115 +260,69 @@ export function SopTemplateTabClient({
       {/* Divider */}
       <hr className="border-[color:var(--dc-edge)]" />
 
-      {/* ── Section 2: Default Template Style ────────────────────────────── */}
+      {/* ── Section 2: Available Templates ───────────────────────────────── */}
       <section aria-labelledby="tmpl-heading">
         <div className="mb-5">
           <h2 id="tmpl-heading" className="text-base font-semibold text-dc-text">
-            Default Template Style
+            Available Templates
           </h2>
           <p className="mt-1 text-sm text-dc-text-2">
-            The structural layout applied to new SOPs by default. Lock it to enforce
-            consistency across your team — only admins can unlock it.
+            {isAdmin
+              ? 'Choose which templates managers can use when creating SOPs. At least one must remain active.'
+              : 'Templates available for new SOPs in your organisation.'}
           </p>
         </div>
 
-        {/* Lock / unlock banner */}
-        <div className={clsx(
-          'mb-6 flex items-center justify-between gap-4 rounded-xl border px-5 py-4',
-          locked
-            ? 'border-(--color-signal-warn)/30 bg-(--color-signal-warn)/5'
-            : 'border-[color:var(--dc-edge)] bg-dc-surface',
-        )}>
-          <div className="flex items-center gap-3">
-            {locked
-              ? <Lock className="size-5 shrink-0 text-(--color-signal-warn)" strokeWidth={1.5} />
-              : <Unlock className="size-5 shrink-0 text-dc-text-3" strokeWidth={1.5} />
-            }
-            <div>
-              <p className="text-sm font-semibold text-dc-text">
-                {locked ? 'Template locked' : 'Template unlocked'}
-              </p>
-              <p className="mt-0.5 text-xs text-dc-text-3">
-                {locked
-                  ? 'All new SOPs must use the selected template. Only admins can change this.'
-                  : 'Managers can choose any template when creating a SOP.'}
-              </p>
-            </div>
-          </div>
-
-          {isAdmin && (
-            locked ? (
-              <Button
-                plain
-                onClick={() => setUnlockDialogOpen(true)}
-                disabled={isPending}
-                className="shrink-0 text-sm text-(--color-signal-warn)"
-              >
-                <Unlock data-slot="icon" className="size-4" strokeWidth={2} />
-                Unlock
-              </Button>
-            ) : (
-              <Button
-                color="brand"
-                onClick={handleLock}
-                disabled={isPending}
-                className="shrink-0 text-sm"
-              >
-                <Lock data-slot="icon" className="size-4" strokeWidth={2} />
-                Lock
-              </Button>
-            )
-          )}
-        </div>
-
-        {/* Template grid */}
-        <p className="mb-4 text-sm font-medium text-dc-text">
-          {locked
-            ? 'Active template (all new SOPs use this style)'
-            : isAdmin
-              ? 'Choose the default template for new SOPs'
-              : 'Org default template (set by admin)'}
-        </p>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {TEMPLATES.map((t) => {
-            const isSelected = selectedTemplate === t.key;
+            const isActive = enabled.has(t.key);
+            const isLastActive = isActive && enabled.size === 1;
             const Icon = t.icon;
-            const isInteractive = isAdmin && !locked;
 
             return (
               <button
                 key={t.key}
                 type="button"
-                onClick={() => handleSelectTemplate(t.key)}
-                disabled={!isInteractive}
-                aria-pressed={isSelected}
+                onClick={() => handleToggle(t.key)}
+                disabled={!isAdmin || isLastActive}
+                aria-pressed={isActive}
+                title={isLastActive ? 'At least one template must remain active' : undefined}
                 className={clsx(
                   'group relative flex flex-col gap-4 rounded-xl border p-5 text-left transition-all',
-                  isSelected
-                    ? 'border-(--color-brand) bg-(--color-brand)/5 shadow-sm ring-2 ring-(--color-brand)/20'
-                    : 'border-[color:var(--dc-edge)] bg-dc-surface hover:border-(--color-brand)/40 hover:shadow-sm',
-                  !isInteractive && 'cursor-default',
+                  isActive
+                    ? 'border-(--color-brand) bg-(--color-brand)/5 shadow-sm'
+                    : 'border-[color:var(--dc-edge)] bg-dc-surface opacity-50',
+                  isAdmin && !isLastActive && 'cursor-pointer hover:shadow-sm',
+                  (!isAdmin || isLastActive) && 'cursor-default',
                 )}
               >
-                {isSelected && (
-                  <span className="absolute right-4 top-4 flex size-5 items-center justify-center rounded-full bg-(--color-brand) text-white">
-                    <svg className="size-3" viewBox="0 0 12 12" fill="none" aria-hidden>
+                {/* Active indicator / toggle */}
+                <span
+                  aria-hidden
+                  className={clsx(
+                    'absolute right-4 top-4 flex size-5 items-center justify-center rounded-full border-2 transition-colors',
+                    isActive
+                      ? 'border-(--color-brand) bg-(--color-brand)'
+                      : 'border-[color:var(--dc-edge-2)] bg-transparent',
+                  )}
+                >
+                  {isActive && (
+                    <svg className="size-3 text-white" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                  </span>
-                )}
+                  )}
+                </span>
 
                 <div className="flex items-center gap-3">
                   <span className={clsx(
                     'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                    isSelected
-                      ? 'bg-(--color-brand) text-white'
-                      : 'bg-(--color-brand)/10 text-(--color-brand)',
+                    isActive ? 'bg-(--color-brand)/10 text-(--color-brand)' : 'bg-dc-raised text-dc-text-3',
                   )}>
                     <Icon className="size-5" strokeWidth={1.5} />
                   </span>
-                  <span className="font-semibold text-dc-text">{t.label}</span>
+                  <span className={clsx('font-semibold', isActive ? 'text-dc-text' : 'text-dc-text-3')}>
+                    {t.label}
+                  </span>
                 </div>
 
                 <p className="text-sm leading-relaxed text-dc-text-2">{t.description}</p>
@@ -430,25 +337,14 @@ export function SopTemplateTabClient({
           })}
         </div>
 
-        {/* Template save row */}
         {isAdmin ? (
           <div className="mt-6 flex items-center gap-4">
-            <Button
-              color="brand"
-              onClick={handleSaveTemplate}
-              disabled={isPending || locked || !hasUnsavedTemplate}
-            >
-              {templatePending ? 'Saving…' : 'Save default template'}
+            <Button color="brand" onClick={handleSaveTemplates} disabled={isPending || !hasUnsavedTemplates}>
+              {templatesPending ? 'Saving…' : 'Save available templates'}
             </Button>
-            {templateFeedback && (
-              <p
-                className={clsx(
-                  'text-sm font-medium',
-                  templateFeedback.ok ? 'text-(--color-signal-ok)' : 'text-(--color-signal-urgent)',
-                )}
-                role="status"
-              >
-                {templateFeedback.message}
+            {templatesFeedback && (
+              <p role="status" className={clsx('text-sm font-medium', templatesFeedback.ok ? 'text-(--color-signal-ok)' : 'text-(--color-signal-urgent)')}>
+                {templatesFeedback.message}
               </p>
             )}
           </div>
@@ -458,37 +354,6 @@ export function SopTemplateTabClient({
           </p>
         )}
       </section>
-
-      {/* Unlock confirmation dialog */}
-      <Dialog open={unlockDialogOpen} onClose={setUnlockDialogOpen} size="sm">
-        <DialogTitle>Unlock template?</DialogTitle>
-        <DialogDescription>
-          Unlocking lets managers pick any template when creating a SOP. SOPs already
-          published will keep their current template — only new SOPs are affected.
-        </DialogDescription>
-        <DialogBody>
-          <div className="rounded-lg border border-(--color-signal-warn)/30 bg-(--color-signal-warn)/5 p-4">
-            <p className="text-sm font-medium text-(--color-signal-warn)">Formatting warning</p>
-            <p className="mt-1 text-sm text-dc-text-2">
-              Different templates produce different document structures. Mixing templates
-              across SOPs in the same department can create inconsistent formatting for
-              employees.
-            </p>
-          </div>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setUnlockDialogOpen(false)} disabled={isPending}>
-            Keep locked
-          </Button>
-          <Button
-            onClick={handleUnlock}
-            disabled={isPending}
-            className="bg-(--color-signal-warn) text-white hover:bg-(--color-signal-warn)/90"
-          >
-            {isPending ? 'Unlocking…' : 'Unlock anyway'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 }
