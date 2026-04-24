@@ -2,17 +2,18 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Info, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { SOP_TEMPLATE, type SopTemplate } from '@/lib/types/sop';
+import { getRecommendedTemplate } from '@/lib/sop/template-recommendations';
 import { createSop } from '../_actions';
 
 const TEMPLATE_LABELS: Record<SopTemplate, string> = {
-  'step-by-step': 'Step-by-Step',
-  'reference': 'Reference',
+  'step-by-step':    'Step-by-Step',
+  'reference':        'Reference',
   'safety-checklist': 'Safety Checklist',
-  'onboarding': 'Onboarding',
+  'onboarding':       'Onboarding',
 };
 
 interface Department {
@@ -24,23 +25,59 @@ interface CreateSopClientProps {
   departments: Department[];
   defaultTemplate: SopTemplate;
   templateLocked: boolean;
+  industryPackage: string;
 }
 
-export function CreateSopClient({ departments, defaultTemplate, templateLocked }: CreateSopClientProps) {
+export function CreateSopClient({
+  departments,
+  defaultTemplate,
+  templateLocked,
+  industryPackage,
+}: CreateSopClientProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState('');
   const [template, setTemplate] = useState<SopTemplate>(defaultTemplate);
   const [departmentId, setDepartmentId] = useState<string>('');
+  // null  → no recommendation (no dept selected or no match)
+  // false → manager manually overrode the recommendation
+  // true  → recommendation is currently active
+  const [recommendationActive, setRecommendationActive] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleOpen() {
     setTitle('');
     setTemplate(defaultTemplate);
     setDepartmentId('');
+    setRecommendationActive(null);
     setError(null);
     setOpen(true);
+  }
+
+  function handleDepartmentChange(id: string) {
+    setDepartmentId(id);
+
+    if (!id || templateLocked) {
+      // No department selected or template is locked — keep current template,
+      // clear any recommendation hint.
+      setRecommendationActive(null);
+      return;
+    }
+
+    const deptName = departments.find((d) => d.id === id)?.name ?? '';
+    const recommended = getRecommendedTemplate(industryPackage, deptName, defaultTemplate);
+
+    setTemplate(recommended);
+    // Show the hint only when the recommendation differs from the org default
+    // (if it matched the default the user would see no change anyway).
+    setRecommendationActive(recommended !== defaultTemplate || deptName.toLowerCase() !== '');
+  }
+
+  function handleTemplateChange(value: SopTemplate) {
+    setTemplate(value);
+    // Manager explicitly changed the template — recommendation no longer applies.
+    setRecommendationActive(false);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -115,7 +152,7 @@ export function CreateSopClient({ departments, defaultTemplate, templateLocked }
               <select
                 id="sop-dept"
                 value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
+                onChange={(e) => handleDepartmentChange(e.target.value)}
                 className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
               >
                 <option value="">No department</option>
@@ -140,7 +177,7 @@ export function CreateSopClient({ departments, defaultTemplate, templateLocked }
               <select
                 id="sop-template"
                 value={template}
-                onChange={(e) => setTemplate(e.target.value as SopTemplate)}
+                onChange={(e) => handleTemplateChange(e.target.value as SopTemplate)}
                 disabled={templateLocked}
                 className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none disabled:opacity-50"
               >
@@ -148,15 +185,33 @@ export function CreateSopClient({ departments, defaultTemplate, templateLocked }
                   <option key={t} value={t}>{TEMPLATE_LABELS[t]}</option>
                 ))}
               </select>
-              {templateLocked && (
+
+              {/* Contextual hint — mutually exclusive states */}
+              {templateLocked ? (
                 <p className="text-xs text-dc-text-3">
                   Template is locked org-wide. Only admins can change it in the Template tab.
                 </p>
-              )}
+              ) : recommendationActive === true ? (
+                <p
+                  className="flex items-start gap-1.5 text-xs text-dc-text-2"
+                  role="note"
+                  aria-live="polite"
+                >
+                  <Info
+                    className="mt-px size-3.5 shrink-0 text-(--color-signal-info)"
+                    aria-hidden
+                    strokeWidth={2}
+                  />
+                  Recommended for this department based on your industry package
+                </p>
+              ) : null}
             </div>
 
             {error && (
-              <p className="rounded-lg border border-[color:var(--dc-edge)] bg-(--color-signal-urgent)/5 px-3 py-2 text-sm text-(--color-signal-urgent)">
+              <p
+                role="alert"
+                className="rounded-lg border border-[color:var(--dc-edge)] bg-(--color-signal-urgent)/5 px-3 py-2 text-sm text-(--color-signal-urgent)"
+              >
                 {error}
               </p>
             )}

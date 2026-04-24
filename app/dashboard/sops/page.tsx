@@ -136,12 +136,13 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('default_sop_template, sop_template_locked')
+    .select('default_sop_template, sop_template_locked, industry_package')
     .eq('id', company_id)
     .single();
 
   const defaultTemplate: SopTemplate = (company?.default_sop_template as SopTemplate) ?? 'step-by-step';
   const templateLocked: boolean = company?.sop_template_locked ?? false;
+  const industryPackage: string = (company?.industry_package as string) ?? 'general';
 
   // ── Library tab data ──────────────────────────────────────────────────────
 
@@ -249,6 +250,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
             departments={(departments ?? []) as Department[]}
             defaultTemplate={defaultTemplate}
             templateLocked={templateLocked}
+            industryPackage={industryPackage}
           />
         )}
         {tab === 'library' && (
