@@ -1,5 +1,6 @@
 import {
   Building2,
+  FileText,
   Home,
   QrCode,
   Settings2,
@@ -52,9 +53,9 @@ const primary: NavSection = {
   reorderable: true,
   items: [
     { href: "/dashboard",    label: "Home",      icon: Home,          match: "exact",  visibility: { member: ["manager"] } },
-    { href: "/dashboard/qr", label: "QR Codes",  icon: QrCode,        match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard/qr",   label: "QR Codes", icon: QrCode,    match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard/sops", label: "SOPs",     icon: FileText,  match: "prefix", visibility: { member: ["manager"] } },
     // Items below are planned but not yet built; uncomment as pages ship:
-    // { href: "/dashboard/sops",          label: "SOPs",          icon: FileText,       match: "prefix", visibility: { member: ["manager"] } },
     // { href: "/dashboard/import",        label: "Import",        icon: Upload,         match: "prefix", visibility: { member: ["manager"] } },
     // { href: "/dashboard/glossary",      label: "Glossary",      icon: Languages,      match: "prefix", visibility: { member: ["manager"] } },
     // { href: "/dashboard/announcements", label: "Announcements", icon: Bell,           match: "prefix", visibility: { member: ["manager"] } },
