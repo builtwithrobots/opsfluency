@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react';
 import { Info, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { SOP_TEMPLATE, type SopTemplate } from '@/lib/types/sop';
+import type { SopTemplate } from '@/lib/types/sop';
 import { getRecommendedTemplate } from '@/lib/sop/template-recommendations';
 import { createSop } from '../_actions';
 
@@ -23,32 +23,31 @@ interface Department {
 
 interface CreateSopClientProps {
   departments: Department[];
-  defaultTemplate: SopTemplate;
-  templateLocked: boolean;
+  activeTemplates: SopTemplate[];
   industryPackage: string;
 }
 
 export function CreateSopClient({
   departments,
-  defaultTemplate,
-  templateLocked,
+  activeTemplates,
   industryPackage,
 }: CreateSopClientProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState('');
-  const [template, setTemplate] = useState<SopTemplate>(defaultTemplate);
+  // Default to the first active template when the dialog opens.
+  const [template, setTemplate] = useState<SopTemplate>(activeTemplates[0] ?? 'step-by-step');
   const [departmentId, setDepartmentId] = useState<string>('');
-  // null  → no recommendation (no dept selected or no match)
-  // false → manager manually overrode the recommendation
-  // true  → recommendation is currently active
+  // null  → no recommendation active
+  // true  → recommendation is pre-filled and visible
+  // false → manager manually overrode it
   const [recommendationActive, setRecommendationActive] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleOpen() {
     setTitle('');
-    setTemplate(defaultTemplate);
+    setTemplate(activeTemplates[0] ?? 'step-by-step');
     setDepartmentId('');
     setRecommendationActive(null);
     setError(null);
@@ -58,25 +57,24 @@ export function CreateSopClient({
   function handleDepartmentChange(id: string) {
     setDepartmentId(id);
 
-    if (!id || templateLocked) {
-      // No department selected or template is locked — keep current template,
-      // clear any recommendation hint.
+    if (!id) {
       setRecommendationActive(null);
       return;
     }
 
     const deptName = departments.find((d) => d.id === id)?.name ?? '';
-    const recommended = getRecommendedTemplate(industryPackage, deptName, defaultTemplate);
+    const fallback = activeTemplates[0] ?? 'step-by-step';
+    const recommended = getRecommendedTemplate(industryPackage, deptName, fallback);
 
-    setTemplate(recommended);
-    // Show the hint only when the recommendation differs from the org default
-    // (if it matched the default the user would see no change anyway).
-    setRecommendationActive(recommended !== defaultTemplate || deptName.toLowerCase() !== '');
+    // Only apply the recommendation if the recommended template is active.
+    const effective = activeTemplates.includes(recommended) ? recommended : fallback;
+    setTemplate(effective);
+    setRecommendationActive(effective === recommended && deptName !== '');
   }
 
   function handleTemplateChange(value: SopTemplate) {
     setTemplate(value);
-    // Manager explicitly changed the template — recommendation no longer applies.
+    // Manager explicitly changed — dismiss the recommendation hint.
     setRecommendationActive(false);
   }
 
@@ -162,56 +160,36 @@ export function CreateSopClient({
               </select>
             </div>
 
-            {/* Template */}
+            {/* Template — only active templates shown */}
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <label htmlFor="sop-template" className="text-sm font-medium text-dc-text">
-                  Template
-                </label>
-                {templateLocked && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-(--color-signal-warn)/15 px-2 py-0.5 text-xs font-medium text-(--color-signal-warn)">
-                    Org-locked
-                  </span>
-                )}
-              </div>
+              <label htmlFor="sop-template" className="text-sm font-medium text-dc-text">
+                Template
+              </label>
               <select
                 id="sop-template"
                 value={template}
                 onChange={(e) => handleTemplateChange(e.target.value as SopTemplate)}
-                disabled={templateLocked}
-                className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none disabled:opacity-50"
+                className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
               >
-                {SOP_TEMPLATE.map((t) => (
+                {activeTemplates.map((t) => (
                   <option key={t} value={t}>{TEMPLATE_LABELS[t]}</option>
                 ))}
               </select>
 
-              {/* Contextual hint — mutually exclusive states */}
-              {templateLocked ? (
-                <p className="text-xs text-dc-text-3">
-                  Template is locked org-wide. Only admins can change it in the Template tab.
-                </p>
-              ) : recommendationActive === true ? (
+              {recommendationActive === true && (
                 <p
                   className="flex items-start gap-1.5 text-xs text-dc-text-2"
                   role="note"
                   aria-live="polite"
                 >
-                  <Info
-                    className="mt-px size-3.5 shrink-0 text-(--color-signal-info)"
-                    aria-hidden
-                    strokeWidth={2}
-                  />
+                  <Info className="mt-px size-3.5 shrink-0 text-(--color-signal-info)" aria-hidden strokeWidth={2} />
                   Recommended for this department based on your industry package
                 </p>
-              ) : null}
+              )}
             </div>
 
             {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-[color:var(--dc-edge)] bg-(--color-signal-urgent)/5 px-3 py-2 text-sm text-(--color-signal-urgent)"
-              >
+              <p role="alert" className="rounded-lg border border-[color:var(--dc-edge)] bg-(--color-signal-urgent)/5 px-3 py-2 text-sm text-(--color-signal-urgent)">
                 {error}
               </p>
             )}

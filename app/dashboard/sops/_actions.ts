@@ -44,45 +44,6 @@ export async function createSop(raw: unknown) {
   }
 }
 
-// ── Update org default template ───────────────────────────────────────────────
-
-const UpdateTemplateSchema = z.object({
-  template: z.enum(SOP_TEMPLATE),
-});
-
-export async function updateDefaultTemplate(raw: unknown) {
-  try {
-    const { supabase, company_id, role } = await getCompanyContext('admin');
-    if (role !== 'admin') return { ok: false as const, error: { code: 'FORBIDDEN' } };
-
-    const input = UpdateTemplateSchema.parse(raw);
-
-    const { data: company } = await supabase
-      .from('companies')
-      .select('sop_template_locked')
-      .eq('id', company_id)
-      .single();
-
-    if (company?.sop_template_locked) {
-      return { ok: false as const, error: { code: 'TEMPLATE_LOCKED' } };
-    }
-
-    const { error } = await supabase
-      .from('companies')
-      .update({ default_sop_template: input.template })
-      .eq('id', company_id);
-
-    if (error) return { ok: false as const, error: { code: 'INTERNAL', message: error.message } };
-
-    revalidatePath('/dashboard/sops');
-    return { ok: true as const };
-  } catch (e) {
-    if (e instanceof z.ZodError) return { ok: false as const, error: { code: 'INVALID_INPUT' } };
-    if (e instanceof AuthError) return { ok: false as const, error: { code: e.code } };
-    throw e;
-  }
-}
-
 // ── Update industry package ───────────────────────────────────────────────────
 
 const UpdatePackageSchema = z.object({
@@ -112,16 +73,22 @@ export async function updateIndustryPackage(raw: unknown) {
   }
 }
 
-// ── Lock / unlock the org template ───────────────────────────────────────────
+// ── Update active templates ───────────────────────────────────────────────────
 
-export async function setTemplateLock(locked: boolean) {
+const UpdateActiveTemplatesSchema = z.object({
+  templates: z.array(z.enum(SOP_TEMPLATE)).min(1, 'At least one template must remain active.'),
+});
+
+export async function updateActiveTemplates(raw: unknown) {
   try {
     const { supabase, company_id, role } = await getCompanyContext('admin');
     if (role !== 'admin') return { ok: false as const, error: { code: 'FORBIDDEN' } };
 
+    const input = UpdateActiveTemplatesSchema.parse(raw);
+
     const { error } = await supabase
       .from('companies')
-      .update({ sop_template_locked: locked })
+      .update({ active_sop_templates: input.templates })
       .eq('id', company_id);
 
     if (error) return { ok: false as const, error: { code: 'INTERNAL', message: error.message } };
@@ -129,6 +96,7 @@ export async function setTemplateLock(locked: boolean) {
     revalidatePath('/dashboard/sops');
     return { ok: true as const };
   } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false as const, error: { code: 'INVALID_INPUT' } };
     if (e instanceof AuthError) return { ok: false as const, error: { code: e.code } };
     throw e;
   }

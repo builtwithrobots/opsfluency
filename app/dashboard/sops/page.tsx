@@ -135,12 +135,14 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('default_sop_template, sop_template_locked, industry_package')
+    .select('active_sop_templates, industry_package')
     .eq('id', company_id)
     .single();
 
-  const defaultTemplate: SopTemplate = (company?.default_sop_template as SopTemplate) ?? 'step-by-step';
-  const templateLocked: boolean = company?.sop_template_locked ?? false;
+  const ALL_TEMPLATES: SopTemplate[] = ['step-by-step', 'reference', 'safety-checklist', 'onboarding'];
+  const activeTemplates: SopTemplate[] = Array.isArray(company?.active_sop_templates) && company.active_sop_templates.length > 0
+    ? (company.active_sop_templates as SopTemplate[]).filter((t) => ALL_TEMPLATES.includes(t))
+    : ALL_TEMPLATES;
   const industryPackage: string = (company?.industry_package as string) ?? 'general';
 
   // ── Library tab data ──────────────────────────────────────────────────────
@@ -247,8 +249,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
         {tab === 'build' && (
           <CreateSopClient
             departments={(departments ?? []) as Department[]}
-            defaultTemplate={defaultTemplate}
-            templateLocked={templateLocked}
+            activeTemplates={activeTemplates}
             industryPackage={industryPackage}
           />
         )}
@@ -280,8 +281,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
         <BuildTab
           sops={buildSops}
           fetchError={buildError}
-          defaultTemplate={defaultTemplate}
-          templateLocked={templateLocked}
+          activeTemplates={activeTemplates}
         />
       )}
 
@@ -299,9 +299,8 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
       {tab === 'template' && (
         <TemplateTab
-          currentTemplate={company?.default_sop_template as SopTemplate | null ?? null}
           currentPackage={industryPackage}
-          templateLocked={templateLocked}
+          activeTemplates={activeTemplates}
           isAdmin={isAdmin}
         />
       )}
@@ -433,14 +432,11 @@ function LibraryTab({ sops, fetchError, departments, q, deptFilter, sort, dir }:
 interface BuildTabProps {
   sops: SopRow[];
   fetchError: string | null;
-  defaultTemplate: SopTemplate;
-  templateLocked: boolean;
+  activeTemplates: SopTemplate[];
 }
 
-function BuildTab({ sops, fetchError, defaultTemplate, templateLocked }: BuildTabProps) {
+function BuildTab({ sops, fetchError, activeTemplates }: BuildTabProps) {
   if (fetchError) return <FetchError message={fetchError} />;
-
-  const TemplateIcon = TEMPLATE_ICONS[defaultTemplate];
 
   // Group by pipeline stage
   const grouped = PIPELINE_STAGES.map((stage) => ({
@@ -452,30 +448,32 @@ function BuildTab({ sops, fetchError, defaultTemplate, templateLocked }: BuildTa
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Org template context banner */}
+      {/* Active templates context banner */}
       <div className="flex items-center justify-between gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
-        <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)">
-            <TemplateIcon className="size-4" strokeWidth={1.5} />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-dc-text">
-              Org template: {TEMPLATE_LABELS[defaultTemplate]}
-              {templateLocked && (
-                <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-(--color-signal-warn)/15 px-1.5 py-0.5 text-xs font-medium text-(--color-signal-warn)">
-                  Locked
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex -space-x-1 shrink-0">
+            {activeTemplates.slice(0, 3).map((t) => {
+              const Icon = TEMPLATE_ICONS[t];
+              return (
+                <span key={t} className="flex size-7 items-center justify-center rounded-full border border-dc-surface bg-(--color-brand)/10 text-(--color-brand)">
+                  <Icon className="size-3.5" strokeWidth={2} />
                 </span>
-              )}
+              );
+            })}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-dc-text">
+              {activeTemplates.length === 4
+                ? 'All templates available'
+                : `${activeTemplates.length} template${activeTemplates.length === 1 ? '' : 's'} active`}
             </p>
-            <p className="mt-0.5 text-xs text-dc-text-3">
-              {templateLocked
-                ? 'All new SOPs must use this template.'
-                : 'New SOPs default to this template. Managers can override.'}
+            <p className="mt-0.5 truncate text-xs text-dc-text-3">
+              {activeTemplates.map((t) => TEMPLATE_LABELS[t]).join(', ')}
             </p>
           </div>
         </div>
         <Button href="/dashboard/sops?tab=template" plain className="shrink-0 text-sm">
-          Change
+          Manage
         </Button>
       </div>
 
@@ -634,19 +632,17 @@ function ArchiveTab({ sops, fetchError, departments, q, deptFilter, sort, dir }:
 // ── Template tab ──────────────────────────────────────────────────────────────
 
 interface TemplateTabProps {
-  currentTemplate: SopTemplate | null;
   currentPackage: string;
-  templateLocked: boolean;
+  activeTemplates: SopTemplate[];
   isAdmin: boolean;
 }
 
-function TemplateTab({ currentTemplate, currentPackage, templateLocked, isAdmin }: TemplateTabProps) {
+function TemplateTab({ currentPackage, activeTemplates, isAdmin }: TemplateTabProps) {
   return (
     <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
       <SopTemplateTabClient
         currentPackage={currentPackage as 'general' | 'iso9001' | 'food-safety' | 'healthcare'}
-        currentTemplate={currentTemplate}
-        templateLocked={templateLocked}
+        activeTemplates={activeTemplates}
         isAdmin={isAdmin}
       />
     </div>
