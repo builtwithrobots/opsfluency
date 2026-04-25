@@ -334,8 +334,9 @@ async function logCall({
     const supabase = getAdminClient();
     await supabase.from("ai_call_log").insert({
       model,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
+      input_units: inputTokens,
+      output_units: outputTokens,
+      unit_kind: "token",
       sop_id: ctx.sopId,
       company_id: ctx.companyId,
       duration_ms: durationMs,

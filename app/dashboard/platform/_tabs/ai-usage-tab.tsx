@@ -1,4 +1,4 @@
-import { Cpu, DollarSign, Timer } from "lucide-react";
+import { Cpu, DollarSign, Languages, Timer } from "lucide-react";
 
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
@@ -6,25 +6,32 @@ import { getAdminClient } from "@/lib/supabase/admin";
 
 const ROLLUP_DAYS = 30;
 
+type UnitKind = "token" | "character";
+
 // Rough public pricing as of 2026-Q1. These are best-effort estimates
-// for the platform dashboard, not billing-grade. When Anthropic updates
-// prices, update this table; surfacing it as a constant keeps the
-// source visible in code review instead of hiding inside a calc.
+// for the platform dashboard, not billing-grade. When Anthropic or
+// Google updates prices, update this table; surfacing it as a constant
+// keeps the source visible in code review instead of hiding inside a
+// calc.
 //
-// $ per 1M tokens (input, output).
-const PRICE_PER_MTOK: Record<string, { input: number; output: number }> = {
-  "claude-sonnet-4-6": { input: 3, output: 15 },
-  "claude-haiku-4-5":  { input: 0.8, output: 4 },
+// $ per 1M units. The unit is `unit_kind`-dependent: tokens for
+// Anthropic, source characters for Google. Google bills source only,
+// so its `output` rate is 0.
+const PRICE_PER_M_UNITS: Record<string, { input: number; output: number }> = {
+  "claude-sonnet-4-6":   { input: 3,    output: 15 },
+  "claude-haiku-4-5":    { input: 0.8,  output: 4 },
+  "google-translate-v2": { input: 20,   output: 0 },
   // Fallback for any unrecognized model — use Sonnet pricing as a
   // conservative upper-bound estimate so unknown models never look
   // cheaper than they are.
-  default:              { input: 3, output: 15 },
+  default:                { input: 3,    output: 15 },
 };
 
 interface AiCallRow {
   model: string;
-  input_tokens: number;
-  output_tokens: number;
+  input_units: number;
+  output_units: number;
+  unit_kind: UnitKind;
   duration_ms: number;
   company_id: string | null;
   created_at: string;
@@ -32,9 +39,10 @@ interface AiCallRow {
 
 interface ModelRollup {
   model: string;
+  unit_kind: UnitKind;
   calls: number;
-  input_tokens: number;
-  output_tokens: number;
+  input_units: number;
+  output_units: number;
   avg_duration_ms: number;
   estimated_cost: number;
 }
@@ -43,28 +51,28 @@ interface TenantRollup {
   company_id: string;
   company_name: string | null;
   calls: number;
-  input_tokens: number;
-  output_tokens: number;
   estimated_cost: number;
 }
 
 interface UsageData {
   totalCalls: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
   totalEstimatedCost: number;
   avgDurationMs: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalInputChars: number;
+  totalOutputChars: number;
   byModel: ModelRollup[];
   topTenants: TenantRollup[];
 }
 
 function estimateCost(
   model: string,
-  inputTokens: number,
-  outputTokens: number,
+  inputUnits: number,
+  outputUnits: number,
 ): number {
-  const price = PRICE_PER_MTOK[model] ?? PRICE_PER_MTOK.default;
-  return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
+  const price = PRICE_PER_M_UNITS[model] ?? PRICE_PER_M_UNITS.default;
+  return (inputUnits * price.input + outputUnits * price.output) / 1_000_000;
 }
 
 async function loadUsage(): Promise<UsageData> {
@@ -76,65 +84,70 @@ async function loadUsage(): Promise<UsageData> {
   const since = new Date(Date.now() - ROLLUP_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data: calls, error } = await admin
     .from("ai_call_log")
-    .select("model, input_tokens, output_tokens, duration_ms, company_id, created_at")
+    .select("model, input_units, output_units, unit_kind, duration_ms, company_id, created_at")
     .gte("created_at", since);
   if (error) throw error;
 
   const rows: AiCallRow[] = calls ?? [];
 
   const totalCalls = rows.length;
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
   let totalDurationMs = 0;
   let totalEstimatedCost = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalInputChars = 0;
+  let totalOutputChars = 0;
 
+  // Per-model rollup keyed by (model, unit_kind) — a future model that
+  // billed both wouldn't merge into a single row. Today every model
+  // has exactly one unit_kind, but the key shape stays correct.
   const modelMap = new Map<string, ModelRollup>();
   const tenantMap = new Map<string, TenantRollup>();
 
   for (const r of rows) {
-    totalInputTokens += r.input_tokens;
-    totalOutputTokens += r.output_tokens;
     totalDurationMs += r.duration_ms;
-    const cost = estimateCost(r.model, r.input_tokens, r.output_tokens);
+    const cost = estimateCost(r.model, r.input_units, r.output_units);
     totalEstimatedCost += cost;
 
-    // By model
-    const mKey = r.model;
+    if (r.unit_kind === "token") {
+      totalInputTokens += r.input_units;
+      totalOutputTokens += r.output_units;
+    } else {
+      totalInputChars += r.input_units;
+      totalOutputChars += r.output_units;
+    }
+
+    const mKey = `${r.model}::${r.unit_kind}`;
     const m = modelMap.get(mKey) ?? {
-      model: mKey,
+      model: r.model,
+      unit_kind: r.unit_kind,
       calls: 0,
-      input_tokens: 0,
-      output_tokens: 0,
+      input_units: 0,
+      output_units: 0,
       avg_duration_ms: 0,
       estimated_cost: 0,
     };
     m.calls += 1;
-    m.input_tokens += r.input_tokens;
-    m.output_tokens += r.output_tokens;
+    m.input_units += r.input_units;
+    m.output_units += r.output_units;
     m.avg_duration_ms += r.duration_ms;
     m.estimated_cost += cost;
     modelMap.set(mKey, m);
 
-    // By tenant (skip null company_id rows — those are non-tenant-scoped calls)
     if (r.company_id) {
       const tKey = r.company_id;
       const t = tenantMap.get(tKey) ?? {
         company_id: tKey,
         company_name: null,
         calls: 0,
-        input_tokens: 0,
-        output_tokens: 0,
         estimated_cost: 0,
       };
       t.calls += 1;
-      t.input_tokens += r.input_tokens;
-      t.output_tokens += r.output_tokens;
       t.estimated_cost += cost;
       tenantMap.set(tKey, t);
     }
   }
 
-  // Finalize per-model average duration.
   for (const m of modelMap.values()) {
     m.avg_duration_ms = m.calls ? m.avg_duration_ms / m.calls : 0;
   }
@@ -143,7 +156,6 @@ async function loadUsage(): Promise<UsageData> {
     (a, b) => b.estimated_cost - a.estimated_cost,
   );
 
-  // Top 5 tenants by cost. Resolve names in one pass.
   const topTenantRollups = Array.from(tenantMap.values())
     .sort((a, b) => b.estimated_cost - a.estimated_cost)
     .slice(0, 5);
@@ -160,16 +172,18 @@ async function loadUsage(): Promise<UsageData> {
 
   return {
     totalCalls,
-    totalInputTokens,
-    totalOutputTokens,
     totalEstimatedCost,
     avgDurationMs: totalCalls ? totalDurationMs / totalCalls : 0,
+    totalInputTokens,
+    totalOutputTokens,
+    totalInputChars,
+    totalOutputChars,
     byModel,
     topTenants: topTenantRollups,
   };
 }
 
-function fmtTokens(n: number): string {
+function fmtUnits(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return n.toLocaleString();
@@ -184,8 +198,16 @@ function fmtMs(n: number): string {
   return `${Math.round(n)}ms`;
 }
 
+function unitKindLabel(kind: UnitKind, count: number): string {
+  if (kind === "token") return count === 1 ? "token" : "tokens";
+  return count === 1 ? "character" : "characters";
+}
+
 export async function AiUsageTab() {
   const data = await loadUsage();
+
+  const hasTokens = data.totalInputTokens + data.totalOutputTokens > 0;
+  const hasChars = data.totalInputChars + data.totalOutputChars > 0;
 
   return (
     <section className="flex flex-col gap-6">
@@ -194,20 +216,55 @@ export async function AiUsageTab() {
           AI usage — last {ROLLUP_DAYS} days
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">
-          Rolled up from <code className="rounded bg-dc-raised px-1 text-xs">ai_call_log</code>.
-          Cost estimates are based on public per-token pricing and are
-          best-effort — always reconcile against the Anthropic billing
-          portal for anything finance-grade.
+          Rolled up from <code className="rounded bg-dc-raised px-1 text-xs">ai_call_log</code>{" "}
+          across every provider — Anthropic Sonnet for SOP conversion (billed per
+          token) and Google Cloud Translation for English → Spanish (billed per
+          source character). Cost estimates are best-effort against published
+          pricing — always reconcile against each provider&apos;s billing portal
+          for anything finance-grade.
         </Text>
       </div>
 
-      {/* Headline stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SimpleStat label="Calls" value={data.totalCalls.toLocaleString()} icon={<Cpu className="size-5" strokeWidth={2} />} />
-        <SimpleStat label="Input tokens" value={fmtTokens(data.totalInputTokens)} icon={<Cpu className="size-5" strokeWidth={2} />} />
-        <SimpleStat label="Output tokens" value={fmtTokens(data.totalOutputTokens)} icon={<Cpu className="size-5" strokeWidth={2} />} />
-        <SimpleStat label="Est. cost" value={fmtUsd(data.totalEstimatedCost)} icon={<DollarSign className="size-5" strokeWidth={2} />} />
+      {/* Headline stats — cost is the universal currency, so it leads. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <SimpleStat
+          label="Calls"
+          value={data.totalCalls.toLocaleString()}
+          icon={<Cpu className="size-5" strokeWidth={2} />}
+        />
+        <SimpleStat
+          label="Avg duration"
+          value={fmtMs(data.avgDurationMs)}
+          icon={<Timer className="size-5" strokeWidth={2} />}
+        />
+        <SimpleStat
+          label="Est. cost"
+          value={fmtUsd(data.totalEstimatedCost)}
+          icon={<DollarSign className="size-5" strokeWidth={2} />}
+        />
       </div>
+
+      {/* Per-unit breakdown — split, since tokens and characters don't compose. */}
+      {(hasTokens || hasChars) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {hasTokens && (
+            <UnitBreakdown
+              title="Tokens"
+              icon={<Cpu className="size-4" strokeWidth={2} />}
+              input={data.totalInputTokens}
+              output={data.totalOutputTokens}
+            />
+          )}
+          {hasChars && (
+            <UnitBreakdown
+              title="Characters"
+              icon={<Languages className="size-4" strokeWidth={2} />}
+              input={data.totalInputChars}
+              output={data.totalOutputChars}
+            />
+          )}
+        </div>
+      )}
 
       {/* By model */}
       <div>
@@ -229,18 +286,35 @@ export async function AiUsageTab() {
               </thead>
               <tbody className="divide-y divide-[color:var(--dc-edge)]">
                 {data.byModel.map((m) => (
-                  <tr key={m.model}>
-                    <td className="px-4 py-2.5 font-mono text-xs text-dc-text">{m.model}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">{m.calls.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">{fmtTokens(m.input_tokens)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">{fmtTokens(m.output_tokens)}</td>
+                  <tr key={`${m.model}::${m.unit_kind}`}>
+                    <td className="px-4 py-2.5">
+                      <div className="font-mono text-xs text-dc-text">{m.model}</div>
+                      <div className="mt-0.5 text-[10px] tracking-wider text-dc-text-3 uppercase">
+                        per {m.unit_kind}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
+                      {m.calls.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
+                      <span title={`${m.input_units.toLocaleString()} ${unitKindLabel(m.unit_kind, m.input_units)}`}>
+                        {fmtUnits(m.input_units)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
+                      <span title={`${m.output_units.toLocaleString()} ${unitKindLabel(m.unit_kind, m.output_units)}`}>
+                        {fmtUnits(m.output_units)}
+                      </span>
+                    </td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
                       <span className="inline-flex items-center gap-1">
                         <Timer className="size-3 text-dc-text-3" strokeWidth={2} />
                         {fmtMs(m.avg_duration_ms)}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">{fmtUsd(m.estimated_cost)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">
+                      {fmtUsd(m.estimated_cost)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -249,7 +323,7 @@ export async function AiUsageTab() {
         )}
       </div>
 
-      {/* Top tenants */}
+      {/* Top tenants — cost-only, since tokens and chars don't sum meaningfully. */}
       <div>
         <Heading level={3} className="font-display text-base">Top tenants by spend</Heading>
         {!data.topTenants.length ? (
@@ -261,7 +335,6 @@ export async function AiUsageTab() {
                 <tr>
                   <th className="px-4 py-2.5">Tenant</th>
                   <th className="px-4 py-2.5 text-right">Calls</th>
-                  <th className="px-4 py-2.5 text-right">Tokens</th>
                   <th className="px-4 py-2.5 text-right">Est. cost</th>
                 </tr>
               </thead>
@@ -272,13 +345,16 @@ export async function AiUsageTab() {
                       {t.company_name ?? (
                         <span className="italic text-dc-text-3">deleted tenant</span>
                       )}
-                      <span className="ml-2 font-mono text-xs text-dc-text-3">{t.company_id.slice(0, 8)}…</span>
+                      <span className="ml-2 font-mono text-xs text-dc-text-3">
+                        {t.company_id.slice(0, 8)}…
+                      </span>
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">{t.calls.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      {fmtTokens(t.input_tokens + t.output_tokens)}
+                      {t.calls.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">{fmtUsd(t.estimated_cost)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">
+                      {fmtUsd(t.estimated_cost)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -309,6 +385,37 @@ function SimpleStat({
         <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)">
           {icon}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function UnitBreakdown({
+  title,
+  icon,
+  input,
+  output,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  input: number;
+  output: number;
+}) {
+  return (
+    <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-4 shadow-xs">
+      <div className="flex items-center gap-2 text-xs font-medium tracking-[0.1em] text-dc-text-3 uppercase">
+        <span aria-hidden className="text-dc-text-3">{icon}</span>
+        {title}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-[10px] tracking-wider text-dc-text-3 uppercase">Input</p>
+          <p className="mt-1 text-lg font-semibold text-dc-text tabular-nums">{fmtUnits(input)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] tracking-wider text-dc-text-3 uppercase">Output</p>
+          <p className="mt-1 text-lg font-semibold text-dc-text tabular-nums">{fmtUnits(output)}</p>
+        </div>
       </div>
     </div>
   );

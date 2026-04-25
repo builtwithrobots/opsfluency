@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getAdminClient } from "@/lib/supabase/admin";
 import type { GlossaryRow } from "@/lib/types/glossary";
 
 /**
@@ -71,7 +72,23 @@ export interface TranslateMarkdownInput {
   /** Tenant glossary; substituted in/out around the API call. */
   glossary: GlossaryRow[];
   signal?: AbortSignal;
+  /**
+   * Cost-tracking attribution. Both flow into a single `ai_call_log`
+   * row written best-effort after a successful call. Optional only
+   * because the typed shape lets a future caller (e.g. an admin tool
+   * translating something that isn't an SOP) skip them — every
+   * production caller today passes both.
+   */
+  sopId?: string | null;
+  companyId?: string | null;
 }
+
+/**
+ * Identifier the platform AI usage tab keys on. Kept as a constant so
+ * the writer here and the price table in
+ * `app/dashboard/platform/_tabs/ai-usage-tab.tsx` stay in sync.
+ */
+export const GOOGLE_TRANSLATE_MODEL = "google-translate-v2";
 
 interface PlaceholderEntry {
   placeholder: string;
@@ -170,6 +187,50 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+interface LogTranslateInput {
+  sopId: string | null | undefined;
+  companyId: string | null | undefined;
+  /** Source character count Google is billed against. */
+  inputChars: number;
+  /** Translated character count — informational, not billed. */
+  outputChars: number;
+  durationMs: number;
+}
+
+/**
+ * Best-effort row into `ai_call_log` after a successful translation.
+ * Mirrors the shape and failure handling of `logCall` in
+ * `lib/ai/sonnet.ts` — admin client (the table is REVOKE'd from anon
+ * + authenticated) and a swallowed catch so a telemetry hiccup never
+ * fails an in-flight translation.
+ *
+ * `unit_kind = 'character'` is what the platform AI usage tab branches
+ * on: tokens vs characters use different price-table rows and render
+ * different unit labels.
+ */
+async function logTranslateCall({
+  sopId,
+  companyId,
+  inputChars,
+  outputChars,
+  durationMs,
+}: LogTranslateInput): Promise<void> {
+  try {
+    const supabase = getAdminClient();
+    await supabase.from("ai_call_log").insert({
+      model: GOOGLE_TRANSLATE_MODEL,
+      input_units: inputChars,
+      output_units: outputChars,
+      unit_kind: "character",
+      sop_id: sopId ?? null,
+      company_id: companyId ?? null,
+      duration_ms: durationMs,
+    });
+  } catch {
+    // Telemetry must never block the main flow.
+  }
+}
+
 export async function translateMarkdown(
   input: TranslateMarkdownInput,
 ): Promise<TranslationResult> {
@@ -244,6 +305,17 @@ export async function translateMarkdown(
           };
         }
         const restored = restorePlaceholders(translatedText, byLower);
+        // Source character count is what Google bills against: the
+        // markdown the caller actually intends to translate, before
+        // placeholder substitution swaps glossary terms with shorter
+        // tokens. Counting `substituted` would understate spend.
+        await logTranslateCall({
+          sopId: input.sopId,
+          companyId: input.companyId,
+          inputChars: input.markdown.length,
+          outputChars: restored.length,
+          durationMs: Date.now() - start,
+        });
         return { ok: true, translated: restored };
       }
 

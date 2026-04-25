@@ -374,6 +374,8 @@ export async function runTranslation(raw: unknown): Promise<ActionResult<{ statu
       source: 'en',
       target: 'es',
       glossary,
+      sopId: input.sop_id,
+      companyId: company_id,
     });
     if (!result.ok) {
       // Forward duration_ms, attempt, http_status, raw — the manager UI's
