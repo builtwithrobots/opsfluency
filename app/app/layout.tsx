@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -24,6 +25,11 @@ import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
  *   but the banner makes it impossible to forget which surface they're
  *   looking at.
  * - Employee → no banner, just the children.
+ *
+ * When the page is loaded inside an iframe (the `/dashboard/emulator`
+ * surface), the banner is suppressed: the parent dashboard already
+ * provides "back to dashboard" affordances, and a banner inside the
+ * phone frame breaks the illusion the emulator is built on.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   let ctx;
@@ -38,9 +44,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     throw e;
   }
 
+  // Sec-Fetch-Dest is set by every modern browser on every navigation
+  // and resource fetch. `iframe` is the dedicated value for iframe
+  // navigations — distinct from `document` (top-level) and `frame`
+  // (legacy <frame>, irrelevant here).
+  const isEmbedded =
+    (await headers()).get("sec-fetch-dest") === "iframe";
+
   return (
     <>
-      {ctx.role === "employee" ? null : <PreviewBanner role={ctx.role} />}
+      {ctx.role === "employee" || isEmbedded ? null : (
+        <PreviewBanner role={ctx.role} />
+      )}
       {children}
     </>
   );
