@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { GlossaryRow } from "@/lib/types/glossary";
+
 import { callSonnet, type SonnetResult, type SonnetUserContent } from "./sonnet";
 
 /**
@@ -17,13 +19,6 @@ import { callSonnet, type SonnetResult, type SonnetUserContent } from "./sonnet"
  * Sonnet, never Haiku — quality of the markdown is what every downstream
  * step (translation, worker reader) inherits.
  */
-
-export interface GlossaryRow {
-  term_en: string;
-  definition_en: string | null;
-  term_es: string;
-  definition_es: string | null;
-}
 
 export interface FlaggedTerm {
   /** The site-specific English term Sonnet flagged. */
