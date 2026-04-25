@@ -14,6 +14,11 @@ import { type SopStatus, SOP_UPLOADS_BUCKET } from '@/lib/types/sop';
 import type { PrintConfig, QrTargetType } from '@/lib/qr/print-config';
 import QRPrintEditor from '@/components/qr/QRPrintEditor';
 
+// Pinned high so the Sonnet conversion call (default 180s timeout) doesn't get
+// killed by Vercel mid-flight. Server Actions inherit the route's maxDuration.
+// Hobby caps at 60s — bump your Vercel plan or this is a no-op.
+export const maxDuration = 300;
+
 import { StageRail } from './_components/StageRail';
 import { ActionBanner } from './_components/ActionBanner';
 import { OriginalEmbed } from './_components/OriginalEmbed';

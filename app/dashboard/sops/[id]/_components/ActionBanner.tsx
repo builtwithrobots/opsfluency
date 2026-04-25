@@ -26,17 +26,20 @@ interface ActionBannerProps {
 export function ActionBanner({ sopId, status, latestVersion, qrCodeId }: ActionBannerProps) {
   if (status === 'draft') {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
+      <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
         <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 size-5 text-(--color-brand)" strokeWidth={1.5} aria-hidden />
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-semibold text-dc-text">Document uploaded — ready to convert</p>
             <p className="mt-1 text-xs text-dc-text-3">
               Claude reads the file, builds Markdown, and flags any site-specific terminology.
+              Typical run: 20–60 seconds.
             </p>
           </div>
         </div>
-        <RunConversionButton sopId={sopId} disabled={!latestVersion?.original_file_url} />
+        <div className="mt-4">
+          <RunConversionButton sopId={sopId} disabled={!latestVersion?.original_file_url} />
+        </div>
       </div>
     );
   }
@@ -52,14 +55,17 @@ export function ActionBanner({ sopId, status, latestVersion, qrCodeId }: ActionB
 
   if (status === 'pending_translation') {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
+      <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
         <div>
           <p className="text-sm font-semibold text-dc-text">Glossary locked in — ready to translate</p>
           <p className="mt-1 text-xs text-dc-text-3">
             Google Translate runs once, with your glossary injected so site-specific terms stay exact.
+            Typical run: 5–20 seconds.
           </p>
         </div>
-        <RunTranslationButton sopId={sopId} disabled={!latestVersion?.content_en} />
+        <div className="mt-4">
+          <RunTranslationButton sopId={sopId} disabled={!latestVersion?.content_en} />
+        </div>
       </div>
     );
   }

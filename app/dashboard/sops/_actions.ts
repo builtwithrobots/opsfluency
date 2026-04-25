@@ -238,7 +238,12 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
       });
     }
 
-    if (!result.ok) return fail(result.error.code, result.error.message);
+    if (!result.ok) {
+      // Forward the full Sonnet error envelope (duration_ms, attempt, raw,
+      // model) into `details` so the manager UI can show debug info without
+      // chasing through Vercel logs.
+      return fail(result.error.code, result.error.message, result.error);
+    }
 
     const conv: SopConversionResult = result.data;
 
@@ -369,7 +374,11 @@ export async function runTranslation(raw: unknown): Promise<ActionResult<{ statu
       target: 'es',
       glossary,
     });
-    if (!result.ok) return fail(result.error.code, result.error.message);
+    if (!result.ok) {
+      // Forward duration_ms, attempt, http_status, raw — the manager UI's
+      // Technical details panel reads these out of `details`.
+      return fail(result.error.code, result.error.message, result.error);
+    }
 
     const { error: vErr } = await supabase
       .from('sop_versions')

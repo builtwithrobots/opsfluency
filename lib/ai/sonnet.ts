@@ -19,7 +19,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
  */
 
 export const SONNET_MODEL = "claude-sonnet-4-6";
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 180_000;
 const MAX_RETRIES = 1;
 
 let client: Anthropic | null = null;
@@ -48,7 +48,14 @@ export interface SonnetFailure {
     code: SonnetErrorCode;
     retry_allowed: boolean;
     message?: string;
+    /** Up to 2KB of the raw response on parse failures, for debugging. */
     raw?: string;
+    /** Wall time of the call, including retries. Useful for "is it slow or stuck?" */
+    duration_ms?: number;
+    /** 1-based attempt count when the failure surfaced. */
+    attempt?: number;
+    /** Sonnet model id (kept here so the error payload is fully self-describing). */
+    model?: string;
   };
 }
 
@@ -155,6 +162,9 @@ export async function callSonnet<T>(
             code: "AI_PARSE_FAILURE",
             retry_allowed: true,
             raw: rawText.slice(0, 2048),
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+            model: SONNET_MODEL,
           },
         };
       }
@@ -181,7 +191,14 @@ export async function callSonnet<T>(
       if (controller.signal.aborted && !input.signal?.aborted) {
         return {
           ok: false,
-          error: { code: "AI_TIMEOUT", retry_allowed: true },
+          error: {
+            code: "AI_TIMEOUT",
+            retry_allowed: true,
+            message: `Sonnet did not respond within ${DEFAULT_TIMEOUT_MS / 1000}s`,
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+            model: SONNET_MODEL,
+          },
         };
       }
 
@@ -193,7 +210,14 @@ export async function callSonnet<T>(
       if (isRateLimited(err)) {
         return {
           ok: false,
-          error: { code: "AI_RATE_LIMITED", retry_allowed: true },
+          error: {
+            code: "AI_RATE_LIMITED",
+            retry_allowed: true,
+            message: err instanceof Error ? err.message : "429 from Anthropic",
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+            model: SONNET_MODEL,
+          },
         };
       }
 
@@ -203,6 +227,9 @@ export async function callSonnet<T>(
           code: "AI_INTERNAL",
           retry_allowed: false,
           message: err instanceof Error ? err.message : String(err),
+          duration_ms: Date.now() - start,
+          attempt: attempt + 1,
+          model: SONNET_MODEL,
         },
       };
     } finally {
@@ -216,6 +243,9 @@ export async function callSonnet<T>(
       code: "AI_INTERNAL",
       retry_allowed: false,
       message: lastError instanceof Error ? lastError.message : String(lastError),
+      duration_ms: Date.now() - start,
+      attempt: MAX_RETRIES + 1,
+      model: SONNET_MODEL,
     },
   };
 }
