@@ -118,7 +118,17 @@ export async function callSonnet<T>(
           model: SONNET_MODEL,
           max_tokens: input.maxTokens,
           system: input.systemPrompt,
-          messages: [{ role: "user", content: input.userMessage }],
+          // The Anthropic SDK narrows image media_type to a specific union;
+          // SOP_UPLOAD_MIME_TYPES enforces the same set on input. Cast at the
+          // SDK boundary so the call site stays clean.
+          messages: [
+            {
+              role: "user",
+              content: input.userMessage as Parameters<
+                Anthropic["messages"]["create"]
+              >[0]["messages"][number]["content"],
+            },
+          ],
         },
         { signal },
       );

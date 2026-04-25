@@ -1,121 +1,54 @@
-import {
-  AlertCircle,
-  Archive,
-  Award,
-  BookOpen,
-  CheckSquare,
-  ChevronDown,
-  Clock,
-  Factory,
-  FileText,
-  Hammer,
-  Hash,
-  HeartPulse,
-  List,
-  Search,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { AlertCircle, ChevronDown, FileText, Search, Upload } from 'lucide-react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 import { isCurrentUserSuperAdmin } from '@/lib/auth/super-admin-context';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DashboardTabs, type TabDef } from '@/components/dashboard/dashboard-tabs';
-import { SOP_TEMPLATE, type SopStatus, type SopTemplate } from '@/lib/types/sop';
-import { CreateSopClient } from './_components/CreateSopClient';
-import { SopTemplateTabClient } from './_components/SopTemplateTabClient';
+import { SOP_STATUS, type SopStatus } from '@/lib/types/sop';
+import { UploadSopClient } from './_components/UploadSopClient';
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const VALID_TABS = ['library', 'build', 'archive', 'template'] as const;
-type Tab = (typeof VALID_TABS)[number];
-
-const TEMPLATE_LABELS: Record<SopTemplate, string> = {
-  'step-by-step': 'Step-by-Step',
-  'reference': 'Reference',
-  'safety-checklist': 'Safety Checklist',
-  'onboarding': 'Onboarding',
-};
-
-const TEMPLATE_ICONS: Record<SopTemplate, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
-  'step-by-step': List,
-  'reference': FileText,
-  'safety-checklist': CheckSquare,
-  'onboarding': Users,
-};
-
-const PACKAGE_ICONS: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
-  'general': Factory,
-  'iso9001': Award,
-  'food-safety': ShieldCheck,
-  'healthcare': HeartPulse,
-};
-
-const PACKAGE_LABELS: Record<string, string> = {
-  'general': 'General',
-  'iso9001': 'ISO 9001',
-  'food-safety': 'Food Safety',
-  'healthcare': 'Healthcare',
-};
-
-const STATUS_BADGE: Record<SopStatus, { label: string; color: string }> = {
-  draft:                { label: 'Draft',               color: 'zinc' },
-  pending_terms:        { label: 'Pending Terms',        color: 'signal-warn' },
-  pending_translation:  { label: 'Pending Translation',  color: 'signal-info' },
-  pending_approval:     { label: 'Pending Approval',     color: 'signal-hub' },
-  published:            { label: 'Published',            color: 'signal-ok' },
-  archived:             { label: 'Archived',             color: 'signal-neutral' },
-};
-
-const PIPELINE_STAGES: { status: SopStatus; label: string; step: number }[] = [
-  { status: 'draft',               label: 'Draft',               step: 1 },
-  { status: 'pending_terms',       label: 'Pending Terms',       step: 2 },
-  { status: 'pending_translation', label: 'Pending Translation', step: 3 },
-  { status: 'pending_approval',    label: 'Pending Approval',    step: 4 },
-];
-
-// ── Row types (from Supabase queries) ────────────────────────────────────────
+interface PageProps {
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+  }>;
+}
 
 interface SopRow {
   id: string;
   title: string;
   status: SopStatus;
-  template: SopTemplate;
-  created_at: string;
   updated_at: string;
   archived_at: string | null;
   departments: { id: string; name: string } | null;
 }
 
-interface Department {
+interface QrRow {
+  target_id: string | null;
   id: string;
-  name: string;
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+const STATUS_LABEL: Record<SopStatus, { label: string; color: Parameters<typeof Badge>[0]['color'] }> = {
+  draft:                { label: 'Draft',                color: 'zinc' },
+  pending_terms:        { label: 'Pending Terms',         color: 'signal-warn' },
+  pending_translation:  { label: 'Pending Translation',   color: 'signal-info' },
+  pending_approval:     { label: 'Pending Approval',      color: 'signal-hub' },
+  published:            { label: 'Published',             color: 'signal-ok' },
+  archived:             { label: 'Archived',              color: 'signal-neutral' },
+};
 
-interface PageProps {
-  searchParams: Promise<{
-    tab?: string;
-    q?: string;
-    dept?: string;
-    sort?: string;
-    dir?: string;
-  }>;
-}
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? '';
 
 export default async function SopsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const rawTab = params.tab;
-  const tab: Tab = VALID_TABS.includes(rawTab as Tab) ? (rawTab as Tab) : 'library';
-  const q = params.q ?? '';
-  const deptFilter = params.dept ?? '';
-  const sort = (params.sort ?? 'date') as 'title' | 'dept' | 'date';
-  const dir = (params.dir ?? 'desc') as 'asc' | 'desc';
+  const q = (params.q ?? '').trim();
+  const statusFilter: SopStatus | 'all' = (SOP_STATUS as readonly string[]).includes(params.status ?? '')
+    ? (params.status as SopStatus)
+    : 'all';
 
   let ctx;
   try {
@@ -129,135 +62,60 @@ export default async function SopsPage({ searchParams }: PageProps) {
     }
     throw e;
   }
-  const { supabase, company_id, role } = ctx;
-  const isAdmin = role === 'admin';
+  const { supabase, company_id } = ctx;
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────
+  // ── Fetch SOPs + departments in parallel ─────────────────────────────────
+  const sopsPromise = (async () => {
+    let query = supabase
+      .from('sops')
+      .select('id, title, status, updated_at, archived_at, departments(id, name)')
+      .eq('company_id', company_id)
+      .order('updated_at', { ascending: false });
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    if (q) query = query.ilike('title', `%${q}%`);
+    return query;
+  })();
 
-  const tabs: TabDef[] = [
-    { id: 'library',  label: 'Library',  href: '/dashboard/sops?tab=library' },
-    { id: 'build',    label: 'Build',    href: '/dashboard/sops?tab=build' },
-    { id: 'archive',  label: 'Archive',  href: '/dashboard/sops?tab=archive' },
-    { id: 'template', label: 'Template', href: '/dashboard/sops?tab=template' },
-  ];
+  const [{ data: sopRows, error: sopsError }, { data: deptCount }] = await Promise.all([
+    sopsPromise,
+    supabase
+      .from('departments')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', company_id),
+  ]);
+  // deptCount is unused in MVP; the variable exists so Supabase actually
+  // runs the count query as a sanity check that RLS lets the manager see
+  // their tenant data. Remove if it ever shows up in profiling.
+  void deptCount;
 
-  // ── Shared: departments for filters + create form ────────────────────────
+  const sops: SopRow[] = (sopRows ?? []) as unknown as SopRow[];
 
+  // Resolve QR ids for any published SOP in the result set.
+  const publishedIds = sops.filter((s) => s.status === 'published').map((s) => s.id);
+  let qrByTargetId = new Map<string, string>();
+  if (publishedIds.length > 0) {
+    const { data: qrRows } = await supabase
+      .from('qr_codes')
+      .select('id, target_id')
+      .eq('company_id', company_id)
+      .eq('target_type', 'sop')
+      .in('target_id', publishedIds);
+    qrByTargetId = new Map(
+      ((qrRows ?? []) as QrRow[])
+        .filter((q): q is QrRow & { target_id: string } => !!q.target_id)
+        .map((q) => [q.target_id, q.id]),
+    );
+  }
+
+  // Departments for the upload dialog.
   const { data: departments = [] } = await supabase
     .from('departments')
     .select('id, name')
     .eq('company_id', company_id)
     .order('name');
 
-  // ── Shared: company template settings ────────────────────────────────────
-
-  const { data: company } = await supabase
-    .from('companies')
-    .select('active_sop_templates, industry_packages')
-    .eq('id', company_id)
-    .single();
-
-  const ALL_TEMPLATES: SopTemplate[] = ['step-by-step', 'reference', 'safety-checklist', 'onboarding'];
-  const activeTemplates: SopTemplate[] = Array.isArray(company?.active_sop_templates) && company.active_sop_templates.length > 0
-    ? (company.active_sop_templates as SopTemplate[]).filter((t) => ALL_TEMPLATES.includes(t))
-    : ALL_TEMPLATES;
-
-  const ALL_PACKAGES = ['general', 'iso9001', 'food-safety', 'healthcare'] as const;
-  type IndustryPackageKey = typeof ALL_PACKAGES[number];
-  const activePackages: IndustryPackageKey[] = Array.isArray(company?.industry_packages) && company.industry_packages.length > 0
-    ? (company.industry_packages as IndustryPackageKey[]).filter((p) => (ALL_PACKAGES as readonly string[]).includes(p))
-    : ['general'];
-
-  // ── Library tab data ──────────────────────────────────────────────────────
-
-  let librarySops: SopRow[] = [];
-  let libraryError: string | null = null;
-
-  if (tab === 'library') {
-    try {
-      let query = supabase
-        .from('sops')
-        .select('id, title, status, template, created_at, updated_at, archived_at, departments(id, name)')
-        .eq('company_id', company_id)
-        .eq('status', 'published');
-
-      if (deptFilter) query = query.eq('department_id', deptFilter);
-      if (q) query = query.ilike('title', `%${q}%`);
-
-      if (sort === 'title') {
-        query = query.order('title', { ascending: dir === 'asc' });
-      } else if (sort === 'dept') {
-        query = query.order('department_id', { ascending: dir === 'asc', nullsFirst: false });
-      } else {
-        query = query.order('updated_at', { ascending: dir === 'asc' });
-      }
-
-      const { data, error } = await query;
-      if (error) libraryError = error.message;
-      else librarySops = (data ?? []) as unknown as SopRow[];
-    } catch {
-      libraryError = 'Unable to load SOPs.';
-    }
-  }
-
-  // ── Build tab data ────────────────────────────────────────────────────────
-
-  let buildSops: SopRow[] = [];
-  let buildError: string | null = null;
-
-  if (tab === 'build') {
-    try {
-      const { data, error } = await supabase
-        .from('sops')
-        .select('id, title, status, template, created_at, updated_at, archived_at, departments(id, name)')
-        .eq('company_id', company_id)
-        .in('status', ['draft', 'pending_terms', 'pending_translation', 'pending_approval'])
-        .order('updated_at', { ascending: false });
-
-      if (error) buildError = error.message;
-      else buildSops = (data ?? []) as unknown as SopRow[];
-    } catch {
-      buildError = 'Unable to load in-progress SOPs.';
-    }
-  }
-
-  // ── Archive tab data ──────────────────────────────────────────────────────
-
-  let archiveSops: SopRow[] = [];
-  let archiveError: string | null = null;
-
-  if (tab === 'archive') {
-    try {
-      let query = supabase
-        .from('sops')
-        .select('id, title, status, template, created_at, updated_at, archived_at, departments(id, name)')
-        .eq('company_id', company_id)
-        .eq('status', 'archived');
-
-      if (deptFilter) query = query.eq('department_id', deptFilter);
-      if (q) query = query.ilike('title', `%${q}%`);
-
-      if (sort === 'title') {
-        query = query.order('title', { ascending: dir === 'asc' });
-      } else if (sort === 'dept') {
-        query = query.order('department_id', { ascending: dir === 'asc', nullsFirst: false });
-      } else {
-        query = query.order('archived_at', { ascending: dir === 'asc', nullsFirst: false });
-      }
-
-      const { data, error } = await query;
-      if (error) archiveError = error.message;
-      else archiveSops = (data ?? []) as unknown as SopRow[];
-    } catch {
-      archiveError = 'Unable to load archived SOPs.';
-    }
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Page header */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
@@ -265,106 +123,20 @@ export default async function SopsPage({ searchParams }: PageProps) {
           </p>
           <Heading className="font-display mt-2">Standard Operating Procedures</Heading>
           <Text className="mt-2 max-w-2xl">
-            Build, publish, and manage bilingual SOPs. Set your org template, track the pipeline,
-            and keep the archive for compliance.
+            Upload, review, translate, and publish bilingual procedures. Each published SOP gets a
+            permanent QR code your workers can scan.
           </Text>
         </div>
-        {tab === 'build' && (
-          <CreateSopClient
-            departments={(departments ?? []) as Department[]}
-            activeTemplates={activeTemplates}
-            industryPackages={activePackages}
-          />
-        )}
-        {tab === 'library' && (
-          <Button href="/dashboard/sops?tab=build" color="brand">
-            <Hammer data-slot="icon" strokeWidth={2} />
-            Build SOP
-          </Button>
-        )}
+        <UploadSopClient departments={(departments ?? []) as { id: string; name: string }[]} />
       </header>
 
-      {/* Tab bar */}
-      <DashboardTabs tabs={tabs} activeTab={tab} />
-
-      {/* Tab panels */}
-      {tab === 'library' && (
-        <LibraryTab
-          sops={librarySops}
-          fetchError={libraryError}
-          departments={(departments ?? []) as Department[]}
-          q={q}
-          deptFilter={deptFilter}
-          sort={sort}
-          dir={dir}
-        />
-      )}
-
-      {tab === 'build' && (
-        <BuildTab
-          sops={buildSops}
-          fetchError={buildError}
-          activeTemplates={activeTemplates}
-          activePackages={activePackages}
-        />
-      )}
-
-      {tab === 'archive' && (
-        <ArchiveTab
-          sops={archiveSops}
-          fetchError={archiveError}
-          departments={(departments ?? []) as Department[]}
-          q={q}
-          deptFilter={deptFilter}
-          sort={sort}
-          dir={dir}
-        />
-      )}
-
-      {tab === 'template' && (
-        <TemplateTab
-          currentPackages={activePackages}
-          activeTemplates={activeTemplates}
-          isAdmin={isAdmin}
-        />
-      )}
-    </div>
-  );
-}
-
-// ── Library tab ───────────────────────────────────────────────────────────────
-
-interface LibraryTabProps {
-  sops: SopRow[];
-  fetchError: string | null;
-  departments: Department[];
-  q: string;
-  deptFilter: string;
-  sort: 'title' | 'dept' | 'date';
-  dir: 'asc' | 'desc';
-}
-
-function LibraryTab({ sops, fetchError, departments, q, deptFilter, sort, dir }: LibraryTabProps) {
-  if (fetchError) return <FetchError message={fetchError} />;
-
-  const deptName = departments.find((d) => d.id === deptFilter)?.name;
-
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Filters */}
       <form
         action="/dashboard/sops"
         method="GET"
         className="flex flex-wrap items-center gap-2"
       >
-        <input type="hidden" name="tab" value="library" />
-
-        {/* Search */}
         <div className="relative flex-1 min-w-48 max-w-sm">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dc-text-3"
-          />
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
           <input
             name="q"
             type="search"
@@ -373,476 +145,119 @@ function LibraryTab({ sops, fetchError, departments, q, deptFilter, sort, dir }:
             className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-9 pr-3 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
           />
         </div>
-
-        {/* Department filter */}
         <div className="relative">
           <select
-            name="dept"
-            defaultValue={deptFilter}
+            name="status"
+            defaultValue={statusFilter}
             className="appearance-none rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-3 pr-8 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
           >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+            <option value="all">All statuses</option>
+            {SOP_STATUS.map((s) => (
+              <option key={s} value={s}>{STATUS_LABEL[s].label}</option>
             ))}
           </select>
           <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
         </div>
-
-        {/* Sort */}
-        <div className="relative">
-          <select
-            name="sort"
-            defaultValue={sort}
-            className="appearance-none rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-3 pr-8 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
+        <button
+          type="submit"
+          className="rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text hover:bg-dc-surface"
+        >
+          Apply
+        </button>
+        {(q || statusFilter !== 'all') && (
+          <Link
+            href="/dashboard/sops"
+            className="rounded-lg px-3 py-2 text-sm text-dc-text-3 hover:text-dc-text"
           >
-            <option value="date">Sort: Last updated</option>
-            <option value="title">Sort: Title</option>
-            <option value="dept">Sort: Department</option>
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
-        </div>
-
-        {/* Direction */}
-        <div className="relative">
-          <select
-            name="dir"
-            defaultValue={dir}
-            className="appearance-none rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-3 pr-8 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
-          >
-            <option value="desc">Newest first</option>
-            <option value="asc">Oldest first</option>
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
-        </div>
-
-        <Button type="submit" plain>Apply</Button>
-        {(q || deptFilter) && (
-          <Button href="/dashboard/sops?tab=library" plain>Clear</Button>
+            Clear
+          </Link>
         )}
       </form>
 
-      {/* Results summary */}
-      {sops.length > 0 && (
-        <p className="text-xs text-dc-text-3">
-          {sops.length} published {sops.length === 1 ? 'SOP' : 'SOPs'}
-          {q ? ` matching "${q}"` : ''}
-          {deptName ? ` in ${deptName}` : ''}
-        </p>
-      )}
-
-      {/* Cards */}
-      {!sops.length ? (
-        q || deptFilter ? (
-          <div className="py-12 text-center text-sm text-dc-text-3">
-            No published SOPs match your filters.
-          </div>
-        ) : (
-          <LibraryEmptyState />
-        )
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {sops.map((sop, i) => (
-            <SopCard key={sop.id} sop={sop} index={i} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Build tab ─────────────────────────────────────────────────────────────────
-
-interface BuildTabProps {
-  sops: SopRow[];
-  fetchError: string | null;
-  activeTemplates: SopTemplate[];
-  activePackages: string[];
-}
-
-function BuildTab({ sops, fetchError, activeTemplates, activePackages }: BuildTabProps) {
-  if (fetchError) return <FetchError message={fetchError} />;
-
-  // Group by pipeline stage
-  const grouped = PIPELINE_STAGES.map((stage) => ({
-    ...stage,
-    sops: sops.filter((s) => s.status === stage.status),
-  }));
-
-  const totalInPipeline = sops.length;
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Org settings context banner */}
-      <div className="flex items-center justify-between gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 min-w-0">
-          {/* Packages */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex -space-x-1 shrink-0">
-              {activePackages.slice(0, 3).map((p) => {
-                const Icon = PACKAGE_ICONS[p];
-                return Icon ? (
-                  <span key={p} className="flex size-7 items-center justify-center rounded-full border border-dc-surface bg-dc-raised text-dc-text-2">
-                    <Icon className="size-3.5" strokeWidth={1.5} />
-                  </span>
-                ) : null;
-              })}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-dc-text-3 uppercase tracking-wide">Packages</p>
-              <p className="truncate text-sm font-semibold text-dc-text">
-                {activePackages.map((p) => PACKAGE_LABELS[p] ?? p).join(', ')}
-              </p>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div aria-hidden className="hidden sm:block h-8 w-px bg-[color:var(--dc-edge)]" />
-
-          {/* Templates */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex -space-x-1 shrink-0">
-              {activeTemplates.slice(0, 3).map((t) => {
-                const Icon = TEMPLATE_ICONS[t];
-                return (
-                  <span key={t} className="flex size-7 items-center justify-center rounded-full border border-dc-surface bg-(--color-brand)/10 text-(--color-brand)">
-                    <Icon className="size-3.5" strokeWidth={2} />
-                  </span>
-                );
-              })}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-dc-text-3 uppercase tracking-wide">Templates</p>
-              <p className="truncate text-sm font-semibold text-dc-text">
-                {activeTemplates.length === 4
-                  ? 'All available'
-                  : activeTemplates.map((t) => TEMPLATE_LABELS[t]).join(', ')}
-              </p>
-            </div>
+      {sopsError && (
+        <div className="flex items-start gap-3 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5">
+          <AlertCircle className="mt-0.5 size-5 shrink-0 text-(--color-signal-urgent)" />
+          <div>
+            <p className="text-sm font-medium text-dc-text">Could not load SOPs</p>
+            <p className="mt-1 text-xs text-dc-text-3">{sopsError.message}</p>
           </div>
         </div>
-
-        <Button href="/dashboard/sops?tab=template" plain className="shrink-0 text-sm">
-          Manage
-        </Button>
-      </div>
-
-      {/* Pipeline overview */}
-      {totalInPipeline === 0 ? (
-        <BuildEmptyState />
-      ) : (
-        <div className="flex flex-col gap-6">
-          <p className="text-xs text-dc-text-3">
-            {totalInPipeline} {totalInPipeline === 1 ? 'SOP' : 'SOPs'} in the pipeline
-          </p>
-
-          {grouped.map((stage) => {
-            if (stage.sops.length === 0) return null;
-            return (
-              <div key={stage.status}>
-                {/* Stage header */}
-                <div className="mb-3 flex items-center gap-2.5">
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--color-brand)/10 text-xs font-bold text-(--color-brand)">
-                    {stage.step}
-                  </span>
-                  <h3 className="text-sm font-semibold text-dc-text">{stage.label}</h3>
-                  <span className="rounded-full bg-dc-raised px-2 py-0.5 text-xs text-dc-text-3">
-                    {stage.sops.length}
-                  </span>
-                </div>
-
-                {/* Stage SOPs */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {stage.sops.map((sop, i) => (
-                    <BuildSopCard key={sop.id} sop={sop} index={i} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       )}
-    </div>
-  );
-}
 
-// ── Archive tab ───────────────────────────────────────────────────────────────
-
-interface ArchiveTabProps {
-  sops: SopRow[];
-  fetchError: string | null;
-  departments: Department[];
-  q: string;
-  deptFilter: string;
-  sort: 'title' | 'dept' | 'date';
-  dir: 'asc' | 'desc';
-}
-
-function ArchiveTab({ sops, fetchError, departments, q, deptFilter, sort, dir }: ArchiveTabProps) {
-  if (fetchError) return <FetchError message={fetchError} />;
-
-  const deptName = departments.find((d) => d.id === deptFilter)?.name;
-
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Filters */}
-      <form
-        action="/dashboard/sops"
-        method="GET"
-        className="flex flex-wrap items-center gap-2"
-      >
-        <input type="hidden" name="tab" value="archive" />
-
-        <div className="relative flex-1 min-w-48 max-w-sm">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dc-text-3"
-          />
-          <input
-            name="q"
-            type="search"
-            defaultValue={q}
-            placeholder="Search archived SOPs…"
-            className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-9 pr-3 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
-          />
-        </div>
-
-        <div className="relative">
-          <select
-            name="dept"
-            defaultValue={deptFilter}
-            className="appearance-none rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-3 pr-8 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
-          >
-            <option value="">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
-        </div>
-
-        <div className="relative">
-          <select
-            name="sort"
-            defaultValue={sort}
-            className="appearance-none rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-3 pr-8 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
-          >
-            <option value="date">Sort: Archived date</option>
-            <option value="title">Sort: Title</option>
-            <option value="dept">Sort: Department</option>
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
-        </div>
-
-        <div className="relative">
-          <select
-            name="dir"
-            defaultValue={dir}
-            className="appearance-none rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-3 pr-8 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
-          >
-            <option value="desc">Newest first</option>
-            <option value="asc">Oldest first</option>
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
-        </div>
-
-        <Button type="submit" plain>Apply</Button>
-        {(q || deptFilter) && (
-          <Button href="/dashboard/sops?tab=archive" plain>Clear</Button>
-        )}
-      </form>
+      {!sopsError && sops.length === 0 && <EmptyState filtered={!!q || statusFilter !== 'all'} />}
 
       {sops.length > 0 && (
-        <p className="text-xs text-dc-text-3">
-          {sops.length} archived {sops.length === 1 ? 'SOP' : 'SOPs'}
-          {q ? ` matching "${q}"` : ''}
-          {deptName ? ` in ${deptName}` : ''}
-        </p>
-      )}
-
-      {!sops.length ? (
-        q || deptFilter ? (
-          <div className="py-12 text-center text-sm text-dc-text-3">
-            No archived SOPs match your filters.
-          </div>
-        ) : (
-          <ArchiveEmptyState />
-        )
-      ) : (
-        <div className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2">
           {sops.map((sop) => (
-            <ArchiveSopRow key={sop.id} sop={sop} />
+            <SopRowItem
+              key={sop.id}
+              sop={sop}
+              qrId={qrByTargetId.get(sop.id) ?? null}
+            />
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
 }
 
-// ── Template tab ──────────────────────────────────────────────────────────────
-
-interface TemplateTabProps {
-  currentPackages: string[];
-  activeTemplates: SopTemplate[];
-  isAdmin: boolean;
-}
-
-function TemplateTab({ currentPackages, activeTemplates, isAdmin }: TemplateTabProps) {
-  return (
-    <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
-      <SopTemplateTabClient
-        currentPackages={currentPackages as ('general' | 'iso9001' | 'food-safety' | 'healthcare')[]}
-        activeTemplates={activeTemplates}
-        isAdmin={isAdmin}
-      />
-    </div>
-  );
-}
-
-// ── Shared cards + rows ───────────────────────────────────────────────────────
-
-function SopCard({ sop, index }: { sop: SopRow; index: number }) {
-  const badge = STATUS_BADGE[sop.status];
-  const TemplateIcon = TEMPLATE_ICONS[sop.template];
+function SopRowItem({ sop, qrId }: { sop: SopRow; qrId: string | null }) {
+  const meta = STATUS_LABEL[sop.status];
 
   return (
-    <div
-      className="group relative flex flex-col gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5 shadow-xs transition-shadow hover:shadow-md"
-      style={{ animationDelay: `${index * 40}ms` }}
-    >
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-2">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
-        >
-          <TemplateIcon className="size-4" strokeWidth={2} />
-        </span>
-        <Badge color={badge.color as Parameters<typeof Badge>[0]['color']}>{badge.label}</Badge>
-      </div>
-
-      {/* Title + dept */}
-      <div className="flex-1">
-        <p className="font-semibold leading-snug text-dc-text">{sop.title}</p>
-        {sop.departments && (
-          <p className="mt-1 text-xs text-dc-text-3">{sop.departments.name}</p>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-[color:var(--dc-edge)] pt-3">
-        <div className="flex items-center gap-1 text-xs text-dc-text-3">
-          <Clock className="size-3.5" />
-          {new Date(sop.updated_at).toLocaleDateString()}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-dc-text-3">
-          <Hash className="size-3" />
-          {TEMPLATE_LABELS[sop.template]}
-        </div>
-      </div>
-
-      <span
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 rounded-b-xl bg-(--color-brand) transition-transform duration-200 group-hover:scale-x-100"
-      />
-    </div>
-  );
-}
-
-function BuildSopCard({ sop, index }: { sop: SopRow; index: number }) {
-  const badge = STATUS_BADGE[sop.status];
-  const TemplateIcon = TEMPLATE_ICONS[sop.template];
-
-  const nextActionLabel: Record<SopStatus, string | null> = {
-    draft: 'Upload document',
-    pending_terms: 'Review terms',
-    pending_translation: 'Review translation',
-    pending_approval: 'Approve for publish',
-    published: null,
-    archived: null,
-  };
-
-  return (
-    <div
-      className="group relative flex flex-col gap-3 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5 shadow-xs transition-shadow hover:shadow-md"
-      style={{ animationDelay: `${index * 40}ms` }}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
-        >
-          <TemplateIcon className="size-4" strokeWidth={2} />
-        </span>
-        <Badge color={badge.color as Parameters<typeof Badge>[0]['color']}>{badge.label}</Badge>
-      </div>
-
-      <div className="flex-1">
-        <p className="font-semibold leading-snug text-dc-text">{sop.title}</p>
-        {sop.departments && (
-          <p className="mt-1 text-xs text-dc-text-3">{sop.departments.name}</p>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between border-t border-[color:var(--dc-edge)] pt-3">
-        <span className="text-xs text-dc-text-3">
-          {new Date(sop.updated_at).toLocaleDateString()}
-        </span>
-        {nextActionLabel[sop.status] && (
-          <Button
-            href={`/dashboard/sops/${sop.id}`}
-            plain
-            className="text-xs text-(--color-brand)"
-          >
-            {nextActionLabel[sop.status]} →
-          </Button>
-        )}
-      </div>
-
-      <span
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 rounded-b-xl bg-(--color-brand) transition-transform duration-200 group-hover:scale-x-100"
-      />
-    </div>
-  );
-}
-
-function ArchiveSopRow({ sop }: { sop: SopRow }) {
-  const TemplateIcon = TEMPLATE_ICONS[sop.template];
-
-  return (
-    <div className="flex items-center gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4 transition-colors hover:bg-dc-raised">
-      <span
-        aria-hidden
-        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-dc-raised text-dc-text-3"
+    <li>
+      <Link
+        href={`/dashboard/sops/${sop.id}`}
+        className="group flex items-center gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-4 py-3 transition-colors hover:bg-dc-raised"
       >
-        <TemplateIcon className="size-4" strokeWidth={1.5} />
-      </span>
+        <span
+          aria-hidden
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
+        >
+          <FileText className="size-5" strokeWidth={1.75} />
+        </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-dc-text">{sop.title}</p>
-        <p className="mt-0.5 text-xs text-dc-text-3">
-          {sop.departments?.name ?? 'No department'}
-          {' · '}
-          {TEMPLATE_LABELS[sop.template]}
-        </p>
-      </div>
-
-      <div className="shrink-0 text-right">
-        <Badge color="signal-neutral">Archived</Badge>
-        {sop.archived_at && (
-          <p className="mt-1 text-xs text-dc-text-3">
-            {new Date(sop.archived_at).toLocaleDateString()}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-dc-text">{sop.title}</p>
+          <p className="mt-0.5 text-xs text-dc-text-3">
+            {sop.departments?.name ?? 'No department'}
+            <span className="mx-1.5">·</span>
+            Updated {new Date(sop.updated_at).toLocaleDateString()}
           </p>
+        </div>
+
+        <Badge color={meta.color}>{meta.label}</Badge>
+
+        {qrId ? (
+          <span
+            aria-label="QR thumbnail"
+            className="hidden shrink-0 rounded-md bg-white p-1 sm:block"
+          >
+            <QRCodeSVG
+              value={`${APP_URL}/s/${qrId}`}
+              size={48}
+              bgColor="#ffffff"
+              fgColor="#000000"
+              level="M"
+              includeMargin={false}
+            />
+          </span>
+        ) : (
+          <span aria-hidden className="hidden size-[48px] shrink-0 sm:block" />
         )}
-      </div>
-    </div>
+      </Link>
+    </li>
   );
 }
 
-// ── Empty states ──────────────────────────────────────────────────────────────
-
-function LibraryEmptyState() {
+function EmptyState({ filtered }: { filtered: boolean }) {
+  if (filtered) {
+    return (
+      <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-10 text-center text-sm text-dc-text-3">
+        No SOPs match your filters.
+      </div>
+    );
+  }
   return (
     <div className="relative overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-8 shadow-xs">
       <div
@@ -854,94 +269,18 @@ function LibraryEmptyState() {
           aria-hidden
           className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-(--color-brand)/10 text-(--color-brand)"
         >
-          <BookOpen className="size-7" strokeWidth={1.5} />
+          <Upload className="size-7" strokeWidth={1.5} />
         </span>
         <div>
           <p className="font-display text-sm tracking-[0.15em] text-(--color-brand) uppercase">
-            Library is empty
+            Get started
           </p>
-          <h3 className="mt-1 text-xl font-semibold text-dc-text">No published SOPs yet</h3>
+          <h3 className="mt-1 text-xl font-semibold text-dc-text">Upload your first SOP</h3>
           <p className="mt-1 max-w-md text-dc-text-2">
-            Build and publish your first SOP to see it appear here. Published SOPs are live for
-            employees to scan and view.
-          </p>
-          <Button href="/dashboard/sops?tab=build" color="brand" className="mt-5">
-            <Hammer data-slot="icon" strokeWidth={2} />
-            Start building
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BuildEmptyState() {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-8 shadow-xs">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-(--color-brand) opacity-10 blur-3xl"
-      />
-      <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-        <span
-          aria-hidden
-          className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-(--color-brand)/10 text-(--color-brand)"
-        >
-          <Hammer className="size-7" strokeWidth={1.5} />
-        </span>
-        <div>
-          <p className="font-display text-sm tracking-[0.15em] text-(--color-brand) uppercase">
-            Pipeline is clear
-          </p>
-          <h3 className="mt-1 text-xl font-semibold text-dc-text">No SOPs in progress</h3>
-          <p className="mt-1 max-w-md text-dc-text-2">
-            Create a new SOP to start the pipeline. Upload a PDF, Word doc, or plain text file
-            and Claude will convert it to structured, bilingual Markdown.
+            Drop a PDF, photo, or text file. Claude reads it, builds clean Markdown, flags
+            site-specific terms, and translates to Spanish — all in one pass.
           </p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ArchiveEmptyState() {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-8 shadow-xs">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-(--color-brand) opacity-10 blur-3xl"
-      />
-      <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-        <span
-          aria-hidden
-          className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-dc-raised text-dc-text-3"
-        >
-          <Archive className="size-7" strokeWidth={1.5} />
-        </span>
-        <div>
-          <p className="font-display text-sm tracking-[0.15em] text-dc-text-3 uppercase">
-            Archive
-          </p>
-          <h3 className="mt-1 text-xl font-semibold text-dc-text">No archived SOPs</h3>
-          <p className="mt-1 max-w-md text-dc-text-2">
-            When you retire a published SOP it moves here. Archived SOPs are read-only — their
-            QR codes return a "no longer available" message.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Shared error state ────────────────────────────────────────────────────────
-
-function FetchError({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5">
-      <AlertCircle className="mt-0.5 size-5 shrink-0 text-(--color-signal-urgent)" />
-      <div>
-        <p className="text-sm font-medium text-dc-text">Could not load SOPs</p>
-        <p className="mt-1 text-xs text-dc-text-3">{message}</p>
       </div>
     </div>
   );
