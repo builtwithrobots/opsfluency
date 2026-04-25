@@ -25,8 +25,9 @@ import { OriginalEmbed } from './_components/OriginalEmbed';
 import { SpanishEditorClient } from './_components/SpanishEditorClient';
 import { UploadNewVersionClient } from './_components/UploadNewVersionClient';
 import { ArchiveButton } from './_components/ArchiveButton';
+import { PhoneFrame } from './_components/PhoneFrame';
 
-const VALID_TABS = ['original', 'english', 'spanish', 'versions', 'qr'] as const;
+const VALID_TABS = ['original', 'english', 'spanish', 'app', 'versions', 'qr'] as const;
 type Tab = (typeof VALID_TABS)[number];
 
 const STATUS_BADGE: Record<SopStatus, { label: string; color: Parameters<typeof Badge>[0]['color'] }> = {
@@ -110,10 +111,16 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     .eq('id', company_id)
     .single();
 
+  // Disable App view until conversion has produced something for the worker
+  // page to render — otherwise the iframe would show the "Not ready yet"
+  // empty state, which is correct but not useful.
+  const hasWorkerContent = !!latest?.content_en;
+
   const tabs: TabDef[] = [
     { id: 'original', label: 'Original',   href: `/dashboard/sops/${id}?tab=original` },
     { id: 'english',  label: 'English',    href: `/dashboard/sops/${id}?tab=english` },
     { id: 'spanish',  label: 'Spanish',    href: `/dashboard/sops/${id}?tab=spanish`, disabled: !latest?.content_es },
+    { id: 'app',      label: 'App view',   href: `/dashboard/sops/${id}?tab=app`, disabled: !hasWorkerContent },
     { id: 'versions', label: 'Versions',   href: `/dashboard/sops/${id}?tab=versions` },
     { id: 'qr',       label: 'QR',         href: `/dashboard/sops/${id}?tab=qr`, disabled: !qrRow },
   ];
@@ -192,6 +199,33 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
       )}
       {tab === 'spanish' && !latest?.content_es && (
         <EmptyTab message="Spanish translation hasn't run yet." />
+      )}
+
+      {tab === 'app' && hasWorkerContent && (
+        <div className="flex flex-col items-start gap-6 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6 lg:flex-row">
+          <PhoneFrame
+            src={`/app/sop/${id}?preview=1`}
+            title="Worker reader preview"
+            caption="Live preview · 390 × 844 (iPhone 12+ viewport)"
+          />
+          <div className="flex-1 text-sm text-dc-text-2">
+            <p className="font-semibold text-dc-text">What workers see</p>
+            <p className="mt-2">
+              This is a real render of <code className="rounded bg-dc-raised px-1.5 py-0.5 text-xs">/app/sop/{id}</code>{' '}
+              — the same page that loads when an employee scans the QR. The EN/ES toggle inside
+              the frame works; preferences persist back to{' '}
+              <code className="rounded bg-dc-raised px-1.5 py-0.5 text-xs">company_members.preferred_language</code>.
+            </p>
+            <p className="mt-3 text-xs text-dc-text-3">
+              Preview mode shows the latest version even if it&apos;s not yet published, so you
+              can spot-check before approval. Workers always see the latest <em>published</em>{' '}
+              version only.
+            </p>
+          </div>
+        </div>
+      )}
+      {tab === 'app' && !hasWorkerContent && (
+        <EmptyTab message="The worker preview will appear here once Sonnet conversion runs." />
       )}
 
       {tab === 'versions' && (
