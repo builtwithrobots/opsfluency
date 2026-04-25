@@ -376,16 +376,14 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
           <div className="flex w-full items-center gap-2">
             {!collapsed && <ThemeToggle />}
             {!collapsed && (
-              <a
-                href="/app/home"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Preview employee app"
-                title="Preview employee app"
+              <Link
+                href="/dashboard/emulator"
+                aria-label="Worker app emulator"
+                title="Worker app emulator"
                 className={utilityButtonClass}
               >
                 <Eye className="h-5 w-5" strokeWidth={2} />
-              </a>
+              </Link>
             )}
             {!collapsed && (
               <a
