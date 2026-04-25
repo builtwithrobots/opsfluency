@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { GlossaryRow } from "@/lib/ai/sop-conversion";
+import type { GlossaryRow } from "@/lib/types/glossary";
 
 /**
  * Google Cloud Translation with glossary injection.

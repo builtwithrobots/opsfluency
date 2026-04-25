@@ -10,9 +10,9 @@ import {
   convertSopFromPdf,
   convertSopFromText,
   type FlaggedTerm,
-  type GlossaryRow,
   type SopConversionResult,
 } from '@/lib/ai/sop-conversion';
+import type { GlossaryRow } from '@/lib/types/glossary';
 import { translateMarkdown } from '@/lib/translation/google';
 import { createQrCode } from '@/lib/qr/generate';
 import {
