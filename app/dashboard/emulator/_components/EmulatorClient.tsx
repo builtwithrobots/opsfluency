@@ -1,10 +1,13 @@
 "use client";
 
 import {
+  BatteryFull,
   ExternalLink,
   RefreshCw,
+  Signal,
   Smartphone,
   Tablet,
+  Wifi,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -134,6 +137,11 @@ export function EmulatorClient({ initialLang }: Props) {
 
 // ── Device frame ─────────────────────────────────────────────────────────────
 
+// Status bar height matches iOS standard (44pt). Real worker apps
+// have to leave room here; rendering it in the emulator forces the
+// preview to honor the same safe area.
+const STATUS_BAR_HEIGHT = 44;
+
 function DeviceFrame({
   width,
   height,
@@ -148,11 +156,31 @@ function DeviceFrame({
       style={{ width, height }}
       className="relative shrink-0 overflow-hidden rounded-[44px] border-[10px] border-zinc-900 bg-zinc-900 shadow-2xl transition-[width,height] duration-300 ease-out dark:border-zinc-700"
     >
-      {/* Notch */}
-      <div className="pointer-events-none absolute top-0 left-1/2 z-10 h-6 w-32 -translate-x-1/2 rounded-b-2xl bg-zinc-900" />
-      <div className="size-full overflow-hidden rounded-[34px] bg-dc-bg">
-        {children}
+      <div className="flex size-full flex-col overflow-hidden rounded-[34px] bg-white">
+        <StatusBar />
+        <div className="min-h-0 flex-1 overflow-hidden bg-dc-bg">
+          {children}
+        </div>
       </div>
+      {/* Dynamic-island-style notch sits on top of the status bar. */}
+      <div className="pointer-events-none absolute top-1.5 left-1/2 z-10 h-7 w-28 -translate-x-1/2 rounded-full bg-zinc-900" />
+    </div>
+  );
+}
+
+function StatusBar() {
+  return (
+    <div
+      style={{ height: STATUS_BAR_HEIGHT }}
+      className="flex shrink-0 items-end justify-between bg-white px-7 pb-1.5 text-[13px] font-semibold text-zinc-900 select-none"
+      aria-hidden
+    >
+      <span className="tabular-nums">9:41</span>
+      <span className="flex items-center gap-1.5">
+        <Signal className="size-3.5" strokeWidth={2.5} />
+        <Wifi className="size-3.5" strokeWidth={2.5} />
+        <BatteryFull className="size-4" strokeWidth={2.5} />
+      </span>
     </div>
   );
 }
