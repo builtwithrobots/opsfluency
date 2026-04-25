@@ -26,6 +26,7 @@ import { SpanishEditorClient } from './_components/SpanishEditorClient';
 import { UploadNewVersionClient } from './_components/UploadNewVersionClient';
 import { ArchiveButton } from './_components/ArchiveButton';
 import { PhoneFrame } from './_components/PhoneFrame';
+import { SuperAdminDangerZone } from './_components/SuperAdminDangerZone';
 
 const VALID_TABS = ['original', 'english', 'spanish', 'app', 'versions', 'qr'] as const;
 type Tab = (typeof VALID_TABS)[number];
@@ -74,6 +75,7 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     throw e;
   }
   const { supabase, company_id } = ctx;
+  const viewerIsSuperAdmin = await isCurrentUserSuperAdmin();
 
   const { data: sop, error: sopErr } = await supabase
     .from('sops')
@@ -262,6 +264,15 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
       )}
       {tab === 'qr' && !qrRow && (
         <EmptyTab message="A QR code is generated automatically when this SOP is published." />
+      )}
+
+      {viewerIsSuperAdmin && (
+        <SuperAdminDangerZone
+          sopId={id}
+          sopTitle={sop.title}
+          versionCount={versionRows.length}
+          hasQrCode={!!qrRow}
+        />
       )}
     </div>
   );
