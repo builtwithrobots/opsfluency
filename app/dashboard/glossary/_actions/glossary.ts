@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
+import { translateMarkdown } from "@/lib/translation/google";
 import {
   GLOSSARY_DEFINITION_MAX,
   GLOSSARY_TERM_MAX,
+  type GlossaryRow,
 } from "@/lib/types/glossary";
 
 /**
@@ -206,3 +208,61 @@ export async function restoreGlossaryTerm(raw: unknown): Promise<ActionResult> {
     throw e;
   }
 }
+
+// ── Suggest Spanish translation for a glossary field ────────────────────────
+//
+// Powers the "Translate from English" link inside the create / edit
+// dialog. The manager can edit the result before saving — this is a
+// *suggestion*, not a write. Cost lands on the AI usage tab as Google
+// spend automatically because translateMarkdown logs every successful
+// call to ai_call_log.
+//
+// `excludeTermLower` removes the term being edited from the glossary
+// context so re-translating "Forklift" doesn't substitute itself with
+// "montacargas" before Google ever sees it. New-term creates pass
+// null since there's no in-flight term to exclude.
+
+const SuggestInput = z.object({
+  text: z.string().trim().min(1).max(GLOSSARY_DEFINITION_MAX),
+  excludeTermLower: z.string().trim().min(1).max(GLOSSARY_TERM_MAX).nullable().optional(),
+});
+
+export async function suggestTranslation(
+  raw: unknown,
+): Promise<ActionResult<{ translated: string }>> {
+  try {
+    const { supabase, company_id } = await getCompanyContext("manager");
+    const parsed = SuggestInput.parse(raw);
+
+    const { data: glossaryRows } = await supabase
+      .from("glossary_terms")
+      .select("term_en, definition_en, term_es, definition_es")
+      .eq("company_id", company_id)
+      .is("deleted_at", null);
+
+    const glossary = ((glossaryRows ?? []) as GlossaryRow[]).filter((g) =>
+      parsed.excludeTermLower
+        ? g.term_en.toLowerCase() !== parsed.excludeTermLower
+        : true,
+    );
+
+    const result = await translateMarkdown({
+      markdown: parsed.text,
+      source: "en",
+      target: "es",
+      glossary,
+      companyId: company_id,
+      // sopId left undefined — these calls aren't tied to a specific SOP.
+    });
+
+    if (!result.ok) {
+      return fail(result.error.code, result.error.message, result.error);
+    }
+    return { ok: true, data: { translated: result.translated } };
+  } catch (e) {
+    const handled = handleAuthError<{ translated: string }>(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+

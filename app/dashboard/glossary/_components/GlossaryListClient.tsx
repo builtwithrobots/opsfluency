@@ -250,7 +250,12 @@ function EditDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void
         </DialogDescription>
 
         <DialogBody>
-          <TermFormFields draft={draft} onChange={patch} disabled={isPending} />
+          <TermFormFields
+            draft={draft}
+            onChange={patch}
+            disabled={isPending}
+            excludeTermLower={term.term_en.toLowerCase()}
+          />
 
           {error && (
             <p
