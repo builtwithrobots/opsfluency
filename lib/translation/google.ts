@@ -45,7 +45,19 @@ export interface TranslationSuccess {
 
 export interface TranslationFailure {
   ok: false;
-  error: { code: TranslationErrorCode; retry_allowed: boolean; message?: string };
+  error: {
+    code: TranslationErrorCode;
+    retry_allowed: boolean;
+    message?: string;
+    /** Wall time of the call, including retries. */
+    duration_ms?: number;
+    /** 1-based attempt count when the failure surfaced. */
+    attempt?: number;
+    /** HTTP status code Google returned, when applicable. */
+    http_status?: number;
+    /** First 2KB of the response body, for debugging non-2xx returns. */
+    raw?: string;
+  };
 }
 
 export type TranslationResult = TranslationSuccess | TranslationFailure;
@@ -161,6 +173,7 @@ function sleep(ms: number): Promise<void> {
 export async function translateMarkdown(
   input: TranslateMarkdownInput,
 ): Promise<TranslationResult> {
+  const start = Date.now();
   const apiKey = process.env.GOOGLE_CLOUD_TRANSLATION_API_KEY;
   if (!apiKey) {
     return {
@@ -169,6 +182,8 @@ export async function translateMarkdown(
         code: "TRANSLATION_CONFIG_ERROR",
         retry_allowed: false,
         message: "GOOGLE_CLOUD_TRANSLATION_API_KEY is not set",
+        duration_ms: 0,
+        attempt: 1,
       },
     };
   }
@@ -202,14 +217,30 @@ export async function translateMarkdown(
         } catch {
           return {
             ok: false,
-            error: { code: "TRANSLATION_INTERNAL", retry_allowed: false, message: "Invalid JSON from Google Translate" },
+            error: {
+              code: "TRANSLATION_INTERNAL",
+              retry_allowed: false,
+              message: "Invalid JSON from Google Translate",
+              duration_ms: Date.now() - start,
+              attempt: attempt + 1,
+              http_status: res.status,
+              raw: res.text.slice(0, 2048),
+            },
           };
         }
         const translatedText = extractTranslatedText(parsed);
         if (!translatedText) {
           return {
             ok: false,
-            error: { code: "TRANSLATION_INTERNAL", retry_allowed: false, message: "Empty translation response" },
+            error: {
+              code: "TRANSLATION_INTERNAL",
+              retry_allowed: false,
+              message: "Empty translation response",
+              duration_ms: Date.now() - start,
+              attempt: attempt + 1,
+              http_status: res.status,
+              raw: res.text.slice(0, 2048),
+            },
           };
         }
         const restored = restorePlaceholders(translatedText, byLower);
@@ -222,7 +253,18 @@ export async function translateMarkdown(
           await sleep(500 + Math.floor(Math.random() * 1000));
           continue;
         }
-        return { ok: false, error: { code: "TRANSLATION_RATE_LIMITED", retry_allowed: true } };
+        return {
+          ok: false,
+          error: {
+            code: "TRANSLATION_RATE_LIMITED",
+            retry_allowed: true,
+            message: "Google Translate 429",
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+            http_status: 429,
+            raw: res.text.slice(0, 2048),
+          },
+        };
       }
       if (res.status >= 500 && attempt < MAX_RETRIES) {
         await sleep(500 + Math.floor(Math.random() * 1000));
@@ -231,16 +273,41 @@ export async function translateMarkdown(
       if (res.status === 400 || res.status === 401 || res.status === 403) {
         return {
           ok: false,
-          error: { code: "TRANSLATION_CONFIG_ERROR", retry_allowed: false, message: `Google Translate ${res.status}` },
+          error: {
+            code: "TRANSLATION_CONFIG_ERROR",
+            retry_allowed: false,
+            message: `Google Translate ${res.status}`,
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+            http_status: res.status,
+            raw: res.text.slice(0, 2048),
+          },
         };
       }
       return {
         ok: false,
-        error: { code: "TRANSLATION_INTERNAL", retry_allowed: false, message: `Google Translate ${res.status}` },
+        error: {
+          code: "TRANSLATION_INTERNAL",
+          retry_allowed: false,
+          message: `Google Translate ${res.status}`,
+          duration_ms: Date.now() - start,
+          attempt: attempt + 1,
+          http_status: res.status,
+          raw: res.text.slice(0, 2048),
+        },
       };
     } catch (err) {
       if (controller.signal.aborted && !input.signal?.aborted) {
-        return { ok: false, error: { code: "TRANSLATION_TIMEOUT", retry_allowed: true } };
+        return {
+          ok: false,
+          error: {
+            code: "TRANSLATION_TIMEOUT",
+            retry_allowed: true,
+            message: `Google Translate did not respond within ${DEFAULT_TIMEOUT_MS / 1000}s`,
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+          },
+        };
       }
       if (attempt < MAX_RETRIES) {
         await sleep(500 + Math.floor(Math.random() * 1000));
@@ -252,6 +319,8 @@ export async function translateMarkdown(
           code: "TRANSLATION_INTERNAL",
           retry_allowed: false,
           message: err instanceof Error ? err.message : String(err),
+          duration_ms: Date.now() - start,
+          attempt: attempt + 1,
         },
       };
     } finally {
@@ -259,7 +328,16 @@ export async function translateMarkdown(
     }
   }
 
-  return { ok: false, error: { code: "TRANSLATION_INTERNAL", retry_allowed: false } };
+  return {
+    ok: false,
+    error: {
+      code: "TRANSLATION_INTERNAL",
+      retry_allowed: false,
+      message: "Exhausted retries without a usable response",
+      duration_ms: Date.now() - start,
+      attempt: MAX_RETRIES + 1,
+    },
+  };
 }
 
 function extractTranslatedText(parsed: unknown): string | null {
