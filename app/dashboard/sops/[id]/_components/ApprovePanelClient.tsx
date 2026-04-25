@@ -6,6 +6,7 @@ import { CheckCircle2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { approveSop } from '../../_actions';
+import { PhoneFrame } from './PhoneFrame';
 
 interface Props {
   sopId: string;
@@ -39,18 +40,10 @@ export function ApprovePanelClient({ sopId }: Props) {
       </div>
 
       <div className="mt-5 flex flex-col items-center gap-5 lg:flex-row lg:items-start">
-        {/* Phone-frame iframe at 390x844 (iPhone 12+ logical viewport) */}
-        <div className="shrink-0 overflow-hidden rounded-[2rem] border-8 border-zinc-900 bg-zinc-900 shadow-xl">
-          <iframe
-            title="Worker reader preview"
-            src={`/app/sop/${sopId}?preview=1`}
-            width={390}
-            height={844}
-            className="block"
-            // sandbox allows scripts and same-origin so Clerk session passes through
-            sandbox="allow-scripts allow-same-origin allow-forms"
-          />
-        </div>
+        <PhoneFrame
+          src={`/app/sop/${sopId}?preview=1`}
+          title="Worker reader preview"
+        />
 
         <div className="flex flex-1 flex-col gap-3">
           <p className="text-sm text-dc-text-2">
