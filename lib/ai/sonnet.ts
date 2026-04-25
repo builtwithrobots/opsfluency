@@ -61,9 +61,30 @@ export interface SonnetCallContext {
   companyId: string;
 }
 
+/**
+ * User message content. Accepts a plain string for text-only prompts or an
+ * array of content blocks for vision (image) and document (PDF) prompts.
+ * The Anthropic SDK accepts all three shapes in `messages[0].content`.
+ */
+export type SonnetUserContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | {
+          type: "image";
+          source:
+            | { type: "base64"; media_type: string; data: string }
+            | { type: "url"; url: string };
+        }
+      | {
+          type: "document";
+          source: { type: "base64"; media_type: "application/pdf"; data: string };
+        }
+    >;
+
 export interface SonnetCallInput<T> {
   systemPrompt: string;
-  userMessage: string;
+  userMessage: SonnetUserContent;
   maxTokens: number;
   /** Extract structured output from the raw response text. Must throw on malformed input. */
   parse: (rawText: string) => T;

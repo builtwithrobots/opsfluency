@@ -43,14 +43,36 @@ export function canTransitionSop(from: SopStatus, to: SopStatus): boolean {
   return ALLOWED_SOP_TRANSITIONS[from].includes(to);
 }
 
+/**
+ * MIME types accepted by the SOP upload dropzone. PDFs and images are sent
+ * to Sonnet directly (document/vision blocks); TXT is read as text. DOCX is
+ * intentionally excluded from MVP — the cost of a `mammoth` dependency to
+ * extract text isn't worth it when "save as PDF" is one click in Office.
+ * Re-add `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+ * here when a customer actually asks for it.
+ */
 export const SOP_UPLOAD_MIME_TYPES = [
   "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
 ] as const;
 
 export type SopUploadMimeType = (typeof SOP_UPLOAD_MIME_TYPES)[number];
 
+export function isImageMime(mime: string): boolean {
+  return mime.startsWith("image/");
+}
+
+export function isPdfMime(mime: string): boolean {
+  return mime === "application/pdf";
+}
+
 export const SOP_UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export const SOP_UPLOADS_BUCKET = "sop-uploads";
+
+export const WORKER_LANGUAGES = ["en", "es"] as const;
+export type WorkerLanguage = (typeof WORKER_LANGUAGES)[number];
