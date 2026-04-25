@@ -235,7 +235,7 @@ export function TermFormFields({
           {translateAction}
         </div>
         <textarea
-          rows={2}
+          rows={3}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           maxLength={maxLength}
@@ -260,9 +260,9 @@ function TranslateLink({
   pending: boolean;
   hasContent: boolean;
 }) {
-  // Re-translate (subtle) when the field already has Spanish content;
-  // primary "Translate from English" when it's empty. Both replace the
-  // field on click — manager edits before saving.
+  // Bordered button rather than a text link so the affordance reads as
+  // an action rather than an annotation. Both states replace the field
+  // on click — manager edits before saving.
   const label = pending
     ? "Translating…"
     : hasContent
@@ -273,7 +273,7 @@ function TranslateLink({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-1 rounded text-[11px] font-medium text-(--color-brand) hover:underline disabled:cursor-not-allowed disabled:text-dc-text-3 disabled:no-underline"
+      className="inline-flex items-center gap-1.5 rounded-md border border-(--color-brand)/40 bg-(--color-brand)/5 px-2.5 py-1 text-[11px] font-medium text-(--color-brand) transition-colors hover:bg-(--color-brand)/15 disabled:cursor-not-allowed disabled:border-[color:var(--dc-edge)] disabled:bg-transparent disabled:text-dc-text-3"
     >
       <Languages
         className={`size-3 ${pending ? "animate-pulse" : ""}`}

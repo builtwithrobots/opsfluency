@@ -71,7 +71,7 @@ export function AddTermButtonClient({ variant = "brand" }: Props) {
         </Button>
       )}
 
-      <Dialog open={open} onClose={close} size="2xl">
+      <Dialog open={open} onClose={close} size="3xl">
         <form onSubmit={handleSubmit}>
           <DialogTitle>Add a glossary term</DialogTitle>
           <DialogDescription>

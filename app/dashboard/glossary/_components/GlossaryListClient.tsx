@@ -241,7 +241,7 @@ function EditDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void
   }
 
   return (
-    <Dialog open onClose={() => !isPending && onClose()} size="2xl">
+    <Dialog open onClose={() => !isPending && onClose()} size="3xl">
       <form onSubmit={handleSubmit}>
         <DialogTitle>Edit term</DialogTitle>
         <DialogDescription>
