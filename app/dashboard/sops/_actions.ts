@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
+import { getSuperAdminContext } from '@/lib/auth/super-admin-context';
 import { getAdminClient } from '@/lib/supabase/admin';
 import {
   convertSopFromImage,
@@ -540,6 +541,151 @@ export async function archiveSop(raw: unknown): Promise<ActionResult> {
     if (!t.ok) return fail(t.code);
 
     revalidatePath(`/dashboard/sops/${input.sop_id}`);
+    revalidatePath('/dashboard/sops');
+    return { ok: true };
+  } catch (e) {
+    const handled = handleAuthError(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── 7b. Hard delete (super admin only) ───────────────────────────────────────
+
+const HardDeleteSopSchema = z.object({
+  sop_id: z.string().uuid(),
+  // Caller must echo the SOP title back. The action verifies a
+  // case-insensitive trimmed match before destroying anything; this is
+  // the single human-in-the-loop guard between a god-mode UI click and
+  // permanent loss of versions, QR codes, and uploaded files.
+  confirm_title: z.string().min(1).max(500),
+});
+
+/**
+ * Permanently destroys an SOP and everything that hangs off it. Super
+ * admin only. Distinct from `archiveSop` (soft, manager-callable, status
+ * lifecycle): this is the unrecoverable purge for tenant cleanup, demo
+ * data, or a manager mistake the tenant cannot reach themselves.
+ *
+ * Order of destruction:
+ *   1. Storage objects under sop-uploads/${company_id}/${sop_id}/...
+ *      (best effort — a misconfigured bucket can't block the row delete)
+ *   2. qr_codes rows targeting this SOP (cascades to qr_scans).
+ *      No FK from qr_codes.target_id, so this is a manual cleanup.
+ *   3. sops row (cascades to sop_versions).
+ *   4. Audit row in super_admin_events with the captured counts so the
+ *      paper trail survives even though the source rows are gone.
+ *
+ * Authentication uses `getSuperAdminContext()` which throws FORBIDDEN
+ * for everyone else — including impersonating super admins, since the
+ * Clerk session is still the super admin's. RLS bypass via the admin
+ * client is necessary because we're operating across tenants from a
+ * single super-admin session.
+ */
+export async function hardDeleteSop(raw: unknown): Promise<ActionResult> {
+  try {
+    const { userId } = await getSuperAdminContext();
+    const input = HardDeleteSopSchema.parse(raw);
+
+    const admin = getAdminClient();
+
+    // Read the SOP for audit metadata + existence check. Admin client
+    // because the super admin operates across tenants and we don't have
+    // a company_id to scope by until we read this row.
+    const { data: sop, error: sopReadErr } = await admin
+      .from('sops')
+      .select('id, title, company_id, status')
+      .eq('id', input.sop_id)
+      .maybeSingle();
+    if (sopReadErr) return fail('INTERNAL', sopReadErr.message);
+    if (!sop) return fail('NOT_FOUND');
+
+    if (sop.title.trim().toLowerCase() !== input.confirm_title.trim().toLowerCase()) {
+      return fail(
+        'CONFIRM_MISMATCH',
+        'The title you typed does not match. Hard delete refused.',
+      );
+    }
+
+    // Capture cascade counts for the audit row before anything is removed.
+    const [{ count: versionCount }, qrRowsRes, versionFilesRes] = await Promise.all([
+      admin
+        .from('sop_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('sop_id', sop.id),
+      admin
+        .from('qr_codes')
+        .select('id')
+        .eq('target_type', 'sop')
+        .eq('target_id', sop.id),
+      admin
+        .from('sop_versions')
+        .select('original_file_url')
+        .eq('sop_id', sop.id)
+        .not('original_file_url', 'is', null),
+    ]);
+
+    const qrIds = (qrRowsRes.data ?? []).map((r) => r.id as string);
+    const filesToRemove = (versionFilesRes.data ?? [])
+      .map((r) => r.original_file_url as string | null)
+      .filter((p): p is string => Boolean(p));
+
+    // 1. Storage purge. Best-effort: a remove failure does not block the
+    // row delete, otherwise a misconfigured bucket would strand the row
+    // and force manual SQL cleanup. The audit row records the count we
+    // attempted to remove either way.
+    let storageRemoved = filesToRemove.length;
+    if (filesToRemove.length > 0) {
+      const { data: removed, error: rmErr } = await admin.storage
+        .from(SOP_UPLOADS_BUCKET)
+        .remove(filesToRemove);
+      if (rmErr) {
+        console.warn(
+          '[hardDeleteSop] storage remove failed; proceeding',
+          { sop_id: sop.id, message: rmErr.message },
+        );
+        storageRemoved = 0;
+      } else {
+        storageRemoved = removed?.length ?? 0;
+      }
+    }
+
+    // 2. QR cleanup. No FK from qr_codes.target_id, so we can't rely on
+    // cascade — but qr_scans does cascade off qr_codes.id, so deleting
+    // the QR rows takes the scan history with them.
+    if (qrIds.length > 0) {
+      const { error: qrErr } = await admin
+        .from('qr_codes')
+        .delete()
+        .in('id', qrIds);
+      if (qrErr) return fail('INTERNAL', `QR cleanup failed: ${qrErr.message}`);
+    }
+
+    // 3. SOP row. Cascades to sop_versions via the FK in 20260424000003.
+    const { error: delErr } = await admin
+      .from('sops')
+      .delete()
+      .eq('id', sop.id);
+    if (delErr) return fail('INTERNAL', `SOP delete failed: ${delErr.message}`);
+
+    // 4. Audit row. Lives outside the deletion blast radius (company_id
+    // is on delete set null) so the trail survives a future tenant purge.
+    await admin.from('super_admin_events').insert({
+      super_admin_clerk_user_id: userId,
+      action: 'sop.hard_delete',
+      subject_type: 'sop',
+      subject_id: sop.id,
+      company_id: sop.company_id,
+      metadata: {
+        sop_title: sop.title,
+        sop_status: sop.status,
+        version_count: versionCount ?? 0,
+        qr_code_count: qrIds.length,
+        storage_files_removed: storageRemoved,
+        storage_files_attempted: filesToRemove.length,
+      },
+    });
+
     revalidatePath('/dashboard/sops');
     return { ok: true };
   } catch (e) {
