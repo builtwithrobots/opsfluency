@@ -151,7 +151,7 @@ export async function convertSopFromText(
     {
       systemPrompt: buildSystemPrompt(input.glossary),
       userMessage,
-      maxTokens: 4096,
+      maxTokens: 16384,
       parse: parseConversionResponse,
       signal: input.signal,
     },
@@ -190,7 +190,7 @@ export async function convertSopFromPdf(
     {
       systemPrompt: buildSystemPrompt(input.glossary),
       userMessage: content,
-      maxTokens: 4096,
+      maxTokens: 16384,
       parse: parseConversionResponse,
       signal: input.signal,
     },
@@ -231,7 +231,7 @@ export async function convertSopFromImage(
     {
       systemPrompt: buildSystemPrompt(input.glossary),
       userMessage: content,
-      maxTokens: 4096,
+      maxTokens: 16384,
       parse: parseConversionResponse,
       signal: input.signal,
     },

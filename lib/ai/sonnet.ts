@@ -34,6 +34,7 @@ export type SonnetErrorCode =
   | "AI_TIMEOUT"
   | "AI_RATE_LIMITED"
   | "AI_PARSE_FAILURE"
+  | "AI_TRUNCATED"
   | "AI_INTERNAL";
 
 export interface SonnetSuccess<T> {
@@ -144,6 +145,32 @@ export async function callSonnet<T>(
         .filter((block) => block.type === "text")
         .map((block) => (block as { text: string }).text)
         .join("");
+
+      // `max_tokens` truncation: Anthropic stopped mid-stream, so the JSON
+      // is guaranteed broken. Surface this as its own code rather than
+      // confusing the manager with a parse failure on a perfectly valid
+      // partial response.
+      if (response.stop_reason === "max_tokens") {
+        await logCall({
+          ctx,
+          model: SONNET_MODEL,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+          durationMs: Date.now() - start,
+        });
+        return {
+          ok: false,
+          error: {
+            code: "AI_TRUNCATED",
+            retry_allowed: false,
+            message: `Sonnet hit the ${input.maxTokens}-token output cap. Document is unusually long — split it or raise maxTokens.`,
+            raw: rawText.slice(0, 2048),
+            duration_ms: Date.now() - start,
+            attempt: attempt + 1,
+            model: SONNET_MODEL,
+          },
+        };
+      }
 
       let parsed: T;
       try {
