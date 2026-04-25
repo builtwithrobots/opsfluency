@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
 import type { WorkerLanguage } from '@/lib/types/sop';
@@ -12,20 +12,29 @@ interface Props {
 }
 
 export function LanguageToggleClient({ sopId, current }: Props) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   function pick(lang: WorkerLanguage) {
     if (lang === current || isPending) return;
     startTransition(async () => {
+      // Persist the preference for next visit (best-effort — a failure here
+      // shouldn't block the navigation; the URL ?lang= param drives the
+      // current render either way).
       await setLanguagePreference({ language: lang });
-      // Bring the URL in line with the new selection so refreshes stay sticky
-      // even if the persisted preference write loses the race with a refresh.
+
       const params = new URLSearchParams(searchParams?.toString() ?? '');
       params.set('lang', lang);
-      router.replace(`/app/sop/${sopId}?${params.toString()}`);
-      router.refresh();
+
+      // Hard navigate via window.location instead of router.replace +
+      // router.refresh(). The /app/sop/[id] route is rendered inside a
+      // sandboxed iframe on the manager dashboard's "App view" tab; in that
+      // context router.refresh() doesn't reliably re-fetch the RSC payload,
+      // so the toggle would persist and update the URL but the rendered
+      // content would stay in the previous language. A full reload is ~200ms
+      // on a page this small and is correct in both iframe and standalone
+      // (worker phone) contexts.
+      window.location.replace(`/app/sop/${sopId}?${params.toString()}`);
     });
   }
 
