@@ -15,8 +15,6 @@ interface DepartmentSeed {
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 //
-// Department names MUST match the keys in lib/sop/template-recommendations.ts
-// exactly (case-insensitive lookup, but keeping the canonical casing here).
 // HR is always last in every package — the departments actions guard prevents
 // it from being renamed or deleted.
 
