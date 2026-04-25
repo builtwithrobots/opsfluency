@@ -47,13 +47,17 @@ create unique index if not exists glossary_terms_company_term_lower_idx
 create index if not exists glossary_terms_company_id_idx
   on glossary_terms (company_id);
 
--- Reuse the existing trigger function from migration 003.
+-- Reuse the existing trigger function from migration 003. Drop-then-create so
+-- the migration is safe to re-run after a partial apply (Postgres has no
+-- `create or replace trigger` until 14, and we want this to work everywhere).
+drop trigger if exists glossary_terms_set_updated_at on glossary_terms;
 create trigger glossary_terms_set_updated_at
   before update on glossary_terms
   for each row execute function set_updated_at();
 
 alter table glossary_terms enable row level security;
 
+drop policy if exists glossary_terms_company_isolation on glossary_terms;
 create policy glossary_terms_company_isolation on glossary_terms
   for all to authenticated
   using      (company_id = requesting_company_id() or is_super_admin())
