@@ -14,6 +14,11 @@ interface CreateQrCodeInput {
   print_config_overrides?: Partial<PrintConfig>;
   /** Phone number used as footer2 default (from companies.phone). */
   company_phone?: string | null;
+  /**
+   * Org-wide print defaults from companies.qr_design_defaults. Layered between
+   * the per-target template default and any per-call overrides.
+   */
+  company_design_defaults?: Partial<PrintConfig> | null;
 }
 
 export interface QrCodeRow {
@@ -39,10 +44,12 @@ export async function createQrCode(input: CreateQrCodeInput): Promise<QrCodeRow>
     label = '',
     print_config_overrides,
     company_phone,
+    company_design_defaults,
   } = input;
 
   const print_config = defaultPrintConfig(target_type, {
     footer2: company_phone ?? '',
+    ...(company_design_defaults ?? {}),
     ...print_config_overrides,
   });
 
