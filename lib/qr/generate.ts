@@ -18,6 +18,9 @@ interface CreateQrCodeInput {
   target_url?: string;         // required when target_type = 'url'
   label?: string;
   audience?: QrAudience;
+  /** Optional ISO timestamps; null/undefined = no schedule on that side. */
+  active_from?: string | null;
+  active_until?: string | null;
   print_config_overrides?: Partial<PrintConfig>;
   /** Phone number used as footer2 default (from companies.phone). */
   company_phone?: string | null;
@@ -38,6 +41,9 @@ export interface QrCodeRow {
   print_config: PrintConfig;
   audience_department_ids: string[];
   audience_roles: ('admin' | 'manager' | 'employee')[];
+  archived_at: string | null;
+  active_from: string | null;
+  active_until: string | null;
   created_by: string;
   created_at: string;
 }
@@ -52,6 +58,8 @@ export async function createQrCode(input: CreateQrCodeInput): Promise<QrCodeRow>
     target_url,
     label = '',
     audience,
+    active_from,
+    active_until,
     print_config_overrides,
     company_phone,
     company_design_defaults,
@@ -69,6 +77,9 @@ export async function createQrCode(input: CreateQrCodeInput): Promise<QrCodeRow>
     ...print_config_overrides,
   });
 
+  // SOP-typed QRs never carry a schedule (DB constraint enforces this).
+  const isSop = target_type === 'sop';
+
   const { data, error } = await supabase
     .from('qr_codes')
     .insert({
@@ -81,6 +92,8 @@ export async function createQrCode(input: CreateQrCodeInput): Promise<QrCodeRow>
       print_config,
       audience_department_ids: audience?.department_ids ?? [],
       audience_roles:          audience?.roles          ?? [],
+      active_from:  isSop ? null : (active_from  ?? null),
+      active_until: isSop ? null : (active_until ?? null),
     })
     .select()
     .single();
