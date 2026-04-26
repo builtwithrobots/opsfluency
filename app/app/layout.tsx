@@ -70,6 +70,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {ctx.role === "employee" || isEmbedded ? null : (
         <PreviewBanner role={ctx.role} />
       )}
+      {/* Hide scrollbars only when iframed (i.e., inside the emulator).
+          Real mobile browsers auto-hide scrollbars already; desktop
+          managers browsing /app/* directly should keep them. Touch /
+          arrow-key scrolling stays intact either way. */}
+      {isEmbedded ? (
+        <style>{`
+          html, body { scrollbar-width: none; -ms-overflow-style: none; }
+          html::-webkit-scrollbar, body::-webkit-scrollbar,
+          *::-webkit-scrollbar { display: none; }
+          * { scrollbar-width: none; -ms-overflow-style: none; }
+        `}</style>
+      ) : null}
       {/* Pad the bottom so page content is never hidden behind the nav. */}
       <div className="pb-20">{children}</div>
       <BottomNav lang={navLang} />
