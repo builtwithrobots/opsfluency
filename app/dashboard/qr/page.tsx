@@ -9,7 +9,8 @@ import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DashboardTabs, type TabDef } from '@/components/dashboard/dashboard-tabs';
-import type { QrTargetType } from '@/lib/qr/print-config';
+import QRPrintEditor from '@/components/qr/QRPrintEditor';
+import type { PrintConfig, QrTargetType } from '@/lib/qr/print-config';
 
 const TYPE_LABELS: Record<QrTargetType, string> = {
   sop:           'SOP',
@@ -72,14 +73,19 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
     }
   }
 
-  let company: { name: string | null; phone: string | null; logo_url: string | null } | null = null;
+  let company: {
+    name: string | null;
+    phone: string | null;
+    logo_url: string | null;
+    qr_design_defaults: Partial<PrintConfig> | null;
+  } | null = null;
   if (tab === 'settings' && isAdmin) {
     const { data } = await supabase
       .from('companies')
-      .select('name, phone, logo_url')
+      .select('name, phone, logo_url, qr_design_defaults')
       .eq('id', company_id)
       .single();
-    company = data;
+    company = data as typeof company;
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
@@ -203,7 +209,12 @@ function QrAllTab({ qrCodes, fetchError, searchQuery, appUrl }: QrAllTabProps) {
 /* ── Design Settings tab ────────────────────────────────────────── */
 
 interface QrDesignSettingsTabProps {
-  company: { name: string | null; phone: string | null; logo_url: string | null } | null;
+  company: {
+    name: string | null;
+    phone: string | null;
+    logo_url: string | null;
+    qr_design_defaults: Partial<PrintConfig> | null;
+  } | null;
 }
 
 function QrDesignSettingsTab({ company }: QrDesignSettingsTabProps) {
@@ -274,17 +285,34 @@ function QrDesignSettingsTab({ company }: QrDesignSettingsTabProps) {
         </div>
       </div>
 
-      {/* Template defaults — coming soon */}
-      <div className="rounded-xl border border-dashed border-[color:var(--dc-edge)] p-6">
-        <div className="flex items-center gap-3">
-          <QrCode className="size-5 text-dc-text-3" strokeWidth={1.5} />
-          <div>
-            <p className="text-sm font-medium text-dc-text">Default print templates</p>
-            <p className="mt-0.5 text-xs text-dc-text-3">
-              Set organisation-wide defaults for QR sheet layout, colour scheme, and font size.
-              Coming in the next release.
+      {/* Default print template — full editor */}
+      <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
+          >
+            <QrCode className="size-5" strokeWidth={1.5} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-dc-text">Default print template</h2>
+            <p className="mt-1 max-w-lg text-sm text-dc-text-2">
+              The starting point for every new QR code. Typography, sizing, and section
+              visibility set here apply to new prints; existing QR codes keep their own settings.
             </p>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <QRPrintEditor
+            targetType="sop"
+            initialConfig={company?.qr_design_defaults ?? undefined}
+            companyName={company?.name ?? undefined}
+            logoUrl={company?.logo_url}
+            companyPhone={company?.phone}
+            saveEndpoint="/api/qr/design-defaults"
+            showPrintButton={false}
+          />
         </div>
       </div>
     </div>

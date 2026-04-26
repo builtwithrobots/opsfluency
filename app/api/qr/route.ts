@@ -20,22 +20,23 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = CreateQrInput.parse(body);
 
-    // Fetch company phone for the footer2 default.
+    // Fetch company phone (footer2 default) + org-wide design defaults.
     const { data: company } = await supabase
       .from('companies')
-      .select('phone')
+      .select('phone, qr_design_defaults')
       .eq('id', company_id)
       .single();
 
     const qr = await createQrCode({
       supabase,
       company_id,
-      created_by:    userId,
-      target_type:   parsed.target_type,
-      target_id:     parsed.target_id,
-      target_url:    parsed.target_url,
-      label:         parsed.label,
-      company_phone: company?.phone,
+      created_by:              userId,
+      target_type:             parsed.target_type,
+      target_id:               parsed.target_id,
+      target_url:              parsed.target_url,
+      label:                   parsed.label,
+      company_phone:           company?.phone,
+      company_design_defaults: company?.qr_design_defaults ?? null,
     });
 
     return NextResponse.json({ data: qr }, { status: 201 });
