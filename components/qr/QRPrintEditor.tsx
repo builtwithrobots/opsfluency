@@ -5,6 +5,7 @@ import {
   defaultPrintConfig,
   FONT_FAMILY_LABELS,
   FONT_SIZE_SLIDER,
+  QR_SIZE_SLIDER,
   SPACING_SLIDER,
   type PrintConfig,
   type PrintFontFamily,
@@ -271,6 +272,9 @@ export default function QRPrintEditor({
                     <DotSlider
                       label="QR size"
                       value={config.qr_size}
+                      min={QR_SIZE_SLIDER.min}
+                      max={QR_SIZE_SLIDER.max}
+                      step={QR_SIZE_SLIDER.step}
                       onChange={v => patch({ qr_size: v })}
                     />
                     <div className="flex flex-col gap-3">
