@@ -123,6 +123,54 @@ export const QR_SIZE_SLIDER = { min: 40, max: 80, step: 5 } as const;
 /** Slider config shared by the three per-band spacing controls (px). */
 export const SPACING_SLIDER = { min: 0, max: 40, step: 4 } as const;
 
+/**
+ * Subset of PrintConfig that is meaningful as an organisation-wide default.
+ * Typography, sizing, visibility, and spacing belong here. Text content
+ * (header, sub_header, footer, footer2, tagline) and target-derived fields
+ * (template) are explicitly excluded - those are per-QR concerns and would
+ * silently override every new QR's text if persisted as a default.
+ */
+export const DESIGN_DEFAULT_KEYS = [
+  'font_family',
+  'show_logo',
+  'show_company_name',
+  'logo_size',
+  'qr_size',
+  'font_size_company_name',
+  'font_size_header',
+  'font_size_sub_header',
+  'font_size_tagline',
+  'font_size_footer',
+  'font_size_footer2',
+  'bold_company_name',
+  'bold_header',
+  'bold_sub_header',
+  'bold_tagline',
+  'bold_footer',
+  'bold_footer2',
+  'spacing_top',
+  'spacing_middle',
+  'spacing_footer',
+] as const satisfies readonly (keyof PrintConfig)[];
+
+export type DesignDefaultKey = (typeof DESIGN_DEFAULT_KEYS)[number];
+export type DesignDefaults  = Partial<Pick<PrintConfig, DesignDefaultKey>>;
+
+/** Project an arbitrary partial down to the design-default-safe subset. */
+export function pickDesignDefaults(
+  partial: Partial<PrintConfig> | null | undefined,
+): DesignDefaults {
+  if (!partial) return {};
+  const out: DesignDefaults = {};
+  for (const key of DESIGN_DEFAULT_KEYS) {
+    if (key in partial && partial[key] !== undefined) {
+      // Cast is safe: we copy each key into its own typed slot.
+      (out as Record<string, unknown>)[key] = partial[key];
+    }
+  }
+  return out;
+}
+
 export function defaultPrintConfig(
   targetType: QrTargetType,
   overrides?: Partial<PrintConfig>,

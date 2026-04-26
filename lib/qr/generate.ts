@@ -1,7 +1,12 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { defaultPrintConfig, type PrintConfig, type QrTargetType } from './print-config';
+import {
+  defaultPrintConfig,
+  pickDesignDefaults,
+  type PrintConfig,
+  type QrTargetType,
+} from './print-config';
 
 interface CreateQrCodeInput {
   supabase: SupabaseClient;
@@ -47,9 +52,15 @@ export async function createQrCode(input: CreateQrCodeInput): Promise<QrCodeRow>
     company_design_defaults,
   } = input;
 
+  // Project the company-level defaults down to the org-wide-safe subset
+  // (typography, sizing, spacing, visibility). Text content fields like
+  // header/footer/tagline and target-derived fields like template are
+  // intentionally NOT applied here - they are per-QR concerns.
+  const safeDefaults = pickDesignDefaults(company_design_defaults);
+
   const print_config = defaultPrintConfig(target_type, {
     footer2: company_phone ?? '',
-    ...(company_design_defaults ?? {}),
+    ...safeDefaults,
     ...print_config_overrides,
   });
 

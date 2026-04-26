@@ -32,6 +32,13 @@ interface Props {
   saveEndpoint?: string;
   /** Hide the Print button when editing defaults (no QR to actually print). */
   showPrintButton?: boolean;
+  /**
+   * 'qr' (default) shows everything including header/footer/tagline text
+   * inputs. 'defaults' is for org-wide design settings: text inputs are
+   * hidden because content is per-QR, but bold/size/visibility controls
+   * remain since those are valid org-wide defaults.
+   */
+  mode?: 'qr' | 'defaults';
 }
 
 type SectionKey = 'logo' | 'header' | 'qr' | 'footer' | 'style' | 'spacing';
@@ -56,7 +63,9 @@ export default function QRPrintEditor({
   companyPhone,
   saveEndpoint,
   showPrintButton = true,
+  mode = 'qr',
 }: Props) {
+  const isDefaults = mode === 'defaults';
   const base    = defaultPrintConfig(targetType, { footer2: companyPhone ?? '', ...initialConfig });
   const [config, setConfig] = useState<PrintConfig>(base);
   const [open, setOpen]     = useState<SectionKey | null>('qr');
@@ -216,16 +225,18 @@ export default function QRPrintEditor({
                 {key === 'header' && (
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-dc-text-2">Header</label>
-                        <input
-                          type="text"
-                          value={config.header}
-                          onChange={e => patch({ header: e.target.value })}
-                          placeholder="e.g. Forklift Safety Procedure"
-                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                        />
-                      </div>
+                      {!isDefaults && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Header</label>
+                          <input
+                            type="text"
+                            value={config.header}
+                            onChange={e => patch({ header: e.target.value })}
+                            placeholder="e.g. Forklift Safety Procedure"
+                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                          />
+                        </div>
+                      )}
                       <BoldCheckbox
                         label="Bold header"
                         checked={config.bold_header}
@@ -238,16 +249,18 @@ export default function QRPrintEditor({
                       />
                     </div>
                     <div className="flex flex-col gap-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-dc-text-2">Sub-header</label>
-                        <input
-                          type="text"
-                          value={config.sub_header}
-                          onChange={e => patch({ sub_header: e.target.value })}
-                          placeholder="Optional sub-title"
-                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                        />
-                      </div>
+                      {!isDefaults && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Sub-header</label>
+                          <input
+                            type="text"
+                            value={config.sub_header}
+                            onChange={e => patch({ sub_header: e.target.value })}
+                            placeholder="Optional sub-title"
+                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                          />
+                        </div>
+                      )}
                       <BoldCheckbox
                         label="Bold sub-header"
                         checked={config.bold_sub_header}
@@ -273,19 +286,21 @@ export default function QRPrintEditor({
                       onChange={v => patch({ qr_size: v })}
                     />
                     <div className="flex flex-col gap-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-dc-text-2">Tagline</label>
-                        <input
-                          type="text"
-                          value={config.tagline}
-                          onChange={e => patch({ tagline: e.target.value })}
-                          placeholder="e.g. Scan to view procedure"
-                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                        />
-                        <p className="mt-1 text-xs text-dc-text-3">
-                          Leave blank to hide. Renders below the QR.
-                        </p>
-                      </div>
+                      {!isDefaults && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Tagline</label>
+                          <input
+                            type="text"
+                            value={config.tagline}
+                            onChange={e => patch({ tagline: e.target.value })}
+                            placeholder="e.g. Scan to view procedure"
+                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                          />
+                          <p className="mt-1 text-xs text-dc-text-3">
+                            Leave blank to hide. Renders below the QR.
+                          </p>
+                        </div>
+                      )}
                       <BoldCheckbox
                         label="Bold tagline"
                         checked={config.bold_tagline}
@@ -303,16 +318,18 @@ export default function QRPrintEditor({
                 {key === 'footer' && (
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-dc-text-2">Footer</label>
-                        <input
-                          type="text"
-                          value={config.footer}
-                          onChange={e => patch({ footer: e.target.value })}
-                          placeholder="Optional footer text"
-                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                        />
-                      </div>
+                      {!isDefaults && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Footer</label>
+                          <input
+                            type="text"
+                            value={config.footer}
+                            onChange={e => patch({ footer: e.target.value })}
+                            placeholder="Optional footer text"
+                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                          />
+                        </div>
+                      )}
                       <BoldCheckbox
                         label="Bold footer"
                         checked={config.bold_footer}
@@ -325,16 +342,18 @@ export default function QRPrintEditor({
                       />
                     </div>
                     <div className="flex flex-col gap-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-dc-text-2">Footer 2</label>
-                        <input
-                          type="text"
-                          value={config.footer2}
-                          onChange={e => patch({ footer2: e.target.value })}
-                          placeholder="e.g. phone number"
-                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                        />
-                      </div>
+                      {!isDefaults && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Footer 2</label>
+                          <input
+                            type="text"
+                            value={config.footer2}
+                            onChange={e => patch({ footer2: e.target.value })}
+                            placeholder="e.g. phone number"
+                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                          />
+                        </div>
+                      )}
                       <BoldCheckbox
                         label="Bold footer 2"
                         checked={config.bold_footer2}
