@@ -26,11 +26,13 @@ export function ExternalLinkView({ label, embed }: Props) {
   const showFallbackHint = embed.provider === 'generic';
 
   return (
-    // 100dvh - 80px (BottomNav) keeps the chrome visible on every device.
-    // The PreviewBanner for staff sits above this and naturally pushes the
-    // viewport — overshoot by a few px is hidden by overflow.
-    <div className="flex min-h-[calc(100dvh-5rem)] flex-col bg-dc-base">
-      <header className="sticky top-0 z-20 flex shrink-0 items-center gap-3 border-b border-dc-edge bg-dc-surface/95 px-3 py-2 backdrop-blur">
+    // The component fills whatever height its parent gives it. The
+    // production page (/app/external) wraps this in a viewport-tall
+    // container; the QR builder's device preview wraps it in the inner
+    // 320×680 phone frame. Either way the iframe absolutely fills the
+    // remaining space below the sticky header.
+    <div className="flex h-full min-h-0 flex-col bg-dc-base">
+      <header className="flex shrink-0 items-center gap-3 border-b border-dc-edge bg-dc-surface/95 px-3 py-2 backdrop-blur">
         <Link
           href="/app/home"
           aria-label="Back to home"
@@ -60,7 +62,7 @@ export function ExternalLinkView({ label, embed }: Props) {
       </header>
 
       {showFallbackHint && (
-        <div className="flex items-start gap-2 border-b border-dc-edge bg-(--color-brand)/5 px-4 py-2 text-xs text-dc-text-2">
+        <div className="flex shrink-0 items-start gap-2 border-b border-dc-edge bg-(--color-brand)/5 px-4 py-2 text-xs text-dc-text-2">
           <Info className="mt-0.5 size-3.5 shrink-0 text-(--color-brand)" strokeWidth={2} />
           <p>
             Some sites can&apos;t be displayed inside the app. If this page
@@ -70,7 +72,7 @@ export function ExternalLinkView({ label, embed }: Props) {
         </div>
       )}
 
-      <div className="relative flex-1">
+      <div className="relative min-h-0 flex-1">
         <iframe
           src={embed.embed_url}
           title={label || embed.host || 'External content'}

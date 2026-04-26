@@ -75,5 +75,13 @@ export default async function ExternalLinkPage({ searchParams }: Props) {
 
   const embed = detectEmbed(qr.target_url);
 
-  return <ExternalLinkView label={qr.label ?? ''} embed={embed} />;
+  // 100dvh - 80px (BottomNav from /app/layout) is the visible area for
+  // /app/* pages. ExternalLinkView itself fills its parent so it can
+  // also be embedded inside the QR builder's device preview at a
+  // different height.
+  return (
+    <div className="h-[calc(100dvh-5rem)] min-h-0">
+      <ExternalLinkView label={qr.label ?? ''} embed={embed} />
+    </div>
+  );
 }
