@@ -12,12 +12,12 @@ export type ResolveResult =
  * Resolves a QR scan to a destination URL.
  *
  * Uses the admin client because the scan landing (/s/[id]) is a public route
- * with no Clerk session — we need to read qr_codes without an authenticated
+ * with no Clerk session - we need to read qr_codes without an authenticated
  * JWT. RLS bypass is intentional here; the route only exposes a redirect
  * target, not tenant content.
  */
 export async function resolveQrTarget(qrCodeId: string): Promise<ResolveResult> {
-  // Admin client: RLS bypass justified — public scan route has no Clerk session.
+  // Admin client: RLS bypass justified - public scan route has no Clerk session.
   const admin = getAdminClient();
 
   const { data: qr, error } = await admin
@@ -53,7 +53,7 @@ export async function resolveQrTarget(qrCodeId: string): Promise<ResolveResult> 
       return { status: 'found', qr: qr as QrCodeRow, destination: qr.target_url as string };
     }
 
-    // announcement / questionnaire: stub for now — resolve once those modules land.
+    // announcement / questionnaire: stub for now - resolve once those modules land.
     case 'announcement':
     case 'questionnaire':
     default:

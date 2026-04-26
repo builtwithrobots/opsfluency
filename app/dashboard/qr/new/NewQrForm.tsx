@@ -87,12 +87,12 @@ export default function NewQrForm() {
           value={label}
           onChange={e => setLabel(e.target.value)}
           maxLength={200}
-          placeholder="e.g. Forklift Safety — Bay 3"
+          placeholder="e.g. Forklift Safety - Bay 3"
           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-[color:var(--dc-edge-2)] focus:outline-none"
         />
       </div>
 
-      {/* URL — only shown for url type */}
+      {/* URL - only shown for url type */}
       {type === 'url' && (
         <div>
           <label htmlFor="qr-url" className="mb-1 block text-sm font-medium text-dc-text-2">

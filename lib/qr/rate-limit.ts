@@ -2,7 +2,7 @@
  * In-memory sliding-window rate limiter for QR scan logging.
  *
  * Limit: MAX_SCANS per IP+QR pair per WINDOW_MS.
- * This runs in the Next.js process — good enough for MVP. Replace with
+ * This runs in the Next.js process - good enough for MVP. Replace with
  * a Redis-backed limiter (e.g. @upstash/ratelimit) when usage warrants it.
  */
 

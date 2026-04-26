@@ -6,7 +6,7 @@ import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 /**
  * Org-wide QR print design defaults. Admin-only.
  *
- * Stored as JSONB on companies.qr_design_defaults — see
+ * Stored as JSONB on companies.qr_design_defaults - see
  * supabase/migrations/20260426000001_qr_design_defaults.sql. The shape is a
  * Partial<PrintConfig>; we don't enforce the schema in zod beyond "object of
  * unknown" so the API doesn't drift every time PrintConfig grows a field.

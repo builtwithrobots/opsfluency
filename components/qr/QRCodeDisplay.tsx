@@ -8,7 +8,7 @@ interface Props {
   config: PrintConfig;
   companyName?: string;
   logoUrl?: string | null;
-  /** Width in px — the QR SVG fills this square. */
+  /** Width in px - the QR SVG fills this square. */
   size?: number;
 }
 

@@ -32,7 +32,7 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
     ctx = await getCompanyContext('manager');
   } catch (e) {
     if (e instanceof AuthError) {
-      // Super admins have no company_members row — send them to the
+      // Super admins have no company_members row - send them to the
       // platform view. Employees are already redirected by the layout.
       if (e.code === 'NO_COMPANY' && (await isCurrentUserSuperAdmin())) {
         redirect('/dashboard/platform');
@@ -101,7 +101,7 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
           <Heading className="font-display mt-2">QR Code library</Heading>
           <Text className="mt-2 max-w-2xl">
             Permanent scan URLs for SOPs, announcements, and any destination.
-            Print and post — they never expire.
+            Print and post - they never expire.
           </Text>
         </div>
         <Button href="/dashboard/qr/new" color="brand">
@@ -285,7 +285,7 @@ function QrDesignSettingsTab({ company }: QrDesignSettingsTabProps) {
         </div>
       </div>
 
-      {/* Default print template — full editor */}
+      {/* Default print template - full editor */}
       <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
         <div className="flex items-start gap-4">
           <span
@@ -341,7 +341,7 @@ function QrEmptyState() {
           </p>
           <h3 className="mt-1 text-xl font-semibold text-dc-text">No QR codes yet</h3>
           <p className="mt-1 max-w-md text-dc-text-2">
-            Create a QR code and print it to any surface. The URL never changes — scans always
+            Create a QR code and print it to any surface. The URL never changes - scans always
             resolve to the current content.
           </p>
           <Button href="/dashboard/qr/new" color="brand" className="mt-5">
