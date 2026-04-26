@@ -227,23 +227,29 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
           </p>
         )}
 
-        <QRCodeSVG
-          value={scanUrl}
-          size={qrPx}
-          bgColor="#ffffff"
-          fgColor="#000000"
-          level="M"
-          includeMargin
-        />
+        {/* QR + tagline form one visual cluster with a tight fixed gap so
+            the tagline reads as a caption to the code, not as another
+            independent line. The middle band's spacing_middle still
+            governs distance between header / sub-header / this cluster. */}
+        <div className="flex flex-col items-center" style={{ gap: 6 }}>
+          <QRCodeSVG
+            value={scanUrl}
+            size={qrPx}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="M"
+            includeMargin
+          />
 
-        {showTagline && (
-          <p
-            className={`text-neutral-500 ${config.bold_tagline ? 'font-bold' : 'font-normal'}`}
-            style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
-          >
-            {tagline}
-          </p>
-        )}
+          {showTagline && (
+            <p
+              className={`text-neutral-500 ${config.bold_tagline ? 'font-bold' : 'font-normal'}`}
+              style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
+            >
+              {tagline}
+            </p>
+          )}
+        </div>
       </div>
 
       {showFooterBand && (
