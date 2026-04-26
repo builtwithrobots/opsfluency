@@ -89,7 +89,7 @@ export default function QRPrintPreview({
           transform: `scale(${scale})`,
         }}
       >
-        {/* On-screen sheet — uses a class (not the print id) so the print
+        {/* On-screen sheet - uses a class (not the print id) so the print
             CSS can target only the portal-mounted copy below. */}
         <QRSheet
           variant="screen"
@@ -100,7 +100,7 @@ export default function QRPrintPreview({
         />
       </div>
 
-      {/* Print-only sheet — portal-mounted at body so no ancestor transform
+      {/* Print-only sheet - portal-mounted at body so no ancestor transform
           or overflow:hidden interferes with @media print. */}
       {mounted && createPortal(
         <QRSheet
@@ -194,7 +194,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
           )}
           {showCompanyName && (
             <p
-              className="font-bold text-neutral-800"
+              className={`text-neutral-800 ${config.bold_company_name ? 'font-bold' : 'font-normal'}`}
               style={{ fontSize: sized(BASE_FONT_PX.company_name, config.font_size_company_name) }}
             >
               {companyName}
@@ -209,7 +209,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
       >
         {config.header && (
           <h2
-            className="font-bold text-neutral-900 leading-tight"
+            className={`text-neutral-900 leading-tight ${config.bold_header ? 'font-bold' : 'font-normal'}`}
             style={{ fontSize: sized(BASE_FONT_PX.header, config.font_size_header) }}
           >
             {config.header}
@@ -217,7 +217,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
         )}
         {config.sub_header && (
           <p
-            className="text-neutral-600"
+            className={`text-neutral-600 ${config.bold_sub_header ? 'font-bold' : 'font-normal'}`}
             style={{ fontSize: sized(BASE_FONT_PX.sub_header, config.font_size_sub_header) }}
           >
             {config.sub_header}
@@ -235,7 +235,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
 
         {showTagline && (
           <p
-            className="text-neutral-500"
+            className={`text-neutral-500 ${config.bold_tagline ? 'font-bold' : 'font-normal'}`}
             style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
           >
             {tagline}
@@ -250,7 +250,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
         >
           {config.footer && (
             <p
-              className="text-neutral-700"
+              className={`text-neutral-700 ${config.bold_footer ? 'font-bold' : 'font-normal'}`}
               style={{ fontSize: sized(BASE_FONT_PX.footer, config.font_size_footer) }}
             >
               {config.footer}
@@ -258,7 +258,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
           )}
           {config.footer2 && (
             <p
-              className="text-neutral-500"
+              className={`text-neutral-500 ${config.bold_footer2 ? 'font-bold' : 'font-normal'}`}
               style={{ fontSize: sized(BASE_FONT_PX.footer2, config.font_size_footer2) }}
             >
               {config.footer2}

@@ -36,20 +36,6 @@ export default function DotSlider({
         aria-label={label}
         className="h-2 w-full cursor-pointer appearance-none rounded-full bg-dc-raised accent-(--color-brand)"
       />
-      <div className="flex justify-between">
-        {Array.from({ length: (max - min) / step + 1 }, (_, i) => min + i * step).map(v => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange(v)}
-            aria-label={`Set ${label} to ${v}${unit}`}
-            className={[
-              'h-2.5 w-2.5 rounded-full transition-colors',
-              v === value ? 'bg-(--color-brand)' : 'bg-dc-edge hover:bg-dc-text-3',
-            ].join(' ')}
-          />
-        ))}
-      </div>
     </div>
   );
 }

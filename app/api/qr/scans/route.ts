@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Admin client: RLS bypass justified — this route accepts unauthenticated
+    // Admin client: RLS bypass justified - this route accepts unauthenticated
     // calls (scan happens before the employee has a Clerk session).
     const admin = getAdminClient();
 

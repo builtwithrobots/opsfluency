@@ -17,7 +17,7 @@ export type PrintFontFamily = 'sans' | 'display';
 /**
  * Font size scale, in percent of the element's baseline size. 100 = baseline,
  * 70 = small, 160 = large. Stored as a number so it survives JSON round-trip.
- * Range: 70–160, step 10 — see DotSlider config in QRPrintEditor.
+ * Range: 70–160, step 10 - see DotSlider config in QRPrintEditor.
  */
 export type FontScale = number;
 
@@ -35,7 +35,7 @@ export interface PrintConfig {
    */
   tagline: string;
   show_logo: boolean;
-  show_company_name: boolean;       // independent of logo — both can be on
+  show_company_name: boolean;       // independent of logo - both can be on
   template: PrintTemplate;
 
   /** Font family applied to the whole sheet. */
@@ -49,9 +49,17 @@ export interface PrintConfig {
   font_size_footer:       FontScale;
   font_size_footer2:      FontScale;
 
+  /** Per-element bold toggle. True renders the line in font-weight bold. */
+  bold_company_name: boolean;
+  bold_header:       boolean;
+  bold_sub_header:   boolean;
+  bold_tagline:      boolean;
+  bold_footer:       boolean;
+  bold_footer2:      boolean;
+
   /**
-   * Per-band spacing in pixels — the gap between elements inside each band.
-   * Range 0–60, step 5.
+   * Per-band spacing in pixels, the gap between elements inside each band.
+   * Range 0 to 60, step 5.
    *   spacing_top    → gap inside top band (logo ↔ company name)
    *   spacing_middle → gap inside middle band (header ↔ sub-header ↔ QR ↔ tagline)
    *   spacing_footer → gap inside footer band (footer ↔ footer2)
@@ -70,7 +78,7 @@ const DEFAULT_TEMPLATE_BY_TYPE: Record<QrTargetType, PrintTemplate> = {
 
 /**
  * Hard-coded fallback config. `defaultPrintConfig` layers this with
- * (a) the target-type's template default and (b) caller overrides — typically
+ * (a) the target-type's template default and (b) caller overrides - typically
  * the company's `qr_design_defaults` from the Design Settings tab and the
  * footer2 phone number.
  */
@@ -90,6 +98,14 @@ export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline'> = {
   font_size_tagline:      100,
   font_size_footer:       100,
   font_size_footer2:      100,
+  // Bold defaults mirror what the preview was hard-coding before the
+  // checkbox existed: company name and header bold, the rest regular.
+  bold_company_name:      true,
+  bold_header:            true,
+  bold_sub_header:        false,
+  bold_tagline:           false,
+  bold_footer:            false,
+  bold_footer2:           false,
   // Defaults mirror the original gap-2 / gap-5 / gap-1 Tailwind values.
   spacing_top:            8,
   spacing_middle:         20,
@@ -112,7 +128,7 @@ export function defaultPrintConfig(
 }
 
 export const TEMPLATE_LABELS: Record<PrintTemplate, string> = {
-  'sop-standard':  'SOP — Standard',
+  'sop-standard':  'SOP - Standard',
   'announcement':  'Announcement',
   'questionnaire': 'Questionnaire',
   'generic':       'Generic',
@@ -136,5 +152,5 @@ export const FONT_FAMILY_CSS: Record<PrintFontFamily, string> = {
   display: 'var(--font-display), "Chakra Petch", system-ui, sans-serif',
 };
 
-/** Font size scale slider config — shared by every text-size DotSlider. */
+/** Font size scale slider config - shared by every text-size DotSlider. */
 export const FONT_SIZE_SLIDER = { min: 70, max: 160, step: 10 } as const;

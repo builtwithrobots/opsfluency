@@ -24,7 +24,7 @@ export default function PrintButton({ label = 'Print QR Code' }: Props) {
       </Button>
 
       <style>{`
-        /* Hide the print-only portal copy on screen — only the scaled,
+        /* Hide the print-only portal copy on screen - only the scaled,
            interactive preview is visible during editing. */
         .qr-print-sheet-portal { display: none; }
 

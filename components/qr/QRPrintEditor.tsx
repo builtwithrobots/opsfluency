@@ -88,7 +88,7 @@ export default function QRPrintEditor({
           headers: { 'content-type': 'application/json' },
           body:    JSON.stringify({ print_config: config }),
         });
-        if (!res.ok) setSaveErr('Failed to save — retrying next change');
+        if (!res.ok) setSaveErr('Failed to save, retrying next change');
       } catch {
         setSaveErr('Network error saving config');
       } finally {
@@ -195,15 +195,22 @@ export default function QRPrintEditor({
                     </label>
 
                     {config.show_company_name && (
-                      <FontSizeSlider
-                        label="Company name size"
-                        value={config.font_size_company_name}
-                        onChange={v => patch({ font_size_company_name: v })}
-                      />
+                      <>
+                        <BoldCheckbox
+                          label="Bold company name"
+                          checked={config.bold_company_name}
+                          onChange={b => patch({ bold_company_name: b })}
+                        />
+                        <FontSizeSlider
+                          label="Company name size"
+                          value={config.font_size_company_name}
+                          onChange={v => patch({ font_size_company_name: v })}
+                        />
+                      </>
                     )}
 
                     <SpacingSlider
-                      label="Spacing — top band"
+                      label="Top band spacing"
                       value={config.spacing_top}
                       onChange={v => patch({ spacing_top: v })}
                     />
@@ -223,6 +230,11 @@ export default function QRPrintEditor({
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
+                      <BoldCheckbox
+                        label="Bold header"
+                        checked={config.bold_header}
+                        onChange={b => patch({ bold_header: b })}
+                      />
                       <FontSizeSlider
                         label="Header size"
                         value={config.font_size_header}
@@ -240,6 +252,11 @@ export default function QRPrintEditor({
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
+                      <BoldCheckbox
+                        label="Bold sub-header"
+                        checked={config.bold_sub_header}
+                        onChange={b => patch({ bold_sub_header: b })}
+                      />
                       <FontSizeSlider
                         label="Sub-header size"
                         value={config.font_size_sub_header}
@@ -270,6 +287,11 @@ export default function QRPrintEditor({
                           Leave blank to hide. Renders below the QR.
                         </p>
                       </div>
+                      <BoldCheckbox
+                        label="Bold tagline"
+                        checked={config.bold_tagline}
+                        onChange={b => patch({ bold_tagline: b })}
+                      />
                       <FontSizeSlider
                         label="Tagline size"
                         value={config.font_size_tagline}
@@ -277,7 +299,7 @@ export default function QRPrintEditor({
                       />
                     </div>
                     <SpacingSlider
-                      label="Spacing — middle band"
+                      label="Middle band spacing"
                       value={config.spacing_middle}
                       onChange={v => patch({ spacing_middle: v })}
                     />
@@ -297,6 +319,11 @@ export default function QRPrintEditor({
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
+                      <BoldCheckbox
+                        label="Bold footer"
+                        checked={config.bold_footer}
+                        onChange={b => patch({ bold_footer: b })}
+                      />
                       <FontSizeSlider
                         label="Footer size"
                         value={config.font_size_footer}
@@ -314,6 +341,11 @@ export default function QRPrintEditor({
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
+                      <BoldCheckbox
+                        label="Bold footer 2"
+                        checked={config.bold_footer2}
+                        onChange={b => patch({ bold_footer2: b })}
+                      />
                       <FontSizeSlider
                         label="Footer 2 size"
                         value={config.font_size_footer2}
@@ -321,7 +353,7 @@ export default function QRPrintEditor({
                       />
                     </div>
                     <SpacingSlider
-                      label="Spacing — footer band"
+                      label="Footer band spacing"
                       value={config.spacing_footer}
                       onChange={v => patch({ spacing_footer: v })}
                     />
@@ -385,5 +417,22 @@ function SpacingSlider({
       unit="px"
       onChange={onChange}
     />
+  );
+}
+
+/** Compact bold toggle, slotted under each text input. */
+function BoldCheckbox({
+  label, checked, onChange,
+}: { label: string; checked: boolean; onChange: (b: boolean) => void }) {
+  return (
+    <label className="flex min-h-[32px] cursor-pointer items-center gap-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="h-4 w-4 rounded accent-(--color-brand)"
+      />
+      <span className="text-sm text-dc-text-2">{label}</span>
+    </label>
   );
 }
