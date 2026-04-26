@@ -1,12 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { BatteryFull, Signal, Wifi } from 'lucide-react';
 
-import { detectEmbed } from '@/lib/qr/embed';
-import { ExternalLinkView } from '@/components/app/ExternalLinkView';
 import { AccessDeniedView } from './AccessDeniedView';
-import { PreviewBottomNav } from './PreviewBottomNav';
 
 type PreviewMode = 'allowed' | 'denied';
 
@@ -21,18 +18,27 @@ interface Props {
 
 /**
  * Side-by-side preview of what an end user sees after a successful or denied
- * scan. Visually mirrors the worker-app emulator (`app/dashboard/emulator`)
- * and renders the *actual* `/app/external` chrome — same `ExternalLinkView`
- * the live app uses, plus a presentational `PreviewBottomNav` to mimic the
- * BottomNav that lives one level up in `/app/layout.tsx`. The iframe inside
- * the frame loads the destination URL live, so YouTube and Loom links play
- * here exactly as they will in production.
+ * scan. The "In audience" view iframes `/app/external?preview=1&url=…` so
+ * the creator sees the *real* worker-app chrome — real back arrow, real
+ * BottomNav from /app/layout, real iframe of the destination URL — and
+ * every link inside the frame actually works (within the iframe). Same
+ * approach as `/dashboard/emulator`.
+ *
+ * The "Not in audience" view renders `AccessDeniedView` directly because
+ * the live deny experience lives at `/s/[qr_code_id]`, outside the /app/*
+ * layout, and therefore has no BottomNav. That parity matters.
  */
 export function DevicePreview({ label, url, audience_summary }: Props) {
   const [mode, setMode] = useState<PreviewMode>('allowed');
 
   const trimmed = url.trim();
-  const embed = useMemo(() => (trimmed ? detectEmbed(trimmed) : null), [trimmed]);
+  const validUrl = isValidUrl(trimmed) ? trimmed : null;
+
+  const previewSrc = validUrl
+    ? `/app/external?preview=1&url=${encodeURIComponent(validUrl)}${
+        label ? `&label=${encodeURIComponent(label)}` : ''
+      }`
+    : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -77,7 +83,7 @@ export function DevicePreview({ label, url, audience_summary }: Props) {
       <div className="flex justify-center">
         <DeviceFrame>
           {mode === 'allowed' ? (
-            <AllowedScreen label={label} embed={embed} />
+            <AllowedScreen previewSrc={previewSrc} />
           ) : (
             <DeniedScreen label={label} audience_summary={audience_summary} />
           )}
@@ -85,13 +91,22 @@ export function DevicePreview({ label, url, audience_summary }: Props) {
       </div>
 
       <p className="text-xs text-dc-text-3">
-        This is the live `/app/external` chrome. The iframe loads the
-        destination URL — YouTube and Loom play in place; other sites may
-        render blank if they refuse to be iframed (the &ldquo;Open&rdquo;
-        button always works).
+        The phone is running the live <code>/app/external</code> chrome in
+        an iframe — back arrow and bottom-nav links navigate inside the
+        frame, exactly as a worker would experience them.
       </p>
     </div>
   );
+}
+
+function isValidUrl(value: string): boolean {
+  if (!value) return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ── Device frame ─────────────────────────────────────────────────────────────
@@ -113,7 +128,7 @@ function DeviceFrame({ children }: { children: React.ReactNode }) {
     >
       <div className="flex size-full flex-col overflow-hidden rounded-[34px] bg-white">
         <StatusBar />
-        <div className="min-h-0 flex-1 overflow-auto bg-dc-base">{children}</div>
+        <div className="min-h-0 flex-1 bg-dc-base">{children}</div>
       </div>
       {/* Dynamic-island-style notch sits on top of the status bar. */}
       <div
@@ -143,40 +158,33 @@ function StatusBar() {
 
 // ── Inner screens ────────────────────────────────────────────────────────────
 
-function AllowedScreen({
-  label,
-  embed,
-}: {
-  label: string;
-  embed: ReturnType<typeof detectEmbed> | null;
-}) {
-  // No URL yet → render an empty placeholder shell that matches the live
-  // chrome, so the creator sees the same frame the moment they start.
-  if (!embed) {
+function AllowedScreen({ previewSrc }: { previewSrc: string | null }) {
+  if (!previewSrc) {
     return (
-      <div className="flex h-full flex-col">
-        <div className="flex flex-1 items-center justify-center bg-dc-base px-6 text-center">
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-sm font-medium text-dc-text-2">
-              Enter a destination URL
-            </p>
-            <p className="text-xs text-dc-text-3">
-              The link preview will appear here.
-            </p>
-          </div>
+      <div className="flex h-full items-center justify-center bg-dc-base px-6 text-center">
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm font-medium text-dc-text-2">
+            Enter a destination URL
+          </p>
+          <p className="text-xs text-dc-text-3">
+            The live preview will appear here.
+          </p>
         </div>
-        <PreviewBottomNav />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1">
-        <ExternalLinkView label={label} embed={embed} />
-      </div>
-      <PreviewBottomNav />
-    </div>
+    <iframe
+      src={previewSrc}
+      title="Live worker app preview"
+      // No sandbox: the iframe is same-origin and needs the full Clerk
+      // session + Server Action support to render. The /app/layout
+      // suppresses the PreviewBanner inside iframes via Sec-Fetch-Dest.
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share"
+      allowFullScreen
+      className="size-full border-0 bg-white"
+    />
   );
 }
 
@@ -190,7 +198,7 @@ function DeniedScreen({
   // The live deny experience renders on `/s/[qr_code_id]` — outside the
   // /app/* layout, so no BottomNav appears there. Mirror that here.
   return (
-    <div className="flex min-h-full items-center justify-center px-4 py-6">
+    <div className="flex min-h-full items-center justify-center overflow-auto px-4 py-6">
       <div className="w-full rounded-2xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-sm">
         <AccessDeniedView
           qr_code_id=""
