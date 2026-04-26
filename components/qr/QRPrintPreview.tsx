@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   FONT_FAMILY_CSS,
@@ -32,14 +33,16 @@ const BASE_FONT_PX = {
 
 /**
  * Live print preview at 768×1008pt (8.5×11in at 96dpi minus 0.25in margins).
- * The sheet scales proportionally to its container.
+ * The visible sheet scales proportionally to fit its container.
+ *
+ * Print path: a second, unscaled copy of the sheet is portal-mounted at
+ * document.body with id `qr-print-sheet`. It's display:none on screen and
+ * display:block in @media print, so the print output is always the full-size
+ * sheet without inheriting the on-screen scale or any clipping ancestors.
  *
  * Layout: three vertical bands (top / middle / bottom). The middle band
  * (header + QR + tagline) flex-grows so the QR stays optically centered
  * even when the top or bottom bands are empty.
- *
- * A faint 0.25in inset border draws around the printable area as a print
- * safe-zone guide. Visible on screen and in print.
  */
 export default function QRPrintPreview({
   qrCodeId,
@@ -49,6 +52,12 @@ export default function QRPrintPreview({
 }: Props) {
   const wrapperRef          = useRef<HTMLDivElement>(null);
   const [scale, setScale]   = useState(1);
+  const [mounted, setMounted] = useState(false);
+
+  // Portal target only exists in the browser. Standard SSR-safe portal
+  // mount: the portal copy renders only after first client effect.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -65,20 +74,6 @@ export default function QRPrintPreview({
     return () => ro.disconnect();
   }, []);
 
-  const scanUrl = `${appUrl}/s/${qrCodeId}`;
-  const qrPx    = Math.round((config.qr_size / 100) * SHEET_W * 0.7);
-  const tagline = TEMPLATE_TAGLINES[config.template];
-  const fontStack = FONT_FAMILY_CSS[config.font_family];
-
-  /** Resolve a per-element pt size from the saved scale. */
-  const sized = (baselinePx: number, scalePct: number) =>
-    Math.round(baselinePx * (scalePct / 100));
-
-  const showLogo        = config.show_logo && !!logoUrl;
-  const showCompanyName = config.show_company_name && !!companyName;
-  const showTopBand     = showLogo || showCompanyName;
-  const showFooterBand  = !!config.footer || !!config.footer2;
-
   return (
     /* Outer: reserves the correct height based on the computed scale */
     <div
@@ -94,109 +89,166 @@ export default function QRPrintPreview({
           transform: `scale(${scale})`,
         }}
       >
-        {/* Print sheet — id used by @media print CSS to isolate this element */}
-        <div
-          id="qr-print-sheet"
-          className="relative flex h-full flex-col bg-white"
-          style={{ fontFamily: fontStack, padding: GUIDE_INSET_PX }}
-        >
-          {/* 0.25in faint safe-zone guide. Pointer-events:none so it never
-              blocks clicks on the preview. Renders on screen + in print. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute"
-            style={{
-              top: GUIDE_INSET_PX,
-              left: GUIDE_INSET_PX,
-              right: GUIDE_INSET_PX,
-              bottom: GUIDE_INSET_PX,
-              border: '1px solid rgba(15, 17, 23, 0.08)',
-              borderRadius: 2,
-            }}
-          />
+        {/* On-screen sheet — uses a class (not the print id) so the print
+            CSS can target only the portal-mounted copy below. */}
+        <QRSheet
+          variant="screen"
+          qrCodeId={qrCodeId}
+          config={config}
+          companyName={companyName}
+          logoUrl={logoUrl}
+        />
+      </div>
 
-          {/* Top band — logo + company name. Collapses cleanly when empty. */}
-          {showTopBand && (
-            <div className="flex flex-col items-center gap-2 pt-6">
-              {showLogo && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logoUrl!}
-                  alt={companyName ?? 'Company logo'}
-                  className="max-h-16 max-w-[220px] object-contain"
-                />
-              )}
-              {showCompanyName && (
-                <p
-                  className="font-bold text-neutral-800"
-                  style={{ fontSize: sized(BASE_FONT_PX.company_name, config.font_size_company_name) }}
-                >
-                  {companyName}
-                </p>
-              )}
-            </div>
-          )}
+      {/* Print-only sheet — portal-mounted at body so no ancestor transform
+          or overflow:hidden interferes with @media print. */}
+      {mounted && createPortal(
+        <QRSheet
+          variant="print"
+          qrCodeId={qrCodeId}
+          config={config}
+          companyName={companyName}
+          logoUrl={logoUrl}
+        />,
+        document.body,
+      )}
+    </div>
+  );
+}
 
-          {/* Middle band — header / QR / tagline. flex-1 keeps the QR
-              optically centered even when top/bottom bands are missing. */}
-          <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
-            {config.header && (
-              <h2
-                className="font-bold text-neutral-900 leading-tight"
-                style={{ fontSize: sized(BASE_FONT_PX.header, config.font_size_header) }}
-              >
-                {config.header}
-              </h2>
-            )}
-            {config.sub_header && (
-              <p
-                className="text-neutral-600"
-                style={{ fontSize: sized(BASE_FONT_PX.sub_header, config.font_size_sub_header) }}
-              >
-                {config.sub_header}
-              </p>
-            )}
+/* ── Shared sheet markup ─────────────────────────────────────────────────── */
 
-            <QRCodeSVG
-              value={scanUrl}
-              size={qrPx}
-              bgColor="#ffffff"
-              fgColor="#000000"
-              level="M"
-              includeMargin
+interface SheetProps {
+  variant: 'screen' | 'print';
+  qrCodeId: string;
+  config: PrintConfig;
+  companyName?: string;
+  logoUrl?: string | null;
+}
+
+function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps) {
+  const scanUrl   = `${appUrl}/s/${qrCodeId}`;
+  const qrPx      = Math.round((config.qr_size / 100) * SHEET_W * 0.7);
+  const tagline   = TEMPLATE_TAGLINES[config.template];
+  const fontStack = FONT_FAMILY_CSS[config.font_family];
+  const sized     = (basePx: number, scalePct: number) =>
+    Math.round(basePx * (scalePct / 100));
+
+  const showLogo        = config.show_logo && !!logoUrl;
+  const showCompanyName = config.show_company_name && !!companyName;
+  const showTopBand     = showLogo || showCompanyName;
+  const showFooterBand  = !!config.footer || !!config.footer2;
+
+  const isPrint = variant === 'print';
+
+  return (
+    <div
+      // The print copy carries the id targeted by PrintButton's @media print
+      // CSS. The on-screen copy uses a class only.
+      id={isPrint ? 'qr-print-sheet' : undefined}
+      className={[
+        'relative flex flex-col bg-white',
+        isPrint
+          ? 'qr-print-sheet-portal'
+          : 'qr-print-sheet-screen h-full',
+      ].join(' ')}
+      style={{
+        fontFamily: fontStack,
+        padding:    GUIDE_INSET_PX,
+        // Print copy gets explicit dimensions so it lays out at full size
+        // even though its (body) parent doesn't constrain it.
+        ...(isPrint ? { width: SHEET_W, height: SHEET_H } : null),
+      }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{
+          top: GUIDE_INSET_PX,
+          left: GUIDE_INSET_PX,
+          right: GUIDE_INSET_PX,
+          bottom: GUIDE_INSET_PX,
+          border: '1px solid rgba(15, 17, 23, 0.08)',
+          borderRadius: 2,
+        }}
+      />
+
+      {showTopBand && (
+        <div className="flex flex-col items-center gap-2 pt-6">
+          {showLogo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl!}
+              alt={companyName ?? 'Company logo'}
+              className="max-h-16 max-w-[220px] object-contain"
             />
-
+          )}
+          {showCompanyName && (
             <p
-              className="text-neutral-500"
-              style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
+              className="font-bold text-neutral-800"
+              style={{ fontSize: sized(BASE_FONT_PX.company_name, config.font_size_company_name) }}
             >
-              {tagline}
+              {companyName}
             </p>
-          </div>
-
-          {/* Footer band */}
-          {showFooterBand && (
-            <div className="flex flex-col items-center gap-1 pb-6 text-center">
-              {config.footer && (
-                <p
-                  className="text-neutral-700"
-                  style={{ fontSize: sized(BASE_FONT_PX.footer, config.font_size_footer) }}
-                >
-                  {config.footer}
-                </p>
-              )}
-              {config.footer2 && (
-                <p
-                  className="text-neutral-500"
-                  style={{ fontSize: sized(BASE_FONT_PX.footer2, config.font_size_footer2) }}
-                >
-                  {config.footer2}
-                </p>
-              )}
-            </div>
           )}
         </div>
+      )}
+
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+        {config.header && (
+          <h2
+            className="font-bold text-neutral-900 leading-tight"
+            style={{ fontSize: sized(BASE_FONT_PX.header, config.font_size_header) }}
+          >
+            {config.header}
+          </h2>
+        )}
+        {config.sub_header && (
+          <p
+            className="text-neutral-600"
+            style={{ fontSize: sized(BASE_FONT_PX.sub_header, config.font_size_sub_header) }}
+          >
+            {config.sub_header}
+          </p>
+        )}
+
+        <QRCodeSVG
+          value={scanUrl}
+          size={qrPx}
+          bgColor="#ffffff"
+          fgColor="#000000"
+          level="M"
+          includeMargin
+        />
+
+        <p
+          className="text-neutral-500"
+          style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
+        >
+          {tagline}
+        </p>
       </div>
+
+      {showFooterBand && (
+        <div className="flex flex-col items-center gap-1 pb-6 text-center">
+          {config.footer && (
+            <p
+              className="text-neutral-700"
+              style={{ fontSize: sized(BASE_FONT_PX.footer, config.font_size_footer) }}
+            >
+              {config.footer}
+            </p>
+          )}
+          {config.footer2 && (
+            <p
+              className="text-neutral-500"
+              style={{ fontSize: sized(BASE_FONT_PX.footer2, config.font_size_footer2) }}
+            >
+              {config.footer2}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
