@@ -1,28 +1,88 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 
-import { getCompanyContext } from '@/lib/auth/company-context';
+import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 import { detectEmbed } from '@/lib/qr/embed';
 import { passesAudience, isAudienceUnrestricted, type QrAudience } from '@/lib/qr/audience';
 import { ExternalLinkView } from '@/components/app/ExternalLinkView';
 
 interface Props {
-  searchParams: Promise<{ qr?: string }>;
+  searchParams: Promise<{
+    qr?: string;
+    preview?: string;
+    url?: string;
+    label?: string;
+  }>;
 }
 
 export const metadata: Metadata = { robots: 'noindex' };
 
 /**
- * In-app wrapper for QR codes that point at an external URL. Reached via
- * `/s/[qr_code_id]` for `target_type === 'url'` scans and re-checks the
- * audience as defense in depth: the page is also linkable directly, so
- * we can't rely on the /s gate having already run.
+ * In-app wrapper for QR codes that point at an external URL. Two modes:
  *
- * The actual embed (YouTube/Loom rewrite vs. generic iframe) is decided
- * by `detectEmbed`; this page only owns auth + audience.
+ *   - `?qr=<id>` — production scan path. Reached via `/s/[qr_code_id]`
+ *     for `target_type === 'url'`; re-checks the audience as defense in
+ *     depth (the page is linkable directly, so the /s gate may not have
+ *     run for this request).
+ *
+ *   - `?preview=1&url=<url>&label=<label>` — manager-only builder path.
+ *     The QR builder iframes this URL inside its device-preview frame so
+ *     the creator sees the *live* /app/external chrome (real back arrow,
+ *     real BottomNav from /app/layout, real iframe of the destination)
+ *     before the QR is created. No DB lookup, no audience check —
+ *     manager auth is the gate.
+ *
+ * The embed rewrite (YouTube/Loom → /embed) is decided by `detectEmbed`;
+ * this page only owns auth + audience.
  */
 export default async function ExternalLinkPage({ searchParams }: Props) {
-  const { qr: qr_code_id } = await searchParams;
+  const params = await searchParams;
+
+  if (params.preview === '1') {
+    return previewMode(params);
+  }
+
+  return scanMode(params);
+}
+
+async function previewMode(params: {
+  url?: string;
+  label?: string;
+}) {
+  // Manager-gated: only managers and admins can render arbitrary URLs
+  // inside our chrome. `getCompanyContext('manager')` throws FORBIDDEN
+  // for employees, which we surface as a 404 to keep the surface small.
+  try {
+    await getCompanyContext('manager');
+  } catch (e) {
+    if (e instanceof AuthError) notFound();
+    throw e;
+  }
+
+  const raw = (params.url ?? '').trim();
+  if (!raw) notFound();
+
+  // URL parser is the cheapest validator we can rely on; the embed
+  // helper is more lenient (it returns provider='generic' on parse
+  // failure), so an explicit check keeps obviously-broken inputs out.
+  try {
+    new URL(raw);
+  } catch {
+    notFound();
+  }
+
+  const embed = detectEmbed(raw);
+  const label = (params.label ?? '').trim();
+
+  return (
+    <div className="h-[calc(100dvh-5rem)] min-h-0">
+      <ExternalLinkView label={label} embed={embed} />
+    </div>
+  );
+}
+
+async function scanMode(params: { qr?: string }) {
+  const qr_code_id = params.qr;
   if (!qr_code_id) notFound();
 
   const { supabase, userId, company_id, role } = await getCompanyContext();
@@ -75,10 +135,6 @@ export default async function ExternalLinkPage({ searchParams }: Props) {
 
   const embed = detectEmbed(qr.target_url);
 
-  // 100dvh - 80px (BottomNav from /app/layout) is the visible area for
-  // /app/* pages. ExternalLinkView itself fills its parent so it can
-  // also be embedded inside the QR builder's device preview at a
-  // different height.
   return (
     <div className="h-[calc(100dvh-5rem)] min-h-0">
       <ExternalLinkView label={qr.label ?? ''} embed={embed} />
