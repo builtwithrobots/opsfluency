@@ -16,8 +16,9 @@ export type PrintFontFamily = 'sans' | 'display';
 
 /**
  * Font size scale, in percent of the element's baseline size. 100 = baseline,
- * 70 = small, 160 = large. Stored as a number so it survives JSON round-trip.
- * Range: 70–160, step 10 - see DotSlider config in QRPrintEditor.
+ * 50 = half size, 150 = 1.5x. Stored as a number so it survives JSON round-trip.
+ * Range: 50 to 150, step 10. Symmetric around 100 so the default sits at the
+ * visual midpoint of the slider.
  */
 export type FontScale = number;
 
@@ -106,13 +107,21 @@ export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline'> = {
   bold_tagline:           false,
   bold_footer:            false,
   bold_footer2:           false,
-  // Defaults mirror the original gap-2 / gap-5 / gap-1 Tailwind values.
-  spacing_top:            8,
+  // Spacing defaults sit roughly mid-slider so users can tighten or loosen
+  // each band by a meaningful amount in either direction.
+  spacing_top:            16,
   spacing_middle:         20,
-  spacing_footer:         4,
+  spacing_footer:         12,
 };
 
-export const SPACING_SLIDER = { min: 0, max: 60, step: 5 } as const;
+/** Slider config shared by every percentage-based size control. */
+export const FONT_SIZE_SLIDER = { min: 50, max: 150, step: 10 } as const;
+
+/** Slider config for the QR Code Size control (% of sheet width). */
+export const QR_SIZE_SLIDER = { min: 40, max: 80, step: 5 } as const;
+
+/** Slider config shared by the three per-band spacing controls (px). */
+export const SPACING_SLIDER = { min: 0, max: 40, step: 4 } as const;
 
 export function defaultPrintConfig(
   targetType: QrTargetType,
@@ -151,6 +160,3 @@ export const FONT_FAMILY_CSS: Record<PrintFontFamily, string> = {
   sans:    'var(--font-sans), Inter, system-ui, sans-serif',
   display: 'var(--font-display), "Chakra Petch", system-ui, sans-serif',
 };
-
-/** Font size scale slider config - shared by every text-size DotSlider. */
-export const FONT_SIZE_SLIDER = { min: 70, max: 160, step: 10 } as const;
