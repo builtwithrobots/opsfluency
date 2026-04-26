@@ -6,6 +6,8 @@ interface Props {
   min?: number;
   max?: number;
   step?: number;
+  /** Suffix shown after the numeric value. Default '%'. */
+  unit?: string;
   onChange: (v: number) => void;
 }
 
@@ -15,13 +17,14 @@ export default function DotSlider({
   min = 40,
   max = 90,
   step = 5,
+  unit = '%',
   onChange,
 }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-dc-text-2">{label}</span>
-        <span className="text-sm tabular-nums text-dc-text-3">{value}%</span>
+        <span className="text-sm tabular-nums text-dc-text-3">{value}{unit}</span>
       </div>
       <input
         type="range"
@@ -39,7 +42,7 @@ export default function DotSlider({
             key={v}
             type="button"
             onClick={() => onChange(v)}
-            aria-label={`Set ${label} to ${v}%`}
+            aria-label={`Set ${label} to ${v}${unit}`}
             className={[
               'h-2.5 w-2.5 rounded-full transition-colors',
               v === value ? 'bg-(--color-brand)' : 'bg-dc-edge hover:bg-dc-text-3',

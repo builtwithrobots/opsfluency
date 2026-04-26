@@ -179,7 +179,10 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
       />
 
       {showTopBand && (
-        <div className="flex flex-col items-center gap-2 pt-6">
+        <div
+          className="flex flex-col items-center pt-6"
+          style={{ gap: config.spacing_top }}
+        >
           {showLogo && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -200,7 +203,10 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
         </div>
       )}
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+      <div
+        className="flex flex-1 flex-col items-center justify-center px-6 text-center"
+        style={{ gap: config.spacing_middle }}
+      >
         {config.header && (
           <h2
             className="font-bold text-neutral-900 leading-tight"
@@ -238,7 +244,10 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
       </div>
 
       {showFooterBand && (
-        <div className="flex flex-col items-center gap-1 pb-6 text-center">
+        <div
+          className="flex flex-col items-center pb-6 text-center"
+          style={{ gap: config.spacing_footer }}
+        >
           {config.footer && (
             <p
               className="text-neutral-700"

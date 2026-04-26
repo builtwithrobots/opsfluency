@@ -48,6 +48,17 @@ export interface PrintConfig {
   font_size_tagline:      FontScale;
   font_size_footer:       FontScale;
   font_size_footer2:      FontScale;
+
+  /**
+   * Per-band spacing in pixels — the gap between elements inside each band.
+   * Range 0–60, step 5.
+   *   spacing_top    → gap inside top band (logo ↔ company name)
+   *   spacing_middle → gap inside middle band (header ↔ sub-header ↔ QR ↔ tagline)
+   *   spacing_footer → gap inside footer band (footer ↔ footer2)
+   */
+  spacing_top:    number;
+  spacing_middle: number;
+  spacing_footer: number;
 }
 
 const DEFAULT_TEMPLATE_BY_TYPE: Record<QrTargetType, PrintTemplate> = {
@@ -79,7 +90,13 @@ export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline'> = {
   font_size_tagline:      100,
   font_size_footer:       100,
   font_size_footer2:      100,
+  // Defaults mirror the original gap-2 / gap-5 / gap-1 Tailwind values.
+  spacing_top:            8,
+  spacing_middle:         20,
+  spacing_footer:         4,
 };
+
+export const SPACING_SLIDER = { min: 0, max: 60, step: 5 } as const;
 
 export function defaultPrintConfig(
   targetType: QrTargetType,

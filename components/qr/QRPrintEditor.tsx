@@ -5,6 +5,7 @@ import {
   defaultPrintConfig,
   FONT_FAMILY_LABELS,
   FONT_SIZE_SLIDER,
+  SPACING_SLIDER,
   type PrintConfig,
   type PrintFontFamily,
   type QrTargetType,
@@ -200,6 +201,12 @@ export default function QRPrintEditor({
                         onChange={v => patch({ font_size_company_name: v })}
                       />
                     )}
+
+                    <SpacingSlider
+                      label="Spacing — top band"
+                      value={config.spacing_top}
+                      onChange={v => patch({ spacing_top: v })}
+                    />
                   </div>
                 )}
 
@@ -269,6 +276,11 @@ export default function QRPrintEditor({
                         onChange={v => patch({ font_size_tagline: v })}
                       />
                     </div>
+                    <SpacingSlider
+                      label="Spacing — middle band"
+                      value={config.spacing_middle}
+                      onChange={v => patch({ spacing_middle: v })}
+                    />
                   </div>
                 )}
 
@@ -308,6 +320,11 @@ export default function QRPrintEditor({
                         onChange={v => patch({ font_size_footer2: v })}
                       />
                     </div>
+                    <SpacingSlider
+                      label="Spacing — footer band"
+                      value={config.spacing_footer}
+                      onChange={v => patch({ spacing_footer: v })}
+                    />
                   </div>
                 )}
               </div>
@@ -349,6 +366,23 @@ function FontSizeSlider({
       min={FONT_SIZE_SLIDER.min}
       max={FONT_SIZE_SLIDER.max}
       step={FONT_SIZE_SLIDER.step}
+      onChange={onChange}
+    />
+  );
+}
+
+/** Pixel-unit slider for the per-band spacing controls. */
+function SpacingSlider({
+  label, value, onChange,
+}: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <DotSlider
+      label={label}
+      value={value}
+      min={SPACING_SLIDER.min}
+      max={SPACING_SLIDER.max}
+      step={SPACING_SLIDER.step}
+      unit="px"
       onChange={onChange}
     />
   );
