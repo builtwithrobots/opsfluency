@@ -80,12 +80,40 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
     qr_design_defaults: Partial<PrintConfig> | null;
   } | null = null;
   if (tab === 'settings' && isAdmin) {
-    const { data } = await supabase
+    // Fetch in two steps so a missing/optional column (e.g. qr_design_defaults
+    // before its migration is applied) doesn't take down the whole branding
+    // panel. The base fields are guaranteed to exist on companies.
+    const { data: base, error: baseErr } = await supabase
       .from('companies')
-      .select('name, phone, logo_url, qr_design_defaults')
+      .select('name, phone, logo_url')
       .eq('id', company_id)
       .single();
-    company = data as typeof company;
+
+    if (baseErr) {
+      console.error('[qr/design-settings] company base read failed:', baseErr);
+    }
+
+    let qr_design_defaults: Partial<PrintConfig> | null = null;
+    const { data: defaults, error: defaultsErr } = await supabase
+      .from('companies')
+      .select('qr_design_defaults')
+      .eq('id', company_id)
+      .single();
+    if (defaultsErr) {
+      // Most common cause: migration 20260426000001 not yet applied.
+      console.warn('[qr/design-settings] qr_design_defaults unavailable:', defaultsErr.message);
+    } else {
+      qr_design_defaults = (defaults?.qr_design_defaults as Partial<PrintConfig>) ?? null;
+    }
+
+    if (base) {
+      company = {
+        name:               base.name,
+        phone:              base.phone,
+        logo_url:           base.logo_url,
+        qr_design_defaults,
+      };
+    }
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
