@@ -129,7 +129,8 @@ interface SheetProps {
 function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps) {
   const scanUrl   = `${appUrl}/s/${qrCodeId}`;
   const qrPx      = Math.round((config.qr_size / 100) * SHEET_W * 0.7);
-  const tagline   = TEMPLATE_TAGLINES[config.template];
+  // Custom tagline overrides the per-template default. Empty string hides it.
+  const tagline   = config.tagline ?? TEMPLATE_TAGLINES[config.template];
   const fontStack = FONT_FAMILY_CSS[config.font_family];
   const sized     = (basePx: number, scalePct: number) =>
     Math.round(basePx * (scalePct / 100));
@@ -138,6 +139,9 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
   const showCompanyName = config.show_company_name && !!companyName;
   const showTopBand     = showLogo || showCompanyName;
   const showFooterBand  = !!config.footer || !!config.footer2;
+  const showTagline     = !!tagline;
+  const logoMaxH        = sized(64, config.logo_size);
+  const logoMaxW        = sized(220, config.logo_size);
 
   const isPrint = variant === 'print';
 
@@ -181,7 +185,8 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
             <img
               src={logoUrl!}
               alt={companyName ?? 'Company logo'}
-              className="max-h-16 max-w-[220px] object-contain"
+              className="object-contain"
+              style={{ maxHeight: logoMaxH, maxWidth: logoMaxW }}
             />
           )}
           {showCompanyName && (
@@ -222,12 +227,14 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
           includeMargin
         />
 
-        <p
-          className="text-neutral-500"
-          style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
-        >
-          {tagline}
-        </p>
+        {showTagline && (
+          <p
+            className="text-neutral-500"
+            style={{ fontSize: sized(BASE_FONT_PX.tagline, config.font_size_tagline) }}
+          >
+            {tagline}
+          </p>
+        )}
       </div>
 
       {showFooterBand && (

@@ -23,10 +23,17 @@ export type FontScale = number;
 
 export interface PrintConfig {
   qr_size: number;                  // 40–90 (% of 768pt container width), default 60
+  /** Logo size scale (percent of 64px max-height baseline). */
+  logo_size: FontScale;             // 50–150
   header: string;
   sub_header: string;
   footer: string;
   footer2: string;                  // default: company phone number
+  /**
+   * Tagline rendered below the QR. Defaulted to the target's template tagline
+   * (TEMPLATE_TAGLINES). Empty string hides the line entirely.
+   */
+  tagline: string;
   show_logo: boolean;
   show_company_name: boolean;       // independent of logo — both can be on
   template: PrintTemplate;
@@ -56,8 +63,9 @@ const DEFAULT_TEMPLATE_BY_TYPE: Record<QrTargetType, PrintTemplate> = {
  * the company's `qr_design_defaults` from the Design Settings tab and the
  * footer2 phone number.
  */
-export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template'> = {
+export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline'> = {
   qr_size:                60,
+  logo_size:              100,
   header:                 '',
   sub_header:             '',
   footer:                 '',
@@ -77,9 +85,11 @@ export function defaultPrintConfig(
   targetType: QrTargetType,
   overrides?: Partial<PrintConfig>,
 ): PrintConfig {
+  const template = overrides?.template ?? DEFAULT_TEMPLATE_BY_TYPE[targetType];
   return {
     ...BASE_PRINT_CONFIG,
-    template: DEFAULT_TEMPLATE_BY_TYPE[targetType],
+    template,
+    tagline: TEMPLATE_TAGLINES[template],
     ...overrides,
   };
 }

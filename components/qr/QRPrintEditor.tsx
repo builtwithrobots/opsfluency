@@ -149,7 +149,7 @@ export default function QRPrintEditor({
                           value={f}
                           checked={config.font_family === f}
                           onChange={() => patch({ font_family: f })}
-                          className="accent-white"
+                          className="accent-(--color-brand)"
                         />
                         <span className="text-sm text-dc-text-2">{FONT_FAMILY_LABELS[f]}</span>
                       </label>
@@ -164,7 +164,7 @@ export default function QRPrintEditor({
                         type="checkbox"
                         checked={config.show_logo}
                         onChange={e => patch({ show_logo: e.target.checked })}
-                        className="h-4 w-4 rounded accent-white"
+                        className="h-4 w-4 rounded accent-(--color-brand)"
                         disabled={!logoUrl}
                       />
                       <span className="text-sm text-dc-text-2">
@@ -175,19 +175,22 @@ export default function QRPrintEditor({
                       </span>
                     </label>
 
+                    {config.show_logo && logoUrl && (
+                      <FontSizeSlider
+                        label="Logo size"
+                        value={config.logo_size}
+                        onChange={v => patch({ logo_size: v })}
+                      />
+                    )}
+
                     <label className="flex min-h-[44px] cursor-pointer items-center gap-3">
                       <input
                         type="checkbox"
                         checked={config.show_company_name}
                         onChange={e => patch({ show_company_name: e.target.checked })}
-                        className="h-4 w-4 rounded accent-white"
+                        className="h-4 w-4 rounded accent-(--color-brand)"
                       />
-                      <span className="text-sm text-dc-text-2">
-                        Show company name
-                        {companyName && (
-                          <span className="ml-2 text-xs text-dc-text-3">({companyName})</span>
-                        )}
-                      </span>
+                      <span className="text-sm text-dc-text-2">Show company name</span>
                     </label>
 
                     {config.show_company_name && (
@@ -246,11 +249,26 @@ export default function QRPrintEditor({
                       value={config.qr_size}
                       onChange={v => patch({ qr_size: v })}
                     />
-                    <FontSizeSlider
-                      label="Tagline size"
-                      value={config.font_size_tagline}
-                      onChange={v => patch({ font_size_tagline: v })}
-                    />
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-dc-text-2">Tagline</label>
+                        <input
+                          type="text"
+                          value={config.tagline}
+                          onChange={e => patch({ tagline: e.target.value })}
+                          placeholder="e.g. Scan to view procedure"
+                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                        />
+                        <p className="mt-1 text-xs text-dc-text-3">
+                          Leave blank to hide. Renders below the QR.
+                        </p>
+                      </div>
+                      <FontSizeSlider
+                        label="Tagline size"
+                        value={config.font_size_tagline}
+                        onChange={v => patch({ font_size_tagline: v })}
+                      />
+                    </div>
                   </div>
                 )}
 
