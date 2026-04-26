@@ -52,7 +52,7 @@ export default async function QrScanPage({ params }: Props) {
   };
 
   if (isAudienceUnrestricted(audience)) {
-    redirect(destination);
+    redirect(destinationFor(qr, qr_code_id, destination));
   }
 
   // Admin client: scan landing has no Clerk JWT → Supabase is treating us
@@ -72,7 +72,7 @@ export default async function QrScanPage({ params }: Props) {
       .maybeSingle(),
   ]);
 
-  if (superRow) redirect(destination);
+  if (superRow) redirect(destinationFor(qr, qr_code_id, destination));
 
   if (!member) {
     return (
@@ -97,7 +97,7 @@ export default async function QrScanPage({ params }: Props) {
   };
 
   if (passesAudience(audience, scanner)) {
-    redirect(destination);
+    redirect(destinationFor(qr, qr_code_id, destination));
   }
 
   return (
@@ -119,6 +119,21 @@ function ScanShell({ children }: { children: React.ReactNode }) {
       </div>
     </main>
   );
+}
+
+/**
+ * Picks the post-gate redirect target. URL-type QR codes route through the
+ * in-app `/app/external` wrapper so workers stay inside the OpsFluency
+ * chrome and can navigate back to Home via the BottomNav. Every other
+ * target type keeps using the destination resolved by `resolveQrTarget`.
+ */
+function destinationFor(
+  qr: { target_type: string },
+  qr_code_id: string,
+  destination: string,
+): string {
+  if (qr.target_type === 'url') return `/app/external?qr=${qr_code_id}`;
+  return destination;
 }
 
 function summariseAudience(a: { department_ids: string[]; roles: string[] }) {
