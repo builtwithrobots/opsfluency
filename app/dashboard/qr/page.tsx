@@ -279,7 +279,7 @@ function QrDesignSettingsTab({ company }: QrDesignSettingsTabProps) {
         </div>
 
         <div className="mt-6 border-t border-[color:var(--dc-edge)] pt-4">
-          <Button href="/dashboard/settings" plain className="text-sm">
+          <Button href="/dashboard/org-settings" plain className="text-sm">
             Edit in company settings →
           </Button>
         </div>
@@ -305,6 +305,7 @@ function QrDesignSettingsTab({ company }: QrDesignSettingsTabProps) {
 
         <div className="mt-6">
           <QRPrintEditor
+            mode="defaults"
             targetType="sop"
             initialConfig={company?.qr_design_defaults ?? undefined}
             companyName={company?.name ?? undefined}

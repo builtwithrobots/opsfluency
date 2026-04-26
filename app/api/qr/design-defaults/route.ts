@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
+import { pickDesignDefaults, type PrintConfig } from '@/lib/qr/print-config';
 
 /**
  * Org-wide QR print design defaults. Admin-only.
@@ -38,9 +39,15 @@ export async function PATCH(request: Request) {
     const body   = await request.json();
     const parsed = UpdateInput.parse(body);
 
+    // Persist only the org-wide-safe subset (typography, sizing, spacing,
+    // visibility). Text content fields like header/footer/tagline are
+    // intentionally dropped here, even if the editor sent them, because
+    // they are per-QR concerns and would otherwise clobber every new QR.
+    const safe = pickDesignDefaults(parsed.print_config as Partial<PrintConfig>);
+
     const { data, error } = await supabase
       .from('companies')
-      .update({ qr_design_defaults: parsed.print_config })
+      .update({ qr_design_defaults: safe })
       .eq('id', company_id)
       .select('qr_design_defaults')
       .single();
