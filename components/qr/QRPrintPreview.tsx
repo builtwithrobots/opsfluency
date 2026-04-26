@@ -148,12 +148,15 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
   return (
     <div
       // The print copy carries the id targeted by PrintButton's @media print
-      // CSS. The on-screen copy uses a class only.
+      // CSS. The on-screen copy uses a class only. The portal copy is hidden
+      // on screen via Tailwind's `hidden` (= display:none); PrintButton's
+      // @media print rule overrides with `display: flex !important` while
+      // printing, so the print path is unaffected.
       id={isPrint ? 'qr-print-sheet' : undefined}
       className={[
         'relative flex flex-col bg-white',
         isPrint
-          ? 'qr-print-sheet-portal'
+          ? 'qr-print-sheet-portal hidden'
           : 'qr-print-sheet-screen h-full',
       ].join(' ')}
       style={{
