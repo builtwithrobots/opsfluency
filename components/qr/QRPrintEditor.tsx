@@ -5,10 +5,8 @@ import {
   defaultPrintConfig,
   FONT_FAMILY_LABELS,
   FONT_SIZE_SLIDER,
-  TEMPLATE_LABELS,
   type PrintConfig,
   type PrintFontFamily,
-  type PrintTemplate,
   type QrTargetType,
 } from '@/lib/qr/print-config';
 import DotSlider from './DotSlider';
@@ -34,18 +32,16 @@ interface Props {
   showPrintButton?: boolean;
 }
 
-type SectionKey = 'logo' | 'header' | 'qr' | 'template' | 'footer' | 'style';
+type SectionKey = 'logo' | 'header' | 'qr' | 'footer' | 'style';
 
 const SECTIONS: { key: SectionKey; title: string }[] = [
-  { key: 'style',    title: 'Typography' },
-  { key: 'logo',     title: 'Logo & Company' },
-  { key: 'header',   title: 'Header' },
-  { key: 'qr',       title: 'QR Code Size' },
-  { key: 'template', title: 'Print Template' },
-  { key: 'footer',   title: 'Footer' },
+  { key: 'style',  title: 'Typography' },
+  { key: 'logo',   title: 'Logo & Company' },
+  { key: 'header', title: 'Header' },
+  { key: 'qr',     title: 'QR Code & Tagline' },
+  { key: 'footer', title: 'Footer' },
 ];
 
-const TEMPLATES: PrintTemplate[] = ['sop-standard', 'announcement', 'questionnaire', 'generic'];
 const FONT_FAMILIES: PrintFontFamily[] = ['sans', 'display'];
 
 export default function QRPrintEditor({
@@ -244,33 +240,12 @@ export default function QRPrintEditor({
                 )}
 
                 {key === 'qr' && (
-                  <DotSlider
-                    label="QR size"
-                    value={config.qr_size}
-                    onChange={v => patch({ qr_size: v })}
-                  />
-                )}
-
-                {key === 'template' && (
                   <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      {TEMPLATES.map(t => (
-                        <label
-                          key={t}
-                          className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-dc-raised"
-                        >
-                          <input
-                            type="radio"
-                            name="template"
-                            value={t}
-                            checked={config.template === t}
-                            onChange={() => patch({ template: t })}
-                            className="accent-white"
-                          />
-                          <span className="text-sm text-dc-text-2">{TEMPLATE_LABELS[t]}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <DotSlider
+                      label="QR size"
+                      value={config.qr_size}
+                      onChange={v => patch({ qr_size: v })}
+                    />
                     <FontSizeSlider
                       label="Tagline size"
                       value={config.font_size_tagline}

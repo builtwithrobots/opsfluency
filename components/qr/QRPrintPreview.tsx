@@ -162,6 +162,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
     >
       <div
         aria-hidden
+        data-print-guide
         className="pointer-events-none absolute"
         style={{
           top: GUIDE_INSET_PX,

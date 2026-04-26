@@ -10,8 +10,10 @@ interface Props {
 /**
  * Triggers the browser print dialog and ships the @media print styles that
  * isolate the QR sheet. The sheet itself is portal-mounted at document.body
- * by QRPrintPreview as `<div id="qr-print-sheet" class="qr-print-sheet-portal">`,
- * so the print rules don't have to fight ancestor transforms or overflow.
+ * by QRPrintPreview as a direct child of <body> with id="qr-print-sheet" and
+ * the .qr-print-sheet-portal class. Print rules collapse every other body
+ * child via display:none so the page is exactly one 8.5×11in sheet, no
+ * matter how tall the surrounding dashboard chrome is.
  */
 export default function PrintButton({ label = 'Print QR Code' }: Props) {
   return (
@@ -23,7 +25,7 @@ export default function PrintButton({ label = 'Print QR Code' }: Props) {
 
       <style>{`
         /* Hide the print-only portal copy on screen — only the scaled,
-           interactive preview should be visible during editing. */
+           interactive preview is visible during editing. */
         .qr-print-sheet-portal { display: none; }
 
         @media print {
@@ -32,31 +34,34 @@ export default function PrintButton({ label = 'Print QR Code' }: Props) {
             margin: 0;
           }
 
+          /* Collapse the document to exactly one sheet. Using display:none
+             (not visibility:hidden) means the dashboard chrome doesn't take
+             up layout, so the browser doesn't paginate and reprint the
+             fixed sheet across multiple pages. */
           html, body {
             margin: 0 !important;
             padding: 0 !important;
+            width: 8.5in !important;
+            height: 11in !important;
             background: #ffffff !important;
           }
+          body > *:not(#qr-print-sheet) { display: none !important; }
 
-          /* Hide everything in the document, then re-show only the print
-             sheet and its descendants. visibility (not display) so the
-             sheet's layout survives. */
-          body * { visibility: hidden !important; }
-          #qr-print-sheet, #qr-print-sheet * { visibility: visible !important; }
-
-          /* Position the sheet at the page origin at full 8.5×11in. */
           #qr-print-sheet {
             display: flex !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
+            position: static !important;
             width: 8.5in !important;
             height: 11in !important;
             margin: 0 !important;
             padding: 0.25in !important;
+            box-sizing: border-box !important;
             box-shadow: none !important;
             background: #ffffff !important;
           }
+
+          /* The 0.25in faint border is an editor affordance, not a printed
+             mark. Drop it from the printed sheet. */
+          #qr-print-sheet [data-print-guide] { display: none !important; }
         }
       `}</style>
     </>
