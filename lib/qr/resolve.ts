@@ -33,6 +33,18 @@ export async function resolveQrTarget(qrCodeId: string): Promise<ResolveResult> 
   // a permanent identifier, just intentionally retired.
   if (qr.archived_at) return { status: 'archived', qr: qr as QrCodeRow };
 
+  // Scheduling window: if the QR has an active_from / active_until and
+  // we're outside it, treat the same as archived for the scan flow. The
+  // library card UI distinguishes "Inactive · Date Range" from "Archived"
+  // for managers; workers see the same friendly Gone page either way.
+  const now = new Date();
+  if (qr.active_from && now < new Date(qr.active_from as string)) {
+    return { status: 'archived', qr: qr as QrCodeRow };
+  }
+  if (qr.active_until && now >= new Date(qr.active_until as string)) {
+    return { status: 'archived', qr: qr as QrCodeRow };
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
 
   switch (qr.target_type as string) {

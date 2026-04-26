@@ -5,8 +5,13 @@ import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 import { createQrCode } from '@/lib/qr/generate';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import { isWithinCreatorScope } from '@/lib/qr/audience';
+import { validateScheduleInput } from '@/lib/qr/schedule';
 
 const RoleSchema = z.enum(['admin', 'manager', 'employee']);
+
+// ISO datetime string accepted by `new Date(...)`. We validate the
+// pairwise constraint (until > from, target_type != sop) below.
+const Iso = z.string().datetime({ offset: true }).or(z.string().datetime());
 
 const CreateQrInput = z.object({
   target_type: z.enum(['sop', 'announcement', 'questionnaire', 'url']),
@@ -17,9 +22,14 @@ const CreateQrInput = z.object({
     department_ids: z.array(z.string().uuid()).default([]),
     roles:          z.array(RoleSchema).default([]),
   }).default({ department_ids: [], roles: [] }),
+  active_from:  Iso.nullish(),
+  active_until: Iso.nullish(),
 }).refine(
   d => d.target_type === 'url' ? !!d.target_url : !!d.target_id,
   { message: 'target_id required unless target_type is url; target_url required for url type' },
+).refine(
+  d => d.target_type !== 'sop' || (!d.active_from && !d.active_until),
+  { message: 'SOP QR codes cannot be scheduled' },
 );
 
 export async function POST(request: Request) {
@@ -37,6 +47,14 @@ export async function POST(request: Request) {
       return fail(403, 'FORBIDDEN', 'audience targets a department or role outside your scope');
     }
 
+    // Schedule sanity (until > from). Zod handles per-field shape; this
+    // catches the cross-field case the schema can't express ergonomically.
+    const scheduleErr = validateScheduleInput({
+      active_from:  parsed.active_from,
+      active_until: parsed.active_until,
+    });
+    if (scheduleErr) return fail(400, 'INVALID_INPUT', scheduleErr);
+
     // Fetch company phone (footer2 default) + org-wide design defaults.
     const { data: company } = await supabase
       .from('companies')
@@ -53,6 +71,8 @@ export async function POST(request: Request) {
       target_url:              parsed.target_url,
       label:                   parsed.label,
       audience:                parsed.audience,
+      active_from:             parsed.active_from  ?? null,
+      active_until:            parsed.active_until ?? null,
       company_phone:           company?.phone,
       company_design_defaults: company?.qr_design_defaults ?? null,
     });

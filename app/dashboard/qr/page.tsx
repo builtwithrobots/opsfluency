@@ -13,6 +13,7 @@ import QRPrintEditor from '@/components/qr/QRPrintEditor';
 import { QrCardActions } from '@/components/qr/QrCardActions';
 import { canModifyQr } from '@/lib/qr/audience';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
+import { qrStatus } from '@/lib/qr/schedule';
 import type { PrintConfig, QrTargetType } from '@/lib/qr/print-config';
 
 const TYPE_LABELS: Record<QrTargetType, string> = {
@@ -65,6 +66,8 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
     created_at: string;
     created_by: string;
     archived_at: string | null;
+    active_from: string | null;
+    active_until: string | null;
   };
   let qrCodes: QrRow[] = [];
   let fetchError: string | null = null;
@@ -74,7 +77,7 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
     try {
       let query = supabase
         .from('qr_codes')
-        .select('id, label, target_type, created_at, created_by, archived_at')
+        .select('id, label, target_type, created_at, created_by, archived_at, active_from, active_until')
         .eq('company_id', company_id)
         .order(status === 'archived' ? 'archived_at' : 'created_at', { ascending: false });
 
@@ -195,6 +198,8 @@ type QrRowFull = {
   created_at: string;
   created_by: string;
   archived_at: string | null;
+  active_from: string | null;
+  active_until: string | null;
 };
 
 interface QrAllTabProps {
@@ -509,7 +514,7 @@ function QrCard({ qr, appUrl, index, canManage }: QrCardProps) {
       ].join(' ')}
       style={{ animationDelay: `${index * 40}ms` }}
     >
-      {/* Top row: icon + type/state badges */}
+      {/* Top row: icon + status/schedule/type badges */}
       <div className="flex items-start justify-between gap-2">
         <span
           aria-hidden
@@ -517,8 +522,8 @@ function QrCard({ qr, appUrl, index, canManage }: QrCardProps) {
         >
           <QrCode className="size-4" strokeWidth={2} />
         </span>
-        <div className="flex items-center gap-1.5">
-          {archived && <Badge color="zinc">Archived</Badge>}
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <ScheduleBadges qr={qr} />
           <Badge color="zinc">
             {TYPE_LABELS[qr.target_type as QrTargetType] ?? qr.target_type}
           </Badge>
@@ -568,6 +573,35 @@ function QrCard({ qr, appUrl, index, canManage }: QrCardProps) {
         className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 rounded-b-xl bg-(--color-brand) transition-transform duration-200 group-hover:scale-x-100"
       />
     </div>
+  );
+}
+
+function ScheduleBadges({ qr }: { qr: QrRowFull }) {
+  // SOP QRs piggyback on the SOP's own status; in the library they only
+  // ever show as Active. Scheduling is disabled at the schema level for
+  // sop rows and intentionally not surfaced in the badge area.
+  if (qr.target_type === 'sop') {
+    return <Badge color="signal-ok">Active</Badge>;
+  }
+
+  // Archived takes precedence over schedule — showing both is noisy and
+  // the manager already navigated to the Archive sub-tab to see this row.
+  if (qr.archived_at) {
+    return <Badge color="zinc">Archived</Badge>;
+  }
+
+  const status = qrStatus(qr);
+  return (
+    <>
+      {status.state === 'active' ? (
+        <Badge color="signal-ok">Active</Badge>
+      ) : (
+        <Badge color="signal-warn">Inactive</Badge>
+      )}
+      <Badge color="zinc">
+        {status.schedule === 'scheduled' ? 'Date Range' : 'No Schedule'}
+      </Badge>
+    </>
   );
 }
 

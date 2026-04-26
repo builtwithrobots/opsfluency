@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, ClipboardList, Lock, Globe } from 'lucide-react';
+import { Bell, CalendarRange, ClipboardList, Lock, Globe } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { QrTargetType } from '@/lib/qr/print-config';
@@ -37,6 +37,15 @@ export default function NewQrForm({ departments, scope }: Props) {
     scope.unrestricted ? [] : scope.allowed_department_ids,
   );
   const [roles,   setRoles]   = useState<Role[]>([]);
+
+  // Schedule. Off by default → QR is active indefinitely. When toggled
+  // on, both inputs are required and `active_until` must come after
+  // `active_from`. Values are local datetime strings (matches the
+  // <input type="datetime-local"> contract); we convert to ISO at submit.
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [activeFromLocal,  setActiveFromLocal]  = useState('');
+  const [activeUntilLocal, setActiveUntilLocal] = useState('');
+
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -79,6 +88,26 @@ export default function NewQrForm({ departments, scope }: Props) {
       return;
     }
 
+    let scheduleBody: { active_from: string | null; active_until: string | null } = {
+      active_from: null,
+      active_until: null,
+    };
+    if (scheduleOn) {
+      if (!activeFromLocal || !activeUntilLocal) {
+        setError('Pick a start and end for the schedule, or turn the schedule off.');
+        return;
+      }
+      // datetime-local strings are interpreted in the user's local zone;
+      // toISOString() emits UTC, which is what the server stores.
+      const startIso = new Date(activeFromLocal).toISOString();
+      const endIso   = new Date(activeUntilLocal).toISOString();
+      if (new Date(endIso) <= new Date(startIso)) {
+        setError('The end time must be after the start time.');
+        return;
+      }
+      scheduleBody = { active_from: startIso, active_until: endIso };
+    }
+
     setLoading(true);
     const res = await fetch('/api/qr', {
       method:  'POST',
@@ -88,6 +117,7 @@ export default function NewQrForm({ departments, scope }: Props) {
         target_url:  url,
         label,
         audience: { department_ids: deptIds, roles },
+        ...scheduleBody,
       }),
     });
     const json = await res.json();
@@ -262,6 +292,64 @@ export default function NewQrForm({ departments, scope }: Props) {
           <p className="rounded-md bg-dc-raised px-3 py-2 text-xs text-dc-text-2">
             Audience: <span className="font-medium text-dc-text">{audience_summary}</span>
           </p>
+        </fieldset>
+
+        {/* Schedule */}
+        <fieldset className="flex flex-col gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <legend className="flex items-center gap-2 text-sm font-semibold text-dc-text">
+                <CalendarRange className="size-4 text-(--color-brand)" strokeWidth={2} aria-hidden />
+                Schedule
+              </legend>
+              <p className="mt-1 text-xs text-dc-text-3">
+                Off by default — the QR is active indefinitely. Turn it on
+                to limit when scans resolve. Outside the window, scans
+                show the &ldquo;no longer available&rdquo; page.
+              </p>
+            </div>
+            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={scheduleOn}
+                onChange={(e) => setScheduleOn(e.target.checked)}
+                className="peer sr-only"
+              />
+              <span className="h-6 w-11 rounded-full bg-dc-raised transition-colors peer-checked:bg-(--color-brand)" />
+              <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+            </label>
+          </div>
+
+          {scheduleOn && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="qr-active-from" className="mb-1 block text-xs font-medium tracking-wide text-dc-text-2 uppercase">
+                  Activate at
+                </label>
+                <input
+                  id="qr-active-from"
+                  type="datetime-local"
+                  value={activeFromLocal}
+                  onChange={(e) => setActiveFromLocal(e.target.value)}
+                  required
+                  className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="qr-active-until" className="mb-1 block text-xs font-medium tracking-wide text-dc-text-2 uppercase">
+                  Deactivate at
+                </label>
+                <input
+                  id="qr-active-until"
+                  type="datetime-local"
+                  value={activeUntilLocal}
+                  onChange={(e) => setActiveUntilLocal(e.target.value)}
+                  required
+                  className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
         </fieldset>
 
         {error && (
