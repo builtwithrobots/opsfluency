@@ -28,6 +28,11 @@ export async function resolveQrTarget(qrCodeId: string): Promise<ResolveResult> 
 
   if (error || !qr) return { status: 'not_found' };
 
+  // QR-level archive: a manager moved this QR into the archive. Render the
+  // same Gone page workers see when an SOP is archived — the URL is still
+  // a permanent identifier, just intentionally retired.
+  if (qr.archived_at) return { status: 'archived', qr: qr as QrCodeRow };
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
 
   switch (qr.target_type as string) {

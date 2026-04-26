@@ -66,3 +66,23 @@ export function isWithinCreatorScope(audience: QrAudience, scope: CreatorScope):
   const roleOk = audience.roles.every((r) => scope.allowed_roles.includes(r));
   return roleOk;
 }
+
+/**
+ * Per-QR mutation gate used by archive / restore / delete. Mirrors the
+ * product rules:
+ *   - admin or super-admin impersonator → any QR in the company
+ *   - HR manager (creator scope is unrestricted) → any QR in the company
+ *   - department manager → only QRs they themselves created
+ *
+ * The "everyone in the company" carve-out for an unrestricted scope means
+ * the same helper covers both archive (move to archive) and delete (purge
+ * from archive).
+ */
+export function canModifyQr(args: {
+  qr: { created_by: string };
+  userId: string;
+  scope: CreatorScope;
+}): boolean {
+  if (args.scope.unrestricted) return true;
+  return args.qr.created_by === args.userId;
+}

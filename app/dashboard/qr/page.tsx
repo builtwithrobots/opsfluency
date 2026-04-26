@@ -1,5 +1,5 @@
-import { AlertCircle, ExternalLink, Image as ImageIcon, QrCode, ScanLine, Search, Settings2 } from 'lucide-react';
-
+import { AlertCircle, Archive, ExternalLink, Image as ImageIcon, QrCode, ScanLine, Search, Settings2 } from 'lucide-react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DashboardTabs, type TabDef } from '@/components/dashboard/dashboard-tabs';
 import QRPrintEditor from '@/components/qr/QRPrintEditor';
+import { QrCardActions } from '@/components/qr/QrCardActions';
+import { canModifyQr } from '@/lib/qr/audience';
+import { getCreatorScope } from '@/lib/qr/creator-scope';
 import type { PrintConfig, QrTargetType } from '@/lib/qr/print-config';
 
 const TYPE_LABELS: Record<QrTargetType, string> = {
@@ -20,12 +23,15 @@ const TYPE_LABELS: Record<QrTargetType, string> = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ tab?: string; q?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; status?: string }>;
 }
 
+type StatusFilter = 'active' | 'archived';
+
 export default async function QrCodesPage({ searchParams }: PageProps) {
-  const { tab: rawTab, q = '' } = await searchParams;
+  const { tab: rawTab, q = '', status: rawStatus } = await searchParams;
   const tab = rawTab === 'settings' ? 'settings' : 'all';
+  const status: StatusFilter = rawStatus === 'archived' ? 'archived' : 'active';
 
   let ctx;
   try {
@@ -41,7 +47,7 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
     }
     throw e;
   }
-  const { supabase, company_id, role } = ctx;
+  const { supabase, company_id, userId, role, impersonating } = ctx;
   const isAdmin = role === 'admin';
 
   const tabs: TabDef[] = [
@@ -52,22 +58,41 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
 
   /* ── Data fetching ────────────────────────────────────────────── */
 
-  let qrCodes: { id: string; label: string; target_type: string; created_at: string }[] = [];
+  type QrRow = {
+    id: string;
+    label: string;
+    target_type: string;
+    created_at: string;
+    created_by: string;
+    archived_at: string | null;
+  };
+  let qrCodes: QrRow[] = [];
   let fetchError: string | null = null;
+  let creatorScope: Awaited<ReturnType<typeof getCreatorScope>> | null = null;
 
   if (tab === 'all') {
     try {
       let query = supabase
         .from('qr_codes')
-        .select('id, label, target_type, created_at')
+        .select('id, label, target_type, created_at, created_by, archived_at')
         .eq('company_id', company_id)
-        .order('created_at', { ascending: false });
+        .order(status === 'archived' ? 'archived_at' : 'created_at', { ascending: false });
+
+      query = status === 'archived'
+        ? query.not('archived_at', 'is', null)
+        : query.is('archived_at', null);
 
       if (q) query = query.ilike('label', `%${q}%`);
 
       const { data, error } = await query;
       if (error) fetchError = error.message;
-      else qrCodes = data ?? [];
+      else qrCodes = (data ?? []) as QrRow[];
+
+      // Resolve once per page render — the per-card canModifyQr check is
+      // a pure function over this scope object and the row's created_by.
+      creatorScope = await getCreatorScope({
+        supabase, userId, company_id, role, impersonating,
+      });
     } catch {
       fetchError = 'Unable to load QR codes.';
     }
@@ -147,7 +172,10 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
           qrCodes={qrCodes}
           fetchError={fetchError}
           searchQuery={q}
+          status={status}
           appUrl={appUrl}
+          userId={userId}
+          creatorScope={creatorScope}
         />
       )}
 
@@ -160,14 +188,34 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
 
 /* ── All QR Codes tab ───────────────────────────────────────────── */
 
+type QrRowFull = {
+  id: string;
+  label: string;
+  target_type: string;
+  created_at: string;
+  created_by: string;
+  archived_at: string | null;
+};
+
 interface QrAllTabProps {
-  qrCodes: { id: string; label: string; target_type: string; created_at: string }[];
+  qrCodes: QrRowFull[];
   fetchError: string | null;
   searchQuery: string;
+  status: StatusFilter;
   appUrl: string;
+  userId: string;
+  creatorScope: Awaited<ReturnType<typeof getCreatorScope>> | null;
 }
 
-function QrAllTab({ qrCodes, fetchError, searchQuery, appUrl }: QrAllTabProps) {
+function QrAllTab({
+  qrCodes,
+  fetchError,
+  searchQuery,
+  status,
+  appUrl,
+  userId,
+  creatorScope,
+}: QrAllTabProps) {
   if (fetchError) {
     return (
       <div className="flex items-start gap-3 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5">
@@ -180,11 +228,24 @@ function QrAllTab({ qrCodes, fetchError, searchQuery, appUrl }: QrAllTabProps) {
     );
   }
 
+  const baseHref = '/dashboard/qr?tab=all';
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Active / Archived sub-filter */}
+      <div
+        role="tablist"
+        aria-label="QR code status"
+        className="inline-flex w-fit rounded-md border border-[color:var(--dc-edge)] bg-dc-raised p-0.5 text-sm"
+      >
+        <StatusPill href={baseHref} active={status === 'active'} label="Active" />
+        <StatusPill href={`${baseHref}&status=archived`} active={status === 'archived'} label="Archive" icon />
+      </div>
+
       {/* Search bar */}
       <form action="/dashboard/qr" method="GET" className="flex items-center gap-2">
         <input type="hidden" name="tab" value="all" />
+        {status === 'archived' && <input type="hidden" name="status" value="archived" />}
         <div className="relative flex-1 max-w-sm">
           <Search
             aria-hidden
@@ -202,7 +263,10 @@ function QrAllTab({ qrCodes, fetchError, searchQuery, appUrl }: QrAllTabProps) {
           Search
         </Button>
         {searchQuery && (
-          <Button href="/dashboard/qr?tab=all" plain>
+          <Button
+            href={status === 'archived' ? `${baseHref}&status=archived` : baseHref}
+            plain
+          >
             Clear
           </Button>
         )}
@@ -214,6 +278,8 @@ function QrAllTab({ qrCodes, fetchError, searchQuery, appUrl }: QrAllTabProps) {
           <div className="py-12 text-center text-sm text-dc-text-3">
             No QR codes match &ldquo;{searchQuery}&rdquo;.
           </div>
+        ) : status === 'archived' ? (
+          <ArchivedEmptyState />
         ) : (
           <QrEmptyState />
         )
@@ -222,15 +288,54 @@ function QrAllTab({ qrCodes, fetchError, searchQuery, appUrl }: QrAllTabProps) {
           <p className="text-xs text-dc-text-3">
             {qrCodes.length} {qrCodes.length === 1 ? 'code' : 'codes'}
             {searchQuery ? ` matching "${searchQuery}"` : ''}
+            {status === 'archived' ? ' in the archive' : ''}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {qrCodes.map((qr, i) => (
-              <QrCard key={qr.id} qr={qr} appUrl={appUrl} index={i} />
-            ))}
+            {qrCodes.map((qr, i) => {
+              const canManage = creatorScope
+                ? canModifyQr({ qr, userId, scope: creatorScope })
+                : false;
+              return (
+                <QrCard
+                  key={qr.id}
+                  qr={qr}
+                  appUrl={appUrl}
+                  index={i}
+                  canManage={canManage}
+                />
+              );
+            })}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+function StatusPill({
+  href,
+  active,
+  label,
+  icon,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+  icon?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      role="tab"
+      aria-selected={active}
+      className={[
+        'inline-flex items-center gap-1.5 rounded-sm px-3 py-1 font-medium',
+        active ? 'bg-(--color-brand) text-white' : 'text-dc-text-2 hover:text-dc-text',
+      ].join(' ')}
+    >
+      {icon && <Archive className="size-3.5" strokeWidth={2} aria-hidden />}
+      {label}
+    </Link>
   );
 }
 
@@ -386,30 +491,38 @@ function QrEmptyState() {
 /* ── QR card ────────────────────────────────────────────────────── */
 
 interface QrCardProps {
-  qr: { id: string; label: string; target_type: string; created_at: string };
+  qr: QrRowFull;
   appUrl: string;
   index: number;
+  canManage: boolean;
 }
 
-function QrCard({ qr, appUrl, index }: QrCardProps) {
+function QrCard({ qr, appUrl, index, canManage }: QrCardProps) {
   const scanUrl = `${appUrl}/s/${qr.id}`;
+  const archived = !!qr.archived_at;
 
   return (
     <div
-      className="group relative flex flex-col gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5 shadow-xs transition-shadow hover:shadow-md"
+      className={[
+        'group relative flex flex-col gap-4 rounded-xl border bg-dc-surface p-5 shadow-xs transition-shadow hover:shadow-md',
+        archived ? 'border-dashed border-[color:var(--dc-edge)] opacity-90' : 'border-[color:var(--dc-edge)]',
+      ].join(' ')}
       style={{ animationDelay: `${index * 40}ms` }}
     >
-      {/* Top row: icon + type badge */}
-      <div className="flex items-start justify-between">
+      {/* Top row: icon + type/state badges */}
+      <div className="flex items-start justify-between gap-2">
         <span
           aria-hidden
           className="flex size-9 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
         >
           <QrCode className="size-4" strokeWidth={2} />
         </span>
-        <Badge color="zinc">
-          {TYPE_LABELS[qr.target_type as QrTargetType] ?? qr.target_type}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          {archived && <Badge color="zinc">Archived</Badge>}
+          <Badge color="zinc">
+            {TYPE_LABELS[qr.target_type as QrTargetType] ?? qr.target_type}
+          </Badge>
+        </div>
       </div>
 
       {/* Label */}
@@ -428,15 +541,25 @@ function QrCard({ qr, appUrl, index }: QrCardProps) {
         </a>
       </div>
 
-      {/* Footer row: date + action */}
-      <div className="flex items-center justify-between border-t border-[color:var(--dc-edge)] pt-3">
+      {/* Footer row: date + actions */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[color:var(--dc-edge)] pt-3">
         <div className="flex items-center gap-1.5 text-xs text-dc-text-3">
           <ScanLine className="h-3.5 w-3.5" />
-          {new Date(qr.created_at).toLocaleDateString()}
+          {new Date(archived ? qr.archived_at! : qr.created_at).toLocaleDateString()}
         </div>
-        <Button href={`/dashboard/qr/${qr.id}`} plain className="text-sm">
-          Edit / Print
-        </Button>
+        <div className="flex items-center gap-2">
+          <QrCardActions
+            qr_id={qr.id}
+            qr_label={qr.label}
+            archived={archived}
+            canManage={canManage}
+          />
+          {!archived && (
+            <Button href={`/dashboard/qr/${qr.id}`} plain className="text-sm">
+              Edit / Print
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Brand underline on hover */}
@@ -444,6 +567,24 @@ function QrCard({ qr, appUrl, index }: QrCardProps) {
         aria-hidden
         className="absolute inset-x-0 bottom-0 h-[2px] origin-left scale-x-0 rounded-b-xl bg-(--color-brand) transition-transform duration-200 group-hover:scale-x-100"
       />
+    </div>
+  );
+}
+
+function ArchivedEmptyState() {
+  return (
+    <div className="rounded-xl border border-dashed border-[color:var(--dc-edge)] bg-dc-surface px-5 py-10 text-center">
+      <span
+        aria-hidden
+        className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-dc-raised text-dc-text-3"
+      >
+        <Archive className="size-5" strokeWidth={1.5} />
+      </span>
+      <p className="text-sm font-medium text-dc-text">The archive is empty</p>
+      <p className="mt-1 text-xs text-dc-text-3">
+        Codes you archive from the Active list show up here. Restore brings
+        them back; delete removes them permanently.
+      </p>
     </div>
   );
 }

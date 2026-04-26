@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
+import { canModifyQr } from '@/lib/qr/audience';
+import { getCreatorScope } from '@/lib/qr/creator-scope';
 
 const UpdateQrInput = z.object({
   label:        z.string().max(200).optional(),
@@ -63,7 +65,23 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { supabase, company_id } = await getCompanyContext('admin');
+    const { supabase, company_id, userId, role, impersonating } = await getCompanyContext('manager');
+
+    // Hard delete is only allowed from the archive. Active QRs must be
+    // archived first — keeps a "are they sure?" gate between scanned-by-
+    // workers content and permanent removal.
+    const { data: qr } = await supabase
+      .from('qr_codes')
+      .select('id, created_by, archived_at')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+
+    if (!qr) return fail(404, 'NOT_FOUND');
+    if (!qr.archived_at) return fail(409, 'NOT_ARCHIVED', 'archive the QR before deleting it');
+
+    const scope = await getCreatorScope({ supabase, userId, company_id, role, impersonating });
+    if (!canModifyQr({ qr, userId, scope })) return fail(403, 'FORBIDDEN');
 
     const { error } = await supabase
       .from('qr_codes')
