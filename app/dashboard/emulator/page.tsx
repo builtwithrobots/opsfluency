@@ -6,7 +6,7 @@ import type { WorkerLanguage } from "@/lib/types/sop";
 import { EmulatorClient } from "./_components/EmulatorClient";
 
 export const metadata = {
-  title: "Worker app emulator — OpsFluency",
+  title: "Worker app emulator · OpsFluency",
 };
 
 /**
@@ -44,7 +44,7 @@ export default async function EmulatorPage() {
         <Heading className="font-display">Worker app emulator</Heading>
         <Text className="max-w-2xl">
           Preview what employees see in the worker PWA. Changes you make
-          on the dashboard appear here on reload — useful for verifying
+          on the dashboard appear here on reload, useful for verifying
           a published SOP renders correctly before sharing the QR code.
         </Text>
       </header>

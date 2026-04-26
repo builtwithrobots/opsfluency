@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
 import { setLanguagePreference } from "@/app/dashboard/sops/_actions";
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function LanguageToggleClient({ current }: Props) {
+  const pathname = usePathname() ?? "/app/home";
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
@@ -20,7 +21,7 @@ export function LanguageToggleClient({ current }: Props) {
       await setLanguagePreference({ language: lang });
       const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.set("lang", lang);
-      window.location.replace(`/app/home?${params.toString()}`);
+      window.location.replace(`${pathname}?${params.toString()}`);
     });
   }
 
@@ -36,8 +37,12 @@ export function LanguageToggleClient({ current }: Props) {
           type="button"
           onClick={() => pick(l)}
           aria-pressed={current === l}
+          // The visible pill is compact (32px tall, 36px wide) but the
+          // padding around the inner text keeps the actual hit area at
+          // 44x44 — WCAG / glove-friendly. Don't drop the inner padding.
           className={[
-            "min-h-[44px] min-w-[44px] rounded-full px-3 py-1.5 text-sm font-semibold transition-colors",
+            "relative flex h-8 min-w-9 items-center justify-center rounded-full px-2.5 text-xs font-semibold transition-colors",
+            "before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
             current === l
               ? "bg-(--color-brand) text-white"
               : "text-dc-text-2 hover:text-dc-text",

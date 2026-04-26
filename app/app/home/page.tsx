@@ -12,13 +12,13 @@ interface Props {
 export const metadata = {
   // Worker pages are always behind auth — keep them out of search.
   robots: "noindex",
-  title: "Home — OpsFluency",
+  title: "Home · OpsFluency",
 };
 
 const STRINGS = {
   en: {
     greeting: "Welcome back",
-    subtitle: "Procedures, announcements, and HR — all in one place.",
+    subtitle: "Procedures, announcements, and HR all in one place.",
     announcementsHeading: "Announcements",
     announcementsEmpty: "No announcements yet. Check back later.",
     departmentsHeading: "Your departments",
@@ -31,7 +31,7 @@ const STRINGS = {
   },
   es: {
     greeting: "Bienvenido de nuevo",
-    subtitle: "Procedimientos, anuncios y RR.HH. — todo en un solo lugar.",
+    subtitle: "Procedimientos, anuncios y RR.HH. todo en un solo lugar.",
     announcementsHeading: "Anuncios",
     announcementsEmpty: "No hay anuncios todavía. Vuelve más tarde.",
     departmentsHeading: "Tus departamentos",
@@ -48,26 +48,39 @@ export default async function WorkerHomePage({ searchParams }: Props) {
   const sp = await searchParams;
   const { userId, supabase, company_id } = await getCompanyContext();
 
-  const { data: member } = await supabase
-    .from("company_members")
-    .select("preferred_language")
-    .eq("clerk_user_id", userId)
-    .eq("company_id", company_id)
-    .maybeSingle();
+  const [{ data: member }, { data: company }] = await Promise.all([
+    supabase
+      .from("company_members")
+      .select("preferred_language")
+      .eq("clerk_user_id", userId)
+      .eq("company_id", company_id)
+      .maybeSingle(),
+    supabase
+      .from("companies")
+      .select("name")
+      .eq("id", company_id)
+      .maybeSingle(),
+  ]);
 
   const persisted: WorkerLanguage = member?.preferred_language === "es" ? "es" : "en";
   const lang: WorkerLanguage =
     sp.lang === "es" ? "es" : sp.lang === "en" ? "en" : persisted;
   const t = STRINGS[lang];
+  const companyName = company?.name ?? "";
 
   return (
     <main className="mx-auto min-h-[100dvh] max-w-2xl px-5 py-6 sm:px-6 sm:py-10" lang={lang}>
-      <header className="mb-6 flex items-center justify-between gap-3">
+      <header className="mb-6 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
             OpsFluency
           </p>
-          <h1 className="font-display mt-1 text-2xl leading-tight font-bold text-dc-text">
+          {companyName ? (
+            <p className="mt-0.5 truncate text-sm font-medium text-dc-text-2">
+              {companyName}
+            </p>
+          ) : null}
+          <h1 className="font-display mt-2 text-2xl leading-tight font-bold text-dc-text">
             {t.greeting}
           </h1>
           <p className="mt-1 text-sm text-dc-text-2">{t.subtitle}</p>

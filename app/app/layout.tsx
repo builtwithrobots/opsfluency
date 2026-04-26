@@ -2,9 +2,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { BottomNav } from "@/components/app/bottom-nav";
 import { PreviewBanner } from "@/components/app/preview-banner";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
+import type { WorkerLanguage } from "@/lib/types/sop";
 
 /**
  * Wraps every `/app/*` route. The worker PWA pages render their own
@@ -46,17 +48,31 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   // Sec-Fetch-Dest is set by every modern browser on every navigation
   // and resource fetch. `iframe` is the dedicated value for iframe
-  // navigations — distinct from `document` (top-level) and `frame`
+  // navigations, distinct from `document` (top-level) and `frame`
   // (legacy <frame>, irrelevant here).
   const isEmbedded =
     (await headers()).get("sec-fetch-dest") === "iframe";
+
+  // Bottom nav language follows the worker's persisted preference.
+  // Per-page ?lang= overrides are local to the page render and don't
+  // reach the layout.
+  const { data: member } = await ctx.supabase
+    .from("company_members")
+    .select("preferred_language")
+    .eq("clerk_user_id", ctx.userId)
+    .eq("company_id", ctx.company_id)
+    .maybeSingle();
+  const navLang: WorkerLanguage =
+    member?.preferred_language === "es" ? "es" : "en";
 
   return (
     <>
       {ctx.role === "employee" || isEmbedded ? null : (
         <PreviewBanner role={ctx.role} />
       )}
-      {children}
+      {/* Pad the bottom so page content is never hidden behind the nav. */}
+      <div className="pb-20">{children}</div>
+      <BottomNav lang={navLang} />
     </>
   );
 }

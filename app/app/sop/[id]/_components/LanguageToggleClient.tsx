@@ -50,8 +50,11 @@ export function LanguageToggleClient({ sopId, current }: Props) {
           type="button"
           onClick={() => pick(l)}
           aria-pressed={current === l}
+          // Visible pill is compact; before-pseudo expands the hit area
+          // to 44x44 so glove taps still work. Don't drop the pseudo.
           className={[
-            'min-h-[44px] min-w-[44px] rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
+            "relative flex h-8 min-w-9 items-center justify-center rounded-full px-2.5 text-xs font-semibold transition-colors",
+            "before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
             current === l
               ? 'bg-(--color-brand) text-white'
               : 'text-dc-text-2 hover:text-dc-text',
