@@ -1,16 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Save } from 'lucide-react';
 import {
   defaultPrintConfig,
   FONT_FAMILY_LABELS,
   FONT_SIZE_SLIDER,
+  LOGO_SIZE_SLIDER,
   QR_SIZE_SLIDER,
   SPACING_SLIDER,
   type PrintConfig,
   type PrintFontFamily,
   type QrTargetType,
 } from '@/lib/qr/print-config';
+import { Button } from '@/components/ui/button';
 import DotSlider from './DotSlider';
 import PrintButton from './PrintButton';
 import QRPrintPreview from './QRPrintPreview';
@@ -71,6 +74,7 @@ export default function QRPrintEditor({
   const [open, setOpen]     = useState<SectionKey | null>('qr');
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRenderRef = useRef(true);
 
@@ -79,6 +83,29 @@ export default function QRPrintEditor({
   }, []);
 
   const endpoint = saveEndpoint ?? (qrCodeId ? `/api/qr/${qrCodeId}` : null);
+
+  // Single save path used by both auto-save and the explicit Save button.
+  const saveNow = useCallback(async (next: PrintConfig) => {
+    if (!endpoint) return;
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const res = await fetch(endpoint, {
+        method:  'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify({ print_config: next }),
+      });
+      if (!res.ok) {
+        setSaveErr('Failed to save, retrying next change');
+      } else {
+        setLastSavedAt(Date.now());
+      }
+    } catch {
+      setSaveErr('Network error saving config');
+    } finally {
+      setSaving(false);
+    }
+  }, [endpoint]);
 
   // Auto-save print_config with 500ms debounce. Skip the very first render so
   // we don't immediately PATCH the unchanged hydrated state back to the API.
@@ -90,24 +117,9 @@ export default function QRPrintEditor({
     if (!endpoint) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      setSaving(true);
-      setSaveErr(null);
-      try {
-        const res = await fetch(endpoint, {
-          method:  'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body:    JSON.stringify({ print_config: config }),
-        });
-        if (!res.ok) setSaveErr('Failed to save, retrying next change');
-      } catch {
-        setSaveErr('Network error saving config');
-      } finally {
-        setSaving(false);
-      }
-    }, 500);
+    debounceRef.current = setTimeout(() => { void saveNow(config); }, 500);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [config, endpoint]);
+  }, [config, endpoint, saveNow]);
 
   const toggle = (key: SectionKey) => setOpen(prev => prev === key ? null : key);
 
@@ -120,6 +132,11 @@ export default function QRPrintEditor({
           {saving && <span className="text-xs text-dc-text-3">Saving…</span>}
           {!saving && saveErr && (
             <span className="text-xs text-(--color-signal-urgent)" role="alert">{saveErr}</span>
+          )}
+          {!saving && !saveErr && lastSavedAt && (
+            <span className="text-xs text-(--color-signal-ok)">
+              Saved {formatSaved(lastSavedAt)}
+            </span>
           )}
         </div>
 
@@ -188,9 +205,12 @@ export default function QRPrintEditor({
                     </label>
 
                     {config.show_logo && logoUrl && (
-                      <FontSizeSlider
+                      <DotSlider
                         label="Logo size"
                         value={config.logo_size}
+                        min={LOGO_SIZE_SLIDER.min}
+                        max={LOGO_SIZE_SLIDER.max}
+                        step={LOGO_SIZE_SLIDER.step}
                         onChange={v => patch({ logo_size: v })}
                       />
                     )}
@@ -225,18 +245,18 @@ export default function QRPrintEditor({
                 {key === 'header' && (
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3">
-                      {!isDefaults && (
-                        <div>
-                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Header</label>
-                          <input
-                            type="text"
-                            value={config.header}
-                            onChange={e => patch({ header: e.target.value })}
-                            placeholder="e.g. Forklift Safety Procedure"
-                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-dc-text-2">
+                          Header{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                        </label>
+                        <input
+                          type="text"
+                          value={config.header}
+                          onChange={e => patch({ header: e.target.value })}
+                          placeholder={isDefaults ? 'e.g. Standard Operating Procedure' : 'e.g. Forklift Safety Procedure'}
+                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                        />
+                      </div>
                       <BoldCheckbox
                         label="Bold header"
                         checked={config.bold_header}
@@ -249,18 +269,18 @@ export default function QRPrintEditor({
                       />
                     </div>
                     <div className="flex flex-col gap-3">
-                      {!isDefaults && (
-                        <div>
-                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Sub-header</label>
-                          <input
-                            type="text"
-                            value={config.sub_header}
-                            onChange={e => patch({ sub_header: e.target.value })}
-                            placeholder="Optional sub-title"
-                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-dc-text-2">
+                          Sub-header{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                        </label>
+                        <input
+                          type="text"
+                          value={config.sub_header}
+                          onChange={e => patch({ sub_header: e.target.value })}
+                          placeholder="Optional sub-title"
+                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                        />
+                      </div>
                       <BoldCheckbox
                         label="Bold sub-header"
                         checked={config.bold_sub_header}
@@ -318,18 +338,18 @@ export default function QRPrintEditor({
                 {key === 'footer' && (
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-3">
-                      {!isDefaults && (
-                        <div>
-                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Footer</label>
-                          <input
-                            type="text"
-                            value={config.footer}
-                            onChange={e => patch({ footer: e.target.value })}
-                            placeholder="Optional footer text"
-                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-dc-text-2">
+                          Footer{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                        </label>
+                        <input
+                          type="text"
+                          value={config.footer}
+                          onChange={e => patch({ footer: e.target.value })}
+                          placeholder="Optional footer text"
+                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                        />
+                      </div>
                       <BoldCheckbox
                         label="Bold footer"
                         checked={config.bold_footer}
@@ -342,18 +362,18 @@ export default function QRPrintEditor({
                       />
                     </div>
                     <div className="flex flex-col gap-3">
-                      {!isDefaults && (
-                        <div>
-                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Footer 2</label>
-                          <input
-                            type="text"
-                            value={config.footer2}
-                            onChange={e => patch({ footer2: e.target.value })}
-                            placeholder="e.g. phone number"
-                            className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-dc-text-2">
+                          Footer 2{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                        </label>
+                        <input
+                          type="text"
+                          value={config.footer2}
+                          onChange={e => patch({ footer2: e.target.value })}
+                          placeholder="e.g. phone number"
+                          className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
+                        />
+                      </div>
                       <BoldCheckbox
                         label="Bold footer 2"
                         checked={config.bold_footer2}
@@ -398,6 +418,24 @@ export default function QRPrintEditor({
         {showPrintButton && (
           <div className="pt-2">
             <PrintButton />
+          </div>
+        )}
+
+        {isDefaults && (
+          <div className="pt-2">
+            <Button
+              type="button"
+              color="brand"
+              className="w-full"
+              onClick={() => { void saveNow(config); }}
+              disabled={saving}
+            >
+              <Save data-slot="icon" strokeWidth={2} />
+              {saving ? 'Saving…' : saveErr ? 'Retry save' : 'Save defaults'}
+            </Button>
+            <p className="mt-2 text-xs text-dc-text-3">
+              Changes auto-save as you edit. The button forces an immediate save.
+            </p>
           </div>
         )}
       </div>
@@ -466,4 +504,14 @@ function BoldCheckbox({
       <span className="text-sm text-dc-text-2">{label}</span>
     </label>
   );
+}
+
+/** Compact "Saved 3s ago" timestamp formatter for the save indicator. */
+function formatSaved(at: number): string {
+  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (seconds < 5)  return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }

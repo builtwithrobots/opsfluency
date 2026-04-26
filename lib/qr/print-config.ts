@@ -117,6 +117,9 @@ export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline'> = {
 /** Slider config shared by every percentage-based size control. */
 export const FONT_SIZE_SLIDER = { min: 50, max: 150, step: 10 } as const;
 
+/** Logo size scale. Logo can only be enlarged from baseline, never shrunk. */
+export const LOGO_SIZE_SLIDER = { min: 100, max: 200, step: 10 } as const;
+
 /** Slider config for the QR Code Size control (% of sheet width). */
 export const QR_SIZE_SLIDER = { min: 40, max: 80, step: 5 } as const;
 
@@ -125,10 +128,10 @@ export const SPACING_SLIDER = { min: 0, max: 40, step: 4 } as const;
 
 /**
  * Subset of PrintConfig that is meaningful as an organisation-wide default.
- * Typography, sizing, visibility, and spacing belong here. Text content
- * (header, sub_header, footer, footer2, tagline) and target-derived fields
- * (template) are explicitly excluded - those are per-QR concerns and would
- * silently override every new QR's text if persisted as a default.
+ * Typography, sizing, visibility, spacing, and seed text content all belong
+ * here. Target-derived fields (template) are excluded - tagline is excluded
+ * too because it has a per-target default that admins haven't asked to
+ * override yet.
  */
 export const DESIGN_DEFAULT_KEYS = [
   'font_family',
@@ -136,6 +139,11 @@ export const DESIGN_DEFAULT_KEYS = [
   'show_company_name',
   'logo_size',
   'qr_size',
+  // Seed text content that auto-fills every new QR. Per-QR edits override.
+  'header',
+  'sub_header',
+  'footer',
+  'footer2',
   'font_size_company_name',
   'font_size_header',
   'font_size_sub_header',
