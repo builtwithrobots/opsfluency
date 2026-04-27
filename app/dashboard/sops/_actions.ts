@@ -14,7 +14,10 @@ import {
   type SopConversionResult,
 } from '@/lib/ai/sop-conversion';
 import type { GlossaryRow } from '@/lib/types/glossary';
-import { translateMarkdown } from '@/lib/translation/google';
+// `translateMarkdown` (flat-text path) is kept exported for the glossary
+// suggest-translation feature; runTranslation switched to the structured
+// path below to preserve mdast scaffolding.
+import { translateMarkdownStructured } from '@/lib/translation/structured';
 import { createQrCode } from '@/lib/qr/generate';
 import {
   ALLOWED_SOP_TRANSITIONS,
@@ -435,20 +438,29 @@ export async function defineFlaggedTerms(raw: unknown): Promise<ActionResult<{ s
   }
 }
 
-// ── 4. Run Google translation ─────────────────────────────────────────────────
+// ── 4. Run Google translation + auto-publish ─────────────────────────────────
+//
+// Translation is the last manual gate. Once we have valid Spanish, we
+// transition straight to `published` (skipping pending_approval) and
+// generate the QR if it doesn't exist yet — the prior "Approve" step
+// was just a human checkpoint with no per-SOP work, so removing it
+// gives managers one-click publish without losing any data fidelity.
+// Spanish can still be edited post-publish via `saveSpanishEdit`.
 
 const RunTranslationSchema = z.object({
   sop_id: z.string().uuid(),
 });
 
-export async function runTranslation(raw: unknown): Promise<ActionResult<{ status: SopStatus }>> {
+export async function runTranslation(
+  raw: unknown,
+): Promise<ActionResult<{ status: SopStatus; qr_code_id: string }>> {
   try {
-    const { supabase, company_id } = await getCompanyContext('manager');
+    const { userId, supabase, company_id } = await getCompanyContext('manager');
     const input = RunTranslationSchema.parse(raw);
 
     const { data: sop } = await supabase
       .from('sops')
-      .select('id, status')
+      .select('id, status, title')
       .eq('id', input.sop_id)
       .eq('company_id', company_id)
       .maybeSingle();
@@ -458,8 +470,12 @@ export async function runTranslation(raw: unknown): Promise<ActionResult<{ statu
     const version = await getLatestVersion(supabase, input.sop_id);
     if (!version || !version.content_en) return fail('NOT_FOUND', 'No English content');
 
+    // Structured translator: parse mdast, translate text leaves, reassemble.
+    // Tables / lists / callouts keep their structure. The previous flat-text
+    // translator corrupted GFM table separators which then rendered as raw
+    // pipes in the worker app.
     const glossary = await loadGlossary(supabase, company_id);
-    const result = await translateMarkdown({
+    const result = await translateMarkdownStructured({
       markdown: version.content_en,
       source: 'en',
       target: 'es',
@@ -468,25 +484,60 @@ export async function runTranslation(raw: unknown): Promise<ActionResult<{ statu
       companyId: company_id,
     });
     if (!result.ok) {
-      // Forward duration_ms, attempt, http_status, raw — the manager UI's
-      // Technical details panel reads these out of `details`.
       return fail(result.error.code, result.error.message, result.error);
     }
 
+    // Persist the Spanish content + clear the retranslation flag.
     const { error: vErr } = await supabase
       .from('sop_versions')
-      .update({ content_es: result.translated, needs_retranslation: false })
+      .update({
+        content_es: result.translated,
+        needs_retranslation: false,
+        published_at: new Date().toISOString(),
+      })
       .eq('id', version.id);
     if (vErr) return fail('INTERNAL', vErr.message);
 
-    const t = await transitionStatus(supabase, input.sop_id, 'pending_translation', 'pending_approval');
+    // Status: pending_translation → published (skip pending_approval).
+    const t = await transitionStatus(supabase, input.sop_id, 'pending_translation', 'published');
     if (!t.ok) return fail(t.code);
+
+    // Find or create the QR. Permanent — same id across re-publishes.
+    let qrCodeId: string;
+    const { data: existingQr } = await supabase
+      .from('qr_codes')
+      .select('id')
+      .eq('company_id', company_id)
+      .eq('target_type', 'sop')
+      .eq('target_id', input.sop_id)
+      .maybeSingle();
+
+    if (existingQr) {
+      qrCodeId = existingQr.id as string;
+    } else {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('phone')
+        .eq('id', company_id)
+        .single();
+      const qr = await createQrCode({
+        supabase,
+        company_id,
+        created_by: userId,
+        target_type: 'sop',
+        target_id: input.sop_id,
+        label: sop.title,
+        company_phone: company?.phone ?? null,
+      });
+      qrCodeId = qr.id;
+    }
 
     revalidatePath(`/dashboard/sops/${input.sop_id}`);
     revalidatePath('/dashboard/sops');
-    return { ok: true, data: { status: 'pending_approval' } };
+    revalidatePath(`/app/sop/${input.sop_id}`);
+    return { ok: true, data: { status: 'published', qr_code_id: qrCodeId } };
   } catch (e) {
-    const handled = handleAuthError<{ status: SopStatus }>(e);
+    const handled = handleAuthError<{ status: SopStatus; qr_code_id: string }>(e);
     if (handled) return handled;
     throw e;
   }
@@ -533,83 +584,12 @@ export async function saveSpanishEdit(raw: unknown): Promise<ActionResult> {
   }
 }
 
-// ── 6. Approve + publish (creates QR on first publish) ────────────────────────
-
-const ApproveSopSchema = z.object({
-  sop_id: z.string().uuid(),
-});
-
-export async function approveSop(raw: unknown): Promise<ActionResult<{ qr_code_id: string }>> {
-  try {
-    const { userId, supabase, company_id } = await getCompanyContext('manager');
-    const input = ApproveSopSchema.parse(raw);
-
-    const { data: sop } = await supabase
-      .from('sops')
-      .select('id, status, title')
-      .eq('id', input.sop_id)
-      .eq('company_id', company_id)
-      .maybeSingle();
-    if (!sop) return fail('NOT_FOUND');
-    if (sop.status !== 'pending_approval') return fail('INVALID_TRANSITION');
-
-    const version = await getLatestVersion(supabase, input.sop_id);
-    if (!version || !version.content_en || !version.content_es) {
-      return fail('NOT_FOUND', 'Missing content');
-    }
-
-    const t = await transitionStatus(supabase, input.sop_id, 'pending_approval', 'published');
-    if (!t.ok) return fail(t.code);
-
-    // Stamp published_at on the version.
-    await supabase
-      .from('sop_versions')
-      .update({ published_at: new Date().toISOString() })
-      .eq('id', version.id);
-
-    // Find or create the QR code for this SOP. A QR is permanent — same id
-    // across re-publishes. Look for an existing one first.
-    const { data: existingQr } = await supabase
-      .from('qr_codes')
-      .select('id')
-      .eq('company_id', company_id)
-      .eq('target_type', 'sop')
-      .eq('target_id', input.sop_id)
-      .maybeSingle();
-
-    let qrId: string;
-    if (existingQr) {
-      qrId = existingQr.id as string;
-    } else {
-      const { data: company } = await supabase
-        .from('companies')
-        .select('phone')
-        .eq('id', company_id)
-        .single();
-      const qr = await createQrCode({
-        supabase,
-        company_id,
-        created_by: userId,
-        target_type: 'sop',
-        target_id: input.sop_id,
-        label: sop.title,
-        company_phone: company?.phone ?? null,
-      });
-      qrId = qr.id;
-    }
-
-    revalidatePath(`/dashboard/sops/${input.sop_id}`);
-    revalidatePath('/dashboard/sops');
-    revalidatePath(`/app/sop/${input.sop_id}`);
-    return { ok: true, data: { qr_code_id: qrId } };
-  } catch (e) {
-    const handled = handleAuthError<{ qr_code_id: string }>(e);
-    if (handled) return handled;
-    throw e;
-  }
-}
-
-// ── 7. Archive ────────────────────────────────────────────────────────────────
+// ── 6. Archive ────────────────────────────────────────────────────────────────
+//
+// (The previous `approveSop` action was retired when translation auto-
+// publishes. QR creation + published_at stamping moved into `runTranslation`.
+// Existing pending_approval rows — if any — get auto-promoted to published
+// by migration 20260427000001_drop_sop_approval_step.sql.)
 
 const ArchiveSopSchema = z.object({
   sop_id: z.string().uuid(),

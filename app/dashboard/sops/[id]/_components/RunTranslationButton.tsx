@@ -20,10 +20,11 @@ interface ErrorState {
 }
 
 const TRANSLATION_STAGES = [
-  { at_ms: 0,      label: 'Substituting glossary terms with placeholders…' },
-  { at_ms: 1_500,  label: 'Sending to Google Translate…' },
-  { at_ms: 5_000,  label: 'Translating Markdown — preserving structure and callouts…' },
-  { at_ms: 20_000, label: 'Restoring glossary terms in the Spanish version…' },
+  { at_ms: 0,      label: 'Parsing English Markdown structure…' },
+  { at_ms: 1_500,  label: 'Substituting glossary terms with placeholders…' },
+  { at_ms: 3_000,  label: 'Sending text leaves to Google Translate…' },
+  { at_ms: 12_000, label: 'Reassembling Spanish Markdown…' },
+  { at_ms: 25_000, label: 'Generating QR + publishing…' },
   { at_ms: 45_000, label: 'Still working…' },
 ];
 
@@ -73,7 +74,7 @@ export function RunTranslationButton({ sopId, disabled }: Props) {
   return (
     <Button color="brand" onClick={go} disabled={disabled}>
       <Languages data-slot="icon" strokeWidth={2} />
-      Run translation
+      Translate &amp; publish
     </Button>
   );
 }

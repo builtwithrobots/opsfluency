@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { RunConversionButton } from './RunConversionButton';
 import { TermsGateClient } from './TermsGateClient';
 import { RunTranslationButton } from './RunTranslationButton';
-import { ApprovePanelClient } from './ApprovePanelClient';
 
 export interface ExistingGlossaryEntry {
   id: string;
@@ -67,10 +66,10 @@ export function ActionBanner({ sopId, status, latestVersion, qrCodeId, existingG
     return (
       <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
         <div>
-          <p className="text-sm font-semibold text-dc-text">Glossary locked in — ready to translate</p>
+          <p className="text-sm font-semibold text-dc-text">Glossary locked in — ready to translate &amp; publish</p>
           <p className="mt-1 text-xs text-dc-text-3">
-            Google Translate runs once, with your glossary injected so site-specific terms stay exact.
-            Typical run: 5–20 seconds.
+            Google Translate runs once with your glossary injected, then the SOP goes live and the
+            QR is generated. You can edit Spanish post-publish from the Spanish tab.
           </p>
         </div>
         <div className="mt-4">
@@ -78,10 +77,6 @@ export function ActionBanner({ sopId, status, latestVersion, qrCodeId, existingG
         </div>
       </div>
     );
-  }
-
-  if (status === 'pending_approval') {
-    return <ApprovePanelClient sopId={sopId} />;
   }
 
   if (status === 'published') {

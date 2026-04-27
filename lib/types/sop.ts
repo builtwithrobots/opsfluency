@@ -33,7 +33,10 @@ export type SopTemplate = (typeof SOP_TEMPLATE)[number];
 export const ALLOWED_SOP_TRANSITIONS: Record<SopStatus, readonly SopStatus[]> = {
   draft: ["pending_terms"],
   pending_terms: ["pending_translation"],
-  pending_translation: ["pending_approval"],
+  // Translation auto-publishes — the manual approve gate was retired.
+  // pending_approval is kept in the enum for legacy rows; promoting them
+  // to published is still allowed so the migration path stays open.
+  pending_translation: ["published"],
   pending_approval: ["published"],
   published: ["archived"],
   archived: [],

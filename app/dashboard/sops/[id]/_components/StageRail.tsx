@@ -3,11 +3,10 @@ import { Check } from 'lucide-react';
 
 import type { SopStatus } from '@/lib/types/sop';
 
-const STAGES: { key: 'upload' | 'terms' | 'translate' | 'approve' | 'published'; label: string }[] = [
+const STAGES: { key: 'upload' | 'terms' | 'translate' | 'published'; label: string }[] = [
   { key: 'upload',    label: 'Upload' },
   { key: 'terms',     label: 'Terms' },
   { key: 'translate', label: 'Translate' },
-  { key: 'approve',   label: 'Approve' },
   { key: 'published', label: 'Published' },
 ];
 
@@ -16,9 +15,12 @@ function stageIndexFor(status: SopStatus): number {
     case 'draft':                return 1;  // upload done, terms next
     case 'pending_terms':        return 1;
     case 'pending_translation':  return 2;
-    case 'pending_approval':     return 3;
-    case 'published':            return 4;
-    case 'archived':             return 4;
+    // pending_approval is retired but still in the enum for legacy data —
+    // any row that lands there should sit at the Translate stage so the
+    // user knows the manual gate is gone.
+    case 'pending_approval':     return 2;
+    case 'published':            return 3;
+    case 'archived':             return 3;
   }
 }
 
