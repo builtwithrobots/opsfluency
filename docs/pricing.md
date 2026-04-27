@@ -49,9 +49,6 @@ Sonnet's input is the compact Markdown (not the raw document), so it processes ~
 | Anthropic | claude-sonnet-4-6 | $3.00 / M tokens | $15 / M tokens | $0.30 / M tokens |
 | Google | Cloud Translation v2 | $20 / M **source characters** | $0 (source only) | — |
 
-Google includes a **500k character free tier per month** (resets monthly, never expires). Starter customers
-with small libraries may effectively pay $0 in translation costs for months.
-
 ### Measured cost — 2 × five-page PDFs (Cold Storage Pro, live data)
 
 | Component | Measured cost | Per SOP |
@@ -259,7 +256,7 @@ Two triggers, either of which earns a fresh look:
 | `ai_call_log` (Supabase) | Actual measured tokens + characters + duration per call. Per-tenant rollups on `/dashboard/platform?tab=ai` read from this table directly. |
 | Cold Storage Pro live upload | 2 × five-page PDFs through full pipeline = $0.5523 total ($0.2171 Anthropic + $0.3352 Google). Ground truth for per-page estimates. |
 | [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing) | Haiku 4.5: $1.00/$5 per M tokens (cached: $0.10/M). Sonnet 4.6: $3/$15 per M tokens (cached: $0.30/M). Verified April 2026. |
-| [Google Cloud Translation pricing](https://cloud.google.com/translate/pricing) | $20 / M source characters for v2 standard. Free tier: 500k chars/month. Verified April 2026. |
+| [Google Cloud Translation pricing](https://cloud.google.com/translate/pricing) | $20 / M source characters for v2 standard. Verified April 2026. Note: the 500k char/month free tier applies to the API key (platform-wide), not per tenant — treat all translation as billable. |
 | Vercel + Supabase dashboards | Monthly bill for serverless + storage. |
 
 When any of these change, update the projections table and the lever table — don't paper over a pricing-model decision with stale cost data.
