@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 import { isCurrentUserSuperAdmin } from '@/lib/auth/super-admin-context';
+import { getCreatorScope } from '@/lib/qr/creator-scope';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Badge } from '@/components/ui/badge';
@@ -62,7 +63,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
     }
     throw e;
   }
-  const { supabase, company_id } = ctx;
+  const { userId, supabase, company_id, role, impersonating } = ctx;
 
   // ── Fetch SOPs + departments in parallel ─────────────────────────────────
   const sopsPromise = (async () => {
@@ -107,12 +108,14 @@ export default async function SopsPage({ searchParams }: PageProps) {
     );
   }
 
-  // Departments for the upload dialog.
-  const { data: departments = [] } = await supabase
-    .from('departments')
-    .select('id, name')
-    .eq('company_id', company_id)
-    .order('name');
+  // Departments for the upload dialog + the audience scope this manager
+  // can target. The creator scope is the same one QR creation uses —
+  // admins / HR managers are unrestricted; other managers can only set
+  // audience to their own department(s) and to manager / employee roles.
+  const [{ data: departments = [] }, creatorScope] = await Promise.all([
+    supabase.from('departments').select('id, name').eq('company_id', company_id).order('name'),
+    getCreatorScope({ supabase, userId, company_id, role, impersonating }),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,7 +130,10 @@ export default async function SopsPage({ searchParams }: PageProps) {
             permanent QR code your workers can scan.
           </Text>
         </div>
-        <UploadSopClient departments={(departments ?? []) as { id: string; name: string }[]} />
+        <UploadSopClient
+          departments={(departments ?? []) as { id: string; name: string }[]}
+          scope={creatorScope}
+        />
       </header>
 
       <form

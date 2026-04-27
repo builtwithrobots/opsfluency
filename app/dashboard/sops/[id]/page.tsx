@@ -27,8 +27,11 @@ import { UploadNewVersionClient } from './_components/UploadNewVersionClient';
 import { ArchiveButton } from './_components/ArchiveButton';
 import { PhoneFrame } from './_components/PhoneFrame';
 import { SuperAdminDangerZone } from './_components/SuperAdminDangerZone';
+import { AudienceClient } from './_components/AudienceClient';
+import { getCreatorScope } from '@/lib/qr/creator-scope';
+import type { Role } from '@/lib/auth/company-context';
 
-const VALID_TABS = ['original', 'english', 'spanish', 'app', 'versions', 'qr'] as const;
+const VALID_TABS = ['original', 'english', 'spanish', 'app', 'audience', 'versions', 'qr'] as const;
 type Tab = (typeof VALID_TABS)[number];
 
 const STATUS_BADGE: Record<SopStatus, { label: string; color: Parameters<typeof Badge>[0]['color'] }> = {
@@ -74,12 +77,12 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     }
     throw e;
   }
-  const { supabase, company_id } = ctx;
+  const { userId, supabase, company_id, role, impersonating } = ctx;
   const viewerIsSuperAdmin = await isCurrentUserSuperAdmin();
 
   const { data: sop, error: sopErr } = await supabase
     .from('sops')
-    .select('id, title, status, department_id, created_at, updated_at, archived_at, departments(id, name)')
+    .select('id, title, status, department_id, audience_department_ids, audience_roles, created_at, updated_at, archived_at, departments(id, name)')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
@@ -126,6 +129,23 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     existingGlossary = rows ?? [];
   }
 
+  // Audience tab data — only fetched when the manager is on that tab so we
+  // don't pull every department on every viewer load.
+  let allDepartments: { id: string; name: string }[] = [];
+  let creatorScope: Awaited<ReturnType<typeof getCreatorScope>> | null = null;
+  if (tab === 'audience') {
+    const [{ data: deptRows = [] }, scope] = await Promise.all([
+      supabase.from('departments').select('id, name').eq('company_id', company_id).order('name'),
+      getCreatorScope({ supabase, userId, company_id, role, impersonating }),
+    ]);
+    allDepartments = deptRows ?? [];
+    creatorScope = scope;
+  }
+  const sopAudience = {
+    department_ids: ((sop as unknown as { audience_department_ids?: string[] }).audience_department_ids ?? []) as string[],
+    roles: ((sop as unknown as { audience_roles?: Role[] }).audience_roles ?? []) as Role[],
+  };
+
   // Disable App view until conversion has produced something for the worker
   // page to render — otherwise the iframe would show the "Not ready yet"
   // empty state, which is correct but not useful.
@@ -136,6 +156,7 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     { id: 'english',  label: 'English',    href: `/dashboard/sops/${id}?tab=english` },
     { id: 'spanish',  label: 'Spanish',    href: `/dashboard/sops/${id}?tab=spanish`, disabled: !latest?.content_es },
     { id: 'app',      label: 'App view',   href: `/dashboard/sops/${id}?tab=app`, disabled: !hasWorkerContent },
+    { id: 'audience', label: 'Audience',   href: `/dashboard/sops/${id}?tab=audience` },
     { id: 'versions', label: 'Versions',   href: `/dashboard/sops/${id}?tab=versions` },
     { id: 'qr',       label: 'QR',         href: `/dashboard/sops/${id}?tab=qr`, disabled: !qrRow },
   ];
@@ -242,6 +263,15 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
       )}
       {tab === 'app' && !hasWorkerContent && (
         <EmptyTab message="The worker preview will appear here once Sonnet conversion runs." />
+      )}
+
+      {tab === 'audience' && creatorScope && (
+        <AudienceClient
+          sopId={id}
+          departments={allDepartments}
+          scope={creatorScope}
+          initial={sopAudience}
+        />
       )}
 
       {tab === 'versions' && (

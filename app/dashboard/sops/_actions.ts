@@ -19,6 +19,8 @@ import type { GlossaryRow } from '@/lib/types/glossary';
 // path below to preserve mdast scaffolding.
 import { translateMarkdownStructured } from '@/lib/translation/structured';
 import { createQrCode } from '@/lib/qr/generate';
+import { isWithinCreatorScope, type QrAudience as Audience } from '@/lib/qr/audience';
+import { getCreatorScope } from '@/lib/qr/creator-scope';
 import {
   ALLOWED_SOP_TRANSITIONS,
   SOP_UPLOADS_BUCKET,
@@ -103,6 +105,22 @@ async function transitionStatus(
 
 // ── 1. Create SOP from upload ─────────────────────────────────────────────────
 
+// Per-SOP audience targeting. Mirrors the qr_codes audience shape so the
+// helpers in lib/qr/audience.ts can be reused verbatim. ISO / quality
+// regulation requires explicit doc control: at least one department or
+// role must be picked. Empty audience is rejected at upload, on save in
+// the Audience tab, and would also be caught by the worker-side
+// passesAudience check (an empty audience reads as "everyone" — fine
+// for legacy rows that the migration backfilled, but never a fresh
+// row going forward).
+const SopAudienceSchema = z.object({
+  department_ids: z.array(z.string().uuid()).default([]),
+  roles:          z.array(z.enum(['admin', 'manager', 'employee'])).default([]),
+}).refine(
+  (a) => a.department_ids.length > 0 || a.roles.length > 0,
+  { message: 'pick at least one department or role' },
+);
+
 const CreateSopFromUploadSchema = z.object({
   title: z.string().min(1).max(200),
   // Required: every SOP must belong to a department so workers in that
@@ -111,11 +129,12 @@ const CreateSopFromUploadSchema = z.object({
   filename: z.string().min(1).max(300),
   mime_type: z.enum(SOP_UPLOAD_MIME_TYPES),
   file_base64: z.string().min(1),
+  audience: SopAudienceSchema,
 });
 
 export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ id: string }>> {
   try {
-    const { userId, supabase, company_id } = await getCompanyContext('manager');
+    const { userId, supabase, company_id, role, impersonating } = await getCompanyContext('manager');
     const input = CreateSopFromUploadSchema.parse(raw);
 
     const fileBytes = Buffer.from(input.file_base64, 'base64');
@@ -135,6 +154,14 @@ export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ 
       .maybeSingle();
     if (!dept) return fail('INVALID_INPUT', 'department not found');
 
+    // Audience scope check — a non-HR department manager can only target
+    // their own department(s). Reuses the helper that already powers QR
+    // creation; identical creator-scope semantics across SOPs and QRs.
+    const scope = await getCreatorScope({ supabase, userId, company_id, role, impersonating });
+    if (!isWithinCreatorScope(input.audience, scope)) {
+      return fail('FORBIDDEN', 'audience targets a department or role outside your scope');
+    }
+
     // 1. Insert sops master row (status=draft, template=null).
     const { data: sop, error: sopErr } = await supabase
       .from('sops')
@@ -143,6 +170,8 @@ export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ 
         title: input.title,
         template: null,
         department_id: input.department_id,
+        audience_department_ids: input.audience.department_ids,
+        audience_roles: input.audience.roles,
         status: 'draft' as SopStatus,
         created_by: userId,
       })
@@ -584,7 +613,62 @@ export async function saveSpanishEdit(raw: unknown): Promise<ActionResult> {
   }
 }
 
-// ── 6. Archive ────────────────────────────────────────────────────────────────
+// ── 6. Update SOP audience (visibility / doc control) ────────────────────────
+//
+// Lets a manager edit who can see a published SOP without bumping the
+// version or re-translating — visibility is metadata, not content.
+// Same Zod shape as the upload's audience block (must be non-empty),
+// same creator-scope guard (department managers limited to own depts).
+
+const UpdateSopAudienceSchema = z.object({
+  sop_id: z.string().uuid(),
+  audience: SopAudienceSchema,
+});
+
+export async function updateSopAudience(raw: unknown): Promise<ActionResult<{ ok: true }>> {
+  try {
+    const { userId, supabase, company_id, role, impersonating } = await getCompanyContext('manager');
+    const input = UpdateSopAudienceSchema.parse(raw);
+
+    const { data: sop } = await supabase
+      .from('sops')
+      .select('id')
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (!sop) return fail('NOT_FOUND');
+
+    const scope = await getCreatorScope({ supabase, userId, company_id, role, impersonating });
+    if (!isWithinCreatorScope(input.audience, scope)) {
+      return fail('FORBIDDEN', 'audience targets a department or role outside your scope');
+    }
+
+    const { error: updErr } = await supabase
+      .from('sops')
+      .update({
+        audience_department_ids: input.audience.department_ids,
+        audience_roles: input.audience.roles,
+      })
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id);
+    if (updErr) return fail('INTERNAL', updErr.message);
+
+    revalidatePath(`/dashboard/sops/${input.sop_id}`);
+    revalidatePath('/dashboard/sops');
+    revalidatePath(`/app/sop/${input.sop_id}`);
+    return { ok: true, data: { ok: true } };
+  } catch (e) {
+    const handled = handleAuthError<{ ok: true }>(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// Re-export the audience type from the shared QR-side helpers so SOP
+// callers don't need to know it lives there. Same shape, same rules.
+export type { Audience };
+
+// ── 7. Archive ────────────────────────────────────────────────────────────────
 //
 // (The previous `approveSop` action was retired when translation auto-
 // publishes. QR creation + published_at stamping moved into `runTranslation`.

@@ -11,6 +11,8 @@ import {
   SOP_UPLOAD_MIME_TYPES,
   type SopUploadMimeType,
 } from '@/lib/types/sop';
+import type { CreatorScope } from '@/lib/qr/audience';
+import { AudiencePicker, type AudienceState } from '@/components/sop/AudiencePicker';
 import { createSopFromUpload } from '../_actions';
 
 interface Department {
@@ -20,6 +22,8 @@ interface Department {
 
 interface Props {
   departments: Department[];
+  /** Audience options the manager is allowed to assign. */
+  scope: CreatorScope;
 }
 
 const ACCEPT_ATTR = SOP_UPLOAD_MIME_TYPES.join(',');
@@ -56,21 +60,27 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function UploadSopClient({ departments }: Props) {
+export function UploadSopClient({ departments, scope }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [departmentId, setDepartmentId] = useState('');
+  const [audience, setAudience] = useState<AudienceState>({ department_ids: [], roles: [] });
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // ISO-grade doc control: manager must explicitly pick at least one
+  // department or role. No silent "everyone in the company" fallback.
+  const audienceChosen = audience.department_ids.length > 0 || audience.roles.length > 0;
 
   function reset() {
     setFile(null);
     setTitle('');
     setDepartmentId('');
+    setAudience({ department_ids: [], roles: [] });
     setError(null);
     setDragOver(false);
     if (inputRef.current) inputRef.current.value = '';
@@ -123,6 +133,10 @@ export function UploadSopClient({ departments }: Props) {
       setError('Pick a department before uploading.');
       return;
     }
+    if (!audienceChosen) {
+      setError('Pick at least one department or role for the audience — every SOP needs a defined audience.');
+      return;
+    }
     setError(null);
 
     let base64: string;
@@ -140,6 +154,7 @@ export function UploadSopClient({ departments }: Props) {
         filename: file.name,
         mime_type: file.type as SopUploadMimeType,
         file_base64: base64,
+        audience,
       });
 
       if (!result.ok) {
@@ -272,6 +287,14 @@ export function UploadSopClient({ departments }: Props) {
               )}
             </div>
 
+            <AudiencePicker
+              departments={departments}
+              scope={scope}
+              value={audience}
+              onChange={setAudience}
+              description="Document control: pick the departments and/or roles that should see this SOP. Admins and HR managers always see every SOP regardless."
+            />
+
             {error && (
               <p
                 role="alert"
@@ -289,7 +312,14 @@ export function UploadSopClient({ departments }: Props) {
             <Button
               type="submit"
               color="brand"
-              disabled={isPending || !file || !title.trim() || !departmentId || departments.length === 0}
+              disabled={
+                isPending ||
+                !file ||
+                !title.trim() ||
+                !departmentId ||
+                departments.length === 0 ||
+                !audienceChosen
+              }
             >
               {isPending ? 'Uploading…' : 'Upload & continue'}
             </Button>

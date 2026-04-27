@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 
-import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
+import { AuthError, getCompanyContext, type Role } from '@/lib/auth/company-context';
+import { passesAudience, type QrAudience } from '@/lib/qr/audience';
 import { renderMarkdown } from '@/lib/sop/markdown';
 import type { WorkerLanguage } from '@/lib/types/sop';
 import { LanguageToggleClient } from './_components/LanguageToggleClient';
@@ -29,7 +30,7 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
     }
     throw e;
   }
-  const { userId, supabase, company_id } = ctx;
+  const { userId, supabase, company_id, role } = ctx;
 
   // Worker preference. Defaults to 'en'. Override via ?lang=es for the
   // current render only; the toggle action persists across page loads.
@@ -45,7 +46,7 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
 
   const { data: sop } = await supabase
     .from('sops')
-    .select('id, title, status')
+    .select('id, title, status, audience_department_ids, audience_roles')
     .eq('id', id)
     .maybeSingle();
   if (!sop) notFound();
@@ -57,6 +58,44 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
         <h1 className="text-2xl font-semibold text-dc-text">No longer available</h1>
         <p className="text-base text-dc-text-2">
           This procedure has been archived. Ask your manager for the current version.
+        </p>
+      </main>
+    );
+  }
+
+  // Audience gate. Admins and HR managers always pass via passesAudience's
+  // built-in admin carve-out + the unrestricted-creator-scope mapping. For
+  // everyone else we resolve their department list and run the same shared
+  // helper that powers the QR scan flow.
+  const audience: QrAudience = {
+    department_ids: ((sop as unknown as { audience_department_ids?: string[] }).audience_department_ids ?? []) as string[],
+    roles: ((sop as unknown as { audience_roles?: Role[] }).audience_roles ?? []) as Role[],
+  };
+  const { data: memberRow } = await supabase
+    .from('company_members')
+    .select('id')
+    .eq('clerk_user_id', userId)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  const { data: deptRows = [] } = memberRow
+    ? await supabase
+        .from('employee_departments')
+        .select('department_id')
+        .eq('member_id', memberRow.id)
+    : { data: [] as { department_id: string }[] };
+
+  const scanner = {
+    role,
+    department_ids: ((deptRows ?? []) as { department_id: string }[]).map((r) => r.department_id),
+  };
+
+  if (!passesAudience(audience, scanner)) {
+    return (
+      <main className="mx-auto flex min-h-[100dvh] max-w-md flex-col items-center justify-center gap-3 px-6 py-10 text-center" lang={lang}>
+        <h1 className="text-2xl font-semibold text-dc-text">Not for your team</h1>
+        <p className="text-base text-dc-text-2">
+          This procedure isn&apos;t set up for your department or role. If you think you should
+          have access, ask your manager.
         </p>
       </main>
     );
