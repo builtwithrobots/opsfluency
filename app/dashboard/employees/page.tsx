@@ -1,4 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { UserRound } from "lucide-react";
 
 import { Heading } from "@/components/ui/heading";
@@ -96,7 +97,13 @@ export default async function EmployeesPage() {
     }),
   );
 
-  const joinUrl = `${process.env.NEXT_PUBLIC_APP_URL}/join/${company_id}`;
+  // Derive the origin from request headers so the QR always encodes the
+  // correct URL — works on Vercel previews, custom domains, and localhost
+  // without relying on NEXT_PUBLIC_APP_URL being set.
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
+  const proto = hdrs.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
+  const joinUrl = `${proto}://${host}/join/${company_id}`;
 
   return (
     <div className="flex flex-col gap-8">
