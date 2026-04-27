@@ -117,7 +117,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
       .select('sop_id, tags(*)')
       .in('sop_id', visibleSopIds);
     for (const row of assignments ?? []) {
-      const r = row as { sop_id: string; tags: Tag };
+      const r = row as unknown as { sop_id: string; tags: Tag };
       if (!tagsBySOPId.has(r.sop_id)) tagsBySOPId.set(r.sop_id, []);
       tagsBySOPId.get(r.sop_id)!.push(r.tags);
     }

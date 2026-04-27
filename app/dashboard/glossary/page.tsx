@@ -72,7 +72,7 @@ async function loadTermsWithTags(
 
   const tagsByTermId = new Map<string, Tag[]>();
   for (const row of assignments ?? []) {
-    const r = row as { term_id: string; tags: Tag };
+    const r = row as unknown as { term_id: string; tags: Tag };
     if (!tagsByTermId.has(r.term_id)) tagsByTermId.set(r.term_id, []);
     tagsByTermId.get(r.term_id)!.push(r.tags);
   }
