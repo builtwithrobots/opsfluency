@@ -57,8 +57,8 @@ export async function claimInvite(
     const user = await clerk.users.createUser({
       firstName: nameParts[0] ?? undefined,
       lastName: nameParts.slice(1).join(" ") || undefined,
-      ...(clerkEmail ? { emailAddresses: [clerkEmail] } : {}),
-      phoneNumbers: [phone],
+      ...(clerkEmail ? { emailAddress: [clerkEmail] } : {}),
+      phoneNumber: [phone],
       skipPasswordRequirement: true,
     });
     clerkUserId = user.id;
