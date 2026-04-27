@@ -22,8 +22,8 @@ function isPresetDays(n: number): n is PresetDays {
 // source characters for Google. Google bills source only (output rate 0).
 const PRICE_PER_M_UNITS: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-6":   { input: 3,    output: 15 },
-  "claude-haiku-4-5-20251001": { input: 0.80, output: 4 },
-  "claude-haiku-4-5":    { input: 0.80, output: 4 },
+  "claude-haiku-4-5-20251001": { input: 1.00, output: 5 },
+  "claude-haiku-4-5":    { input: 1.00, output: 5 },
   "google-translate-v2": { input: 20,   output: 0 },
   // Conservative upper-bound fallback so unknown models never look cheaper.
   default:               { input: 3,    output: 15 },
