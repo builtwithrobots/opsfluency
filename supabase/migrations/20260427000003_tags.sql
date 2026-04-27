@@ -21,9 +21,13 @@ create table tags (
   source        text        not null default 'custom'
                             check (source in ('department', 'custom')),
   department_id uuid        references departments(id) on delete set null,
-  created_at    timestamptz not null default now(),
-  unique (company_id, lower(name_en))
+  created_at    timestamptz not null default now()
 );
+
+-- Functional unique index: case-insensitive name_en per company.
+-- Must be a separate CREATE UNIQUE INDEX — inline UNIQUE constraints
+-- don't accept expressions in PostgreSQL.
+create unique index tags_company_name_en_lower_idx on tags (company_id, lower(name_en));
 
 create index tags_company_id_idx on tags (company_id);
 
