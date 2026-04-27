@@ -1,6 +1,7 @@
 "use server";
 
 import { clerkClient } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -42,15 +43,19 @@ export async function claimInvite(
 
   const clerk = await clerkClient();
 
-  // Create Clerk user. Phone is marked verified — the manager pre-approved it.
-  // Personal email takes priority for magic-link re-logins; work email is a
-  // fallback. If neither is set, the employee uses only the initial sign-in
-  // token and can add an email later from their profile.
+  // Personal email takes priority for magic-link re-logins; work email is the
+  // fallback. If neither is set the employee authenticates only via the
+  // initial sign-in token — they can add an email later from their profile.
   const clerkEmail =
     (invite.email_personal as string | null) ??
     (invite.email_work as string | null) ??
     null;
 
+  // NOTE: phoneNumber is intentionally NOT passed to Clerk. Our phone number
+  // is purely a lookup key in employee_invites — Clerk authentication uses
+  // email magic links. Passing phoneNumber here requires "Phone number" to be
+  // enabled as an identifier in Clerk's dashboard, which is not required and
+  // causes a 422 on instances where it is not configured.
   let clerkUserId: string;
   try {
     const nameParts = (invite.name ?? "").split(" ").filter(Boolean);
@@ -58,14 +63,21 @@ export async function claimInvite(
       firstName: nameParts[0] ?? undefined,
       lastName: nameParts.slice(1).join(" ") || undefined,
       ...(clerkEmail ? { emailAddress: [clerkEmail] } : {}),
-      phoneNumber: [phone],
       skipPasswordRequirement: true,
     });
     clerkUserId = user.id;
   } catch (err: unknown) {
-    const msg =
-      err instanceof Error ? err.message : "Failed to create your account.";
-    return { error: `Account creation failed: ${msg}` };
+    // Extract the most useful message from Clerk's error shape
+    let msg = "Failed to create your account.";
+    if (err && typeof err === "object") {
+      const clerkErr = err as { errors?: { message: string }[]; message?: string };
+      if (Array.isArray(clerkErr.errors) && clerkErr.errors[0]?.message) {
+        msg = clerkErr.errors[0].message;
+      } else if (typeof clerkErr.message === "string") {
+        msg = clerkErr.message;
+      }
+    }
+    return { error: msg };
   }
 
   // Create company_members row (employee, already joined)
@@ -87,7 +99,7 @@ export async function claimInvite(
     return { error: "Failed to register your membership. Please try again." };
   }
 
-  // Create employees extended profile with both email fields
+  // Create employees extended profile — phone stored here, not in Clerk
   await admin.from("employees").insert({
     company_id: companyId,
     clerk_user_id: clerkUserId,
@@ -117,15 +129,18 @@ export async function claimInvite(
     })
     .eq("id", invite.id);
 
-  // Issue a Clerk sign-in token — redirects the employee straight into the app
+  // Issue a Clerk sign-in token. Derive the origin from request headers so
+  // the redirect works on preview deployments, not just production.
   const token = await clerk.signInTokens.createSignInToken({
     userId: clerkUserId,
     expiresInSeconds: 3600,
   });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  const destination = `${appUrl}/sign-in?__clerk_ticket=${token.token}&redirect_url=%2Fapp%2Fhome`;
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
+  const proto = hdrs.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
+  const destination = `${proto}://${host}/sign-in?__clerk_ticket=${token.token}&redirect_url=%2Fapp%2Fhome`;
   redirect(destination);
-  // redirect() throws a NEXT_REDIRECT — unreachable, satisfies return type
+  // redirect() throws NEXT_REDIRECT — unreachable, satisfies return type
   return null;
 }
