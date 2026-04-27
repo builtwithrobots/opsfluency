@@ -4,7 +4,7 @@
  * see `supabase/migrations/...sop_simplification.sql` and the soft-delete
  * follow-on migration.
  *
- * Two shapes:
+ * Three shapes:
  *
  * - `GlossaryRow` is the minimal projection passed into Sonnet system
  *   prompts and Google Translate placeholder substitution. AI callers do
@@ -12,6 +12,8 @@
  * - `GlossaryTerm` is the full row used by the management UI (list,
  *   create, update, archive, restore). `deleted_at` distinguishes
  *   active from archived; the canonical reads filter `deleted_at IS NULL`.
+ * - `GlossaryTermWithTags` extends `GlossaryTerm` with the term's
+ *   associated tags (joined from `glossary_term_tags` + `tags`).
  */
 
 export interface GlossaryRow {
@@ -32,3 +34,9 @@ export interface GlossaryTerm extends GlossaryRow {
 
 export const GLOSSARY_TERM_MAX = 200;
 export const GLOSSARY_DEFINITION_MAX = 2000;
+
+import type { Tag } from "./tags";
+
+export interface GlossaryTermWithTags extends GlossaryTerm {
+  tags: Tag[];
+}

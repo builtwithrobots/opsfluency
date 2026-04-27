@@ -4,29 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { getCompanyContext } from "@/lib/auth/company-context";
-import type { GlossaryTerm } from "@/lib/types/glossary";
+import type { GlossaryTermWithTags } from "@/lib/types/glossary";
+import type { Tag } from "@/lib/types/tags";
 
 import { AddTermButtonClient } from "./_components/AddTermButtonClient";
 import { GlossaryListClient } from "./_components/GlossaryListClient";
 import { GlossarySearchForm } from "./_components/GlossarySearchForm";
 import { GlossaryViewTabs } from "./_components/GlossaryViewTabs";
+import { TagFilterBar } from "./_components/TagFilterBar";
 
 type View = "active" | "archived";
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; view?: string; tag?: string }>;
 }
 
 function resolveView(raw: string | undefined): View {
   return raw === "archived" ? "archived" : "active";
 }
 
-async function loadTerms(
+async function loadTermsWithTags(
   supabase: Awaited<ReturnType<typeof getCompanyContext>>["supabase"],
   company_id: string,
   view: View,
   q: string,
-): Promise<GlossaryTerm[]> {
+  tagId: string | null,
+): Promise<GlossaryTermWithTags[]> {
   let query = supabase
     .from("glossary_terms")
     .select(
@@ -44,9 +47,53 @@ async function loadTerms(
     );
   }
 
+  if (tagId) {
+    const { data: taggedRows } = await supabase
+      .from("glossary_term_tags")
+      .select("term_id")
+      .eq("tag_id", tagId);
+    const ids = (taggedRows ?? []).map((r: { term_id: string }) => r.term_id);
+    if (ids.length === 0) return [];
+    query = query.in("id", ids);
+  }
+
   const { data, error } = await query.order("term_en", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as GlossaryTerm[];
+
+  const terms = data ?? [];
+  if (terms.length === 0) return [];
+
+  // Fetch tag assignments for the returned terms.
+  const termIds = terms.map((t: { id: string }) => t.id);
+  const { data: assignments } = await supabase
+    .from("glossary_term_tags")
+    .select("term_id, tags(*)")
+    .in("term_id", termIds);
+
+  const tagsByTermId = new Map<string, Tag[]>();
+  for (const row of assignments ?? []) {
+    const r = row as { term_id: string; tags: Tag };
+    if (!tagsByTermId.has(r.term_id)) tagsByTermId.set(r.term_id, []);
+    tagsByTermId.get(r.term_id)!.push(r.tags);
+  }
+
+  return terms.map((t: { id: string }) => ({
+    ...(t as object),
+    tags: tagsByTermId.get((t as { id: string }).id) ?? [],
+  })) as GlossaryTermWithTags[];
+}
+
+async function loadCompanyTags(
+  supabase: Awaited<ReturnType<typeof getCompanyContext>>["supabase"],
+  company_id: string,
+): Promise<Tag[]> {
+  const { data } = await supabase
+    .from("tags")
+    .select("*")
+    .eq("company_id", company_id)
+    .order("source", { ascending: false })
+    .order("name_en", { ascending: true });
+  return (data ?? []) as Tag[];
 }
 
 async function countByView(
@@ -69,13 +116,15 @@ async function countByView(
 }
 
 export default async function GlossaryPage({ searchParams }: PageProps) {
-  const { q: rawQ, view: rawView } = await searchParams;
+  const { q: rawQ, view: rawView, tag: rawTag } = await searchParams;
   const view = resolveView(rawView);
   const q = (rawQ ?? "").trim();
+  const tagId = rawTag ?? null;
 
   const { supabase, company_id } = await getCompanyContext("manager");
-  const [terms, counts] = await Promise.all([
-    loadTerms(supabase, company_id, view, q),
+  const [terms, allTags, counts] = await Promise.all([
+    loadTermsWithTags(supabase, company_id, view, q, tagId),
+    loadCompanyTags(supabase, company_id),
     countByView(supabase, company_id),
   ]);
 
@@ -104,7 +153,12 @@ export default async function GlossaryPage({ searchParams }: PageProps) {
               <AddTermButtonClient />
             </div>
           </div>
-          <GlossaryListClient view={view} terms={terms} query={q} />
+
+          {allTags.length > 0 && (
+            <TagFilterBar allTags={allTags} activeTagId={tagId} view={view} q={q} />
+          )}
+
+          <GlossaryListClient view={view} terms={terms} query={q} allTags={allTags} />
         </>
       ) : (
         <EmptyState />

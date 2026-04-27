@@ -34,6 +34,9 @@ export interface NavItem {
   icon: LucideIcon;
   // Match rule: exact path (Home) vs. prefix match (everything else).
   match: "exact" | "prefix";
+  // Pinned items always render at the top of a reorderable section and
+  // cannot be dragged. They are excluded from localStorage ordering.
+  pinned?: boolean;
   // Visibility. `member: Role[]` lists which org-scoped roles see the
   // item (admin always sees everything). `superAdmin: true` adds it to
   // the super-admin sidebar. Omit a key to hide for that viewer kind.
@@ -54,7 +57,7 @@ export interface NavSection {
 const primary: NavSection = {
   reorderable: true,
   items: [
-    { href: "/dashboard",    label: "Home",      icon: Home,          match: "exact",  visibility: { member: ["manager"] } },
+    { href: "/dashboard",    label: "Home",      icon: Home,          match: "exact",  pinned: true, visibility: { member: ["manager"] } },
     { href: "/dashboard/qr",   label: "QR Codes", icon: QrCode,    match: "prefix", visibility: { member: ["manager"] } },
     { href: "/dashboard/sops", label: "SOPs",     icon: FileText,  match: "prefix", visibility: { member: ["manager"] } },
     { href: "/dashboard/glossary", label: "Glossary", icon: Languages, match: "prefix", visibility: { member: ["manager"] } },
