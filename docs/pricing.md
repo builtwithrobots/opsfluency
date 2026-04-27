@@ -39,15 +39,18 @@ SOP import now runs **two Claude calls** per document, not one:
 | 1 | `claude-haiku-4-5-20251001` | Raw document → clean Markdown | 16,384 |
 | 2 | `claude-sonnet-4-6` | Markdown + glossary → flagged site-specific terms | 4,096 |
 
-Sonnet's input is the compact Markdown (not the raw document), so it processes ~60% fewer tokens than the old single-call design. Both calls use `cache_control: { type: 'ephemeral' }` on the system prompt — repeat uploads within a session pay 0.1× the normal input rate on cached tokens.
+Sonnet's input is the compact Markdown (not the raw document), so it processes ~60% fewer tokens than the old single-call design. Both calls use `cache_control: { type: 'ephemeral' }` on the system prompt — repeat uploads within a session pay $0.10/M (Haiku) or $0.30/M (Sonnet) on cached tokens instead of the full input rate.
 
 ### Pricing used
 
-| Provider | Model | Input | Output |
-|---|---|---|---|
-| Anthropic | claude-haiku-4-5-20251001 | $0.80 / M tokens | $4 / M tokens |
-| Anthropic | claude-sonnet-4-6 | $3 / M tokens | $15 / M tokens |
-| Google | Cloud Translation v2 | $20 / M **source characters** | $0 (source only) |
+| Provider | Model | Input | Output | Cached input |
+|---|---|---|---|---|
+| Anthropic | claude-haiku-4-5-20251001 | $1.00 / M tokens | $5 / M tokens | $0.10 / M tokens |
+| Anthropic | claude-sonnet-4-6 | $3.00 / M tokens | $15 / M tokens | $0.30 / M tokens |
+| Google | Cloud Translation v2 | $20 / M **source characters** | $0 (source only) | — |
+
+Google includes a **500k character free tier per month** (resets monthly, never expires). Starter customers
+with small libraries may effectively pay $0 in translation costs for months.
 
 ### Measured cost — 2 × five-page PDFs (Cold Storage Pro, live data)
 
@@ -61,10 +64,13 @@ Restated for the new two-call architecture (Haiku + Sonnet):
 
 | Component | Estimated cost | Per SOP |
 |---|---|---|
-| Haiku — Markdown conversion | ~$0.025 | $0.013 |
+| Haiku — Markdown conversion | ~$0.028 | $0.014 |
 | Sonnet — term flagging (Markdown input only) | ~$0.019 | $0.010 |
 | Google Translation | ~$0.168 | $0.168 |
-| **Total (new architecture)** | **~$0.40** | **~$0.20** |
+| **Total (new architecture)** | **~$0.215** | **~$0.192** |
+
+> Haiku input/output rates verified April 2026: $1.00/$5.00 per M tokens (previously documented as
+> $0.80/$4.00 — the old rates were incorrect). Impact on per-SOP cost is +$0.003; immaterial in practice.
 
 **Cost per page: ~$0.04** (new) / ~$0.05 (old). Holds well for 3–10 page SOPs.
 Short SOPs (1–2 pages) run slightly higher per page because the system prompt and glossary are fixed overhead regardless of document length.
@@ -252,8 +258,8 @@ Two triggers, either of which earns a fresh look:
 |---|---|
 | `ai_call_log` (Supabase) | Actual measured tokens + characters + duration per call. Per-tenant rollups on `/dashboard/platform?tab=ai` read from this table directly. |
 | Cold Storage Pro live upload | 2 × five-page PDFs through full pipeline = $0.5523 total ($0.2171 Anthropic + $0.3352 Google). Ground truth for per-page estimates. |
-| [Anthropic pricing](https://www.anthropic.com/pricing) | Haiku 4.5: $0.80/$4 per M tokens. Sonnet 4.6: $3/$15 per M tokens. |
-| [Google Cloud Translation pricing](https://cloud.google.com/translate/pricing) | $20 / M source characters for v2 standard. |
+| [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing) | Haiku 4.5: $1.00/$5 per M tokens (cached: $0.10/M). Sonnet 4.6: $3/$15 per M tokens (cached: $0.30/M). Verified April 2026. |
+| [Google Cloud Translation pricing](https://cloud.google.com/translate/pricing) | $20 / M source characters for v2 standard. Free tier: 500k chars/month. Verified April 2026. |
 | Vercel + Supabase dashboards | Monthly bill for serverless + storage. |
 
 When any of these change, update the projections table and the lever table — don't paper over a pricing-model decision with stale cost data.
