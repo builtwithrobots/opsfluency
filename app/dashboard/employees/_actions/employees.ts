@@ -10,9 +10,12 @@ export type InviteResult =
   | { ok: true }
   | { ok: false; error: { code: string; message?: string } };
 
+const optionalEmail = z.union([z.string().email(), z.literal("")]).optional();
+
 const CreateInviteInput = z.object({
   name: z.string().max(100).optional(),
-  email: z.union([z.string().email(), z.literal("")]).optional(),
+  email_work: optionalEmail,
+  email_personal: optionalEmail,
   department_ids: z.array(z.string().uuid()).default([]),
 });
 
@@ -29,7 +32,8 @@ export async function createInvite(formData: FormData): Promise<InviteResult> {
   try {
     parsed = CreateInviteInput.parse({
       name: (formData.get("name") as string | null) || undefined,
-      email: (formData.get("email") as string | null) || undefined,
+      email_work: (formData.get("email_work") as string | null) || undefined,
+      email_personal: (formData.get("email_personal") as string | null) || undefined,
       department_ids: (formData.getAll("department_ids") as string[]).filter(Boolean),
     });
   } catch {
@@ -40,7 +44,8 @@ export async function createInvite(formData: FormData): Promise<InviteResult> {
     company_id,
     phone,
     name: parsed.name ?? null,
-    email: parsed.email || null,
+    email_work: parsed.email_work || null,
+    email_personal: parsed.email_personal || null,
     department_ids: parsed.department_ids,
     invited_by: userId,
   });

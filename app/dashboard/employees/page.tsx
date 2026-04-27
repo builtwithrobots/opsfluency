@@ -36,7 +36,7 @@ export default async function EmployeesPage() {
       .order("joined_at", { ascending: false }),
     supabase
       .from("employee_invites")
-      .select("id, phone, name, email, department_ids, invited_at")
+      .select("id, phone, name, email_work, email_personal, department_ids, invited_at")
       .eq("company_id", company_id)
       .is("claimed_at", null)
       .order("invited_at", { ascending: false }),

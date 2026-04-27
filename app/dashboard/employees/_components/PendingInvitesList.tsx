@@ -7,7 +7,8 @@ export interface InviteRow {
   id: string;
   phone: string;
   name: string | null;
-  email: string | null;
+  email_work: string | null;
+  email_personal: string | null;
   department_ids: string[];
   invited_at: string;
 }
@@ -41,6 +42,9 @@ export function PendingInvitesList({ invites, deptMap }: Props) {
           ? invite.name.slice(0, 2).toUpperCase()
           : "??";
 
+        // The email Clerk will actually use for magic-link logins
+        const loginEmail = invite.email_personal ?? invite.email_work;
+
         return (
           <li
             key={invite.id}
@@ -62,12 +66,25 @@ export function PendingInvitesList({ invites, deptMap }: Props) {
                     Pending
                   </span>
                 </div>
+
                 <p className="mt-0.5 text-xs text-dc-text-3">
                   {formatPhoneDisplay(invite.phone)}
-                  {invite.email ? ` · ${invite.email}` : ""}
-                  {" · "}
-                  Invited {invitedDate}
+                  {loginEmail ? ` · ${loginEmail}` : ""}
+                  {invite.email_work && invite.email_personal ? (
+                    <span className="ml-1 text-dc-text-3">
+                      (work: {invite.email_work})
+                    </span>
+                  ) : null}
+                  {" · "}Invited {invitedDate}
                 </p>
+
+                {!loginEmail && (
+                  <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                    No email — employee can only log in via the claim QR.
+                    Consider adding a personal email.
+                  </p>
+                )}
+
                 {depts.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {depts.map((name) => (

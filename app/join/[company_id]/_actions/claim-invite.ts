@@ -27,7 +27,7 @@ export async function claimInvite(
   // Look up an unclaimed invite for this company + phone
   const { data: invite } = await admin
     .from("employee_invites")
-    .select("id, phone, name, email, department_ids")
+    .select("id, phone, name, email_work, email_personal, department_ids")
     .eq("company_id", companyId)
     .eq("phone", phone)
     .is("claimed_at", null)
@@ -43,13 +43,21 @@ export async function claimInvite(
   const clerk = await clerkClient();
 
   // Create Clerk user. Phone is marked verified — the manager pre-approved it.
+  // Personal email takes priority for magic-link re-logins; work email is a
+  // fallback. If neither is set, the employee uses only the initial sign-in
+  // token and can add an email later from their profile.
+  const clerkEmail =
+    (invite.email_personal as string | null) ??
+    (invite.email_work as string | null) ??
+    null;
+
   let clerkUserId: string;
   try {
     const nameParts = (invite.name ?? "").split(" ").filter(Boolean);
     const user = await clerk.users.createUser({
       firstName: nameParts[0] ?? undefined,
       lastName: nameParts.slice(1).join(" ") || undefined,
-      ...(invite.email ? { emailAddresses: [invite.email] } : {}),
+      ...(clerkEmail ? { emailAddresses: [clerkEmail] } : {}),
       phoneNumbers: [phone],
       skipPasswordRequirement: true,
     });
@@ -79,11 +87,13 @@ export async function claimInvite(
     return { error: "Failed to register your membership. Please try again." };
   }
 
-  // Create employees extended profile
+  // Create employees extended profile with both email fields
   await admin.from("employees").insert({
     company_id: companyId,
     clerk_user_id: clerkUserId,
     phone,
+    email_work: (invite.email_work as string | null) ?? null,
+    email_personal: (invite.email_personal as string | null) ?? null,
   });
 
   // Assign departments from invite

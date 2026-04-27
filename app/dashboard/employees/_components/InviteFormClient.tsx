@@ -80,7 +80,7 @@ export function InviteFormClient({ departments }: Props) {
                 className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
               />
               <p className="text-xs text-dc-text-3">
-                The employee scans the QR code and enters this number to pair
+                The employee scans the QR code and enters this number to claim
                 their account — no app download required.
               </p>
             </label>
@@ -99,19 +99,40 @@ export function InviteFormClient({ departments }: Props) {
               />
             </label>
 
-            {/* Email — optional */}
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
-                Email{" "}
-                <span className="font-normal text-dc-text-3">(optional)</span>
-              </span>
-              <input
-                name="email"
-                type="email"
-                placeholder="jane@example.com"
-                className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
-              />
-            </label>
+            {/* Email row — work + personal side by side on larger screens */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Work email */}
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
+                  Work email{" "}
+                  <span className="font-normal text-dc-text-3">(optional)</span>
+                </span>
+                <input
+                  name="email_work"
+                  type="email"
+                  placeholder="jane@company.com"
+                  className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
+                />
+                <p className="text-xs text-dc-text-3">Company-issued address.</p>
+              </label>
+
+              {/* Personal email */}
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
+                  Personal email{" "}
+                  <span className="font-normal text-(--color-brand)">(recommended)</span>
+                </span>
+                <input
+                  name="email_personal"
+                  type="email"
+                  placeholder="jane@gmail.com"
+                  className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
+                />
+                <p className="text-xs text-dc-text-3">
+                  Used for magic-link re-login if session expires.
+                </p>
+              </label>
+            </div>
 
             {/* Departments — optional */}
             {departments.length > 0 && (
