@@ -37,12 +37,13 @@ function resolveTab(raw: string | undefined): TabId {
 }
 
 interface PageProps {
-  searchParams: Promise<{ tab?: string; preset?: string; q?: string }>;
+  searchParams: Promise<{ tab?: string; preset?: string; q?: string; days?: string }>;
 }
 
 export default async function PlatformPage({ searchParams }: PageProps) {
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, days: rawDays } = await searchParams;
   const tab = resolveTab(rawTab);
+  const days = rawDays ? Math.max(1, parseInt(rawDays, 10) || 30) : 30;
 
   const tabs: TabDef[] = [
     { id: "tenants",       label: "Tenants",         href: "/dashboard/platform?tab=tenants" },
@@ -73,7 +74,7 @@ export default async function PlatformPage({ searchParams }: PageProps) {
       {tab === "seed" && <SeedTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "impersonation" && <ImpersonationTab />}
-      {tab === "ai" && <AiUsageTab />}
+      {tab === "ai" && <AiUsageTab days={days} />}
       {tab === "health" && <HealthTab />}
     </div>
   );

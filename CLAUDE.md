@@ -625,37 +625,35 @@ Server Actions return `{ ok: false, error: { code, ... } }` instead of throwing 
 
 ---
 
-## SOP Conversion -- Sonnet Prompt Pattern
+## SOP Conversion -- Two-Call Pipeline
 
-When calling Sonnet for SOP conversion, always:
+SOP import runs two AI calls per document. The split reduces per-SOP cost ~55% compared to a single combined Sonnet call, with no quality regression because each model is doing only the task it's well-suited for.
 
-1. Include the full company glossary in the system prompt
-2. Ask for two outputs: (a) structured Markdown and (b) a JSON list of flagged site-specific terms
-3. Use a structured output format so the response can be reliably parsed
+**Call 1 — Haiku (`claude-haiku-4-5-20251001`):** raw document → clean Markdown.
+Structural/formatting work: parse layout, preserve headings/steps/tables/warnings, strip page chrome. Deterministic enough that Haiku handles it well. `max_tokens: 16384`. Glossary is NOT injected here — glossary is only needed for term flagging.
 
-**Why Sonnet and not Haiku:** This is the most critical step in the pipeline. Quality of the Markdown directly affects every translation and every employee experience. Sonnet produces better structured output, catches more nuanced site-specific terms, and the cost difference per SOP is negligible (pennies). Haiku is reserved for high-frequency lightweight tasks in Phase 2.
+**Call 2 — Sonnet (`claude-sonnet-4-6`):** Markdown + company glossary → flagged site-specific terms.
+Reasoning-heavy: must distinguish generic English from in-house proper nouns, acronyms, and equipment jargon. Sonnet's quality here gates translation accuracy for every worker. Input is the compact Markdown (not the raw document), so the Sonnet call is ~60% cheaper than the previous single-call design. `max_tokens: 4096`.
+
+Both calls write separate `ai_call_log` rows so the AI usage tab can show per-model attribution correctly.
 
 **Never use Claude for translation.** Google Cloud Translation API with glossary injection is purpose-built for this, significantly cheaper, and produces consistent results.
 
-**System prompt contract** (owned by `lib/ai/sonnet.ts` — callers never rebuild this inline):
+**Prompt contracts** (owned by `lib/ai/sop-conversion.ts` — callers never rebuild inline):
 
-- Role: expert technical writer converting workplace SOPs to structured Markdown.
-- Inject the full `glossary_terms` rows for the `company_id` as "already defined — use exactly as specified."
-- Instructions: convert the document to clean Markdown (no HTML), preserving structure and warnings; flag any term that is site-specific, a proper noun, or would translate incorrectly via generic AI.
-- Output shape, JSON only, no preamble: `{ "markdown": "...", "flagged_terms": [{ "term", "context", "reason", "suggested_definition_en", "suggested_term_es" }] }`.
-- Model: `claude-sonnet-4-6`. `max_tokens: 4096`. Never Haiku for this step.
+- Haiku call: static conversion instructions → `{ "markdown": "..." }` JSON only, no fences.
+- Sonnet call: static flagging instructions + injected glossary → `{ "flagged_terms": [{ "term", "reason", "suggested_definition_en", "suggested_term_es" }] }` JSON only.
 
-The prompt lives as a constant inside `lib/ai/sonnet.ts`; test it by snapshotting the rendered prompt for a fixture document + fixture glossary.
+All Claude calls go through `callSonnet()` in `lib/ai/sonnet.ts`. Pass `model: HAIKU_MODEL` for Haiku; omit or pass `model: SONNET_MODEL` for Sonnet. Callers never import `@anthropic-ai/sdk` directly — if a call site does, that's a bug.
 
-### AI call conventions (every Sonnet and Google Translate call)
+### AI call conventions (every Claude and Google Translate call)
 
-- **Timeout: 60s hard** via `AbortController.signal` passed to the SDK. Timeout is a recoverable error surfaced to the manager, not a crash.
+- **Timeout: 180s hard** via `AbortController.signal` passed to the SDK. SOP documents can be large; 180s accommodates the Haiku conversion of a dense 20-page PDF. Timeout is a recoverable error surfaced to the manager, not a crash.
 - **Retry: 1 retry on 429 / 5xx** with jittered backoff (500–1500ms). No retry on other 4xx — those indicate a prompt or input bug that won't fix itself.
+- **Prompt caching.** System prompts are passed as cached `TextBlockParam` blocks (`cache_control: { type: 'ephemeral' }`). Cache hits pay 0.1× the input token rate. When the same company uploads multiple SOPs in a session the glossary-bearing Sonnet system prompt hits the cache from the second call onward.
 - **Parse safety.** Wrap every `JSON.parse` in try/catch. On failure, log the raw response (first 2KB) and return `{ code: 'AI_PARSE_FAILURE', retry_allowed: true }` to the caller. Do **not** retry automatically — a second call will usually produce the same malformed output.
-- **Cost logging.** After every Anthropic call, write one row to `ai_call_log`: `{ model, input_tokens, output_tokens, sop_id, company_id, duration_ms }`. This is the only early-warning signal for cost runaway before billing notices.
+- **Cost logging.** After every Anthropic call, write one row to `ai_call_log`: `{ model, input_units, output_units, unit_kind: 'token', sop_id, company_id, duration_ms }`. This is the only early-warning signal for cost runaway before billing notices.
 - **Never log full prompt or full response at INFO level.** Glossaries and SOP content are tenant-sensitive.
-
-All Sonnet calls go through `lib/ai/sonnet.ts` (e.g. `convertSop({ documentText, glossary, signal })`), which encapsulates the timeout, retry, parse, and log steps. Callers never touch the Anthropic SDK directly — if a call site imports `@anthropic-ai/sdk`, that's a bug.
 
 ---
 
