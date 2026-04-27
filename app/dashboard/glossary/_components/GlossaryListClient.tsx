@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { AlertTriangle, Archive, ArchiveRestore, Pencil, Search } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, Pencil, Search, Tag as TagIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,29 +12,34 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { GlossaryTerm } from "@/lib/types/glossary";
+import { TagPickerModal } from "@/components/dashboard/TagPickerModal";
+import type { GlossaryTermWithTags } from "@/lib/types/glossary";
+import type { Tag } from "@/lib/types/tags";
 
 import {
   archiveGlossaryTerm,
   restoreGlossaryTerm,
   updateGlossaryTerm,
 } from "../_actions/glossary";
+import { setGlossaryTermTags } from "@/app/dashboard/tags/_actions/tags";
 
 import { TermFormFields, type TermDraft } from "./TermFormFields";
 
 interface Props {
   view: "active" | "archived";
-  terms: GlossaryTerm[];
+  terms: GlossaryTermWithTags[];
   query: string;
+  allTags: Tag[];
 }
 
 type Mode =
   | { kind: "closed" }
-  | { kind: "edit"; term: GlossaryTerm }
-  | { kind: "archive"; term: GlossaryTerm }
-  | { kind: "restore"; term: GlossaryTerm };
+  | { kind: "edit"; term: GlossaryTermWithTags }
+  | { kind: "archive"; term: GlossaryTermWithTags }
+  | { kind: "restore"; term: GlossaryTermWithTags }
+  | { kind: "tags"; term: GlossaryTermWithTags };
 
-export function GlossaryListClient({ view, terms, query }: Props) {
+export function GlossaryListClient({ view, terms, query, allTags }: Props) {
   const [mode, setMode] = useState<Mode>({ kind: "closed" });
 
   if (terms.length === 0) {
@@ -59,6 +64,16 @@ export function GlossaryListClient({ view, terms, query }: Props) {
       )}
       {mode.kind === "restore" && (
         <RestoreDialog term={mode.term} onClose={() => setMode({ kind: "closed" })} />
+      )}
+      {mode.kind === "tags" && (
+        <TagPickerModal
+          open
+          title={`Labels — "${mode.term.term_en}"`}
+          allTags={allTags}
+          currentTagIds={mode.term.tags.map((t) => t.id)}
+          onClose={() => setMode({ kind: "closed" })}
+          onSave={(tagIds) => setGlossaryTermTags({ termId: mode.term.id, tagIds })}
+        />
       )}
     </>
   );
@@ -92,7 +107,7 @@ function TermRow({
   view,
   onAction,
 }: {
-  term: GlossaryTerm;
+  term: GlossaryTermWithTags;
   view: "active" | "archived";
   onAction: (mode: Mode) => void;
 }) {
@@ -121,6 +136,11 @@ function TermRow({
                 onClick={() => onAction({ kind: "edit", term })}
               />
               <RowAction
+                label="Labels"
+                icon={TagIcon}
+                onClick={() => onAction({ kind: "tags", term })}
+              />
+              <RowAction
                 label="Archive"
                 icon={Archive}
                 tone="muted"
@@ -136,7 +156,36 @@ function TermRow({
           )}
         </div>
       </div>
+
+      {/* Tag pills */}
+      {term.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-t border-[color:var(--dc-edge)] px-5 py-2.5">
+          {term.tags.map((tag) => (
+            <TagPill key={tag.id} tag={tag} />
+          ))}
+        </div>
+      )}
     </article>
+  );
+}
+
+function TagPill({ tag }: { tag: Tag }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+      style={{
+        backgroundColor: `${tag.color}18`,
+        borderColor: `${tag.color}40`,
+        color: tag.color,
+      }}
+    >
+      <span
+        className="size-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: tag.color }}
+        aria-hidden
+      />
+      <span lang="en">{tag.name_en}</span>
+    </span>
   );
 }
 
@@ -195,7 +244,7 @@ function RowAction({
 
 // ── Dialogs ──────────────────────────────────────────────────────────────────
 
-function EditDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
+function EditDialog({ term, onClose }: { term: GlossaryTermWithTags; onClose: () => void }) {
   const router = useRouter();
   const [draft, setDraft] = useState<TermDraft>({
     term_en: term.term_en,
@@ -206,8 +255,6 @@ function EditDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Reset state when the targeted term changes (e.g. user opens edit for a
-  // different row without closing first).
   useEffect(() => {
     setDraft({
       term_en: term.term_en,
@@ -284,7 +331,7 @@ function EditDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void
   );
 }
 
-function ArchiveDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
+function ArchiveDialog({ term, onClose }: { term: GlossaryTermWithTags; onClose: () => void }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -349,7 +396,7 @@ function ArchiveDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => v
   );
 }
 
-function RestoreDialog({ term, onClose }: { term: GlossaryTerm; onClose: () => void }) {
+function RestoreDialog({ term, onClose }: { term: GlossaryTermWithTags; onClose: () => void }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

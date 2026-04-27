@@ -150,7 +150,11 @@ function DraggableNavList({
 }) {
   const { collapsed } = useSidebarCollapsed();
 
-  // Ordered hrefs, loaded from localStorage
+  // Pinned items always stay at the top; only non-pinned items are stored/reordered.
+  const pinnedItems = items.filter((i) => i.pinned);
+  const draggableItems = items.filter((i) => !i.pinned);
+
+  // Ordered hrefs for draggable items only, loaded from localStorage
   const [order, setOrder] = useState<string[]>([]);
   useEffect(() => {
     try {
@@ -162,14 +166,14 @@ function DraggableNavList({
   const dragItemRef = useRef<string | null>(null);
   const [dragOverHref, setDragOverHref] = useState<string | null>(null);
 
-  // Apply saved order (unknown hrefs appended to end)
-  const ordered =
+  // Apply saved order to draggable items only (unknown hrefs appended to end)
+  const orderedDraggable =
     order.length > 0
       ? [
-          ...order.filter((h) => items.some((i) => i.href === h)).map((h) => items.find((i) => i.href === h)!),
-          ...items.filter((i) => !order.includes(i.href)),
+          ...order.filter((h) => draggableItems.some((i) => i.href === h)).map((h) => draggableItems.find((i) => i.href === h)!),
+          ...draggableItems.filter((i) => !order.includes(i.href)),
         ]
-      : items;
+      : draggableItems;
 
   function handleDragStart(href: string) {
     dragItemRef.current = href;
@@ -186,7 +190,7 @@ function DraggableNavList({
       setDragOverHref(null);
       return;
     }
-    const hrefs = ordered.map((i) => i.href);
+    const hrefs = orderedDraggable.map((i) => i.href);
     const fromIdx = hrefs.indexOf(from);
     const toIdx = hrefs.indexOf(targetHref);
     const next = [...hrefs];
@@ -203,54 +207,59 @@ function DraggableNavList({
     setDragOverHref(null);
   }
 
-  return (
-    <AnimatePresence initial={false}>
-      {ordered.map((item, index) => {
-        const Icon = item.icon;
-        const active = isActive(item, pathname);
-        const isDragOver = dragOverHref === item.href;
+  function renderNavItem(item: NavItem, index: number, draggable: boolean) {
+    const Icon = item.icon;
+    const active = isActive(item, pathname);
+    const isDragOver = dragOverHref === item.href;
 
-        return (
-          <motion.div
-            key={item.href}
-            draggable={!collapsed}
-            onDragStart={() => handleDragStart(item.href)}
-            onDragOver={(e) => handleDragOver(e, item.href)}
-            onDrop={() => handleDrop(item.href)}
-            onDragEnd={handleDragEnd}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.22, delay: index * 0.02, ease: "easeOut" }}
-            className={`group/drag-item relative transition-colors ${
-              isDragOver ? "rounded-lg ring-2 ring-(--color-brand)/40 bg-(--color-brand)/5" : ""
+    return (
+      <motion.div
+        key={item.href}
+        draggable={draggable && !collapsed}
+        onDragStart={draggable ? () => handleDragStart(item.href) : undefined}
+        onDragOver={draggable ? (e) => handleDragOver(e, item.href) : undefined}
+        onDrop={draggable ? () => handleDrop(item.href) : undefined}
+        onDragEnd={draggable ? handleDragEnd : undefined}
+        initial={{ opacity: 0, x: -6 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.22, delay: index * 0.02, ease: "easeOut" }}
+        className={`group/drag-item relative transition-colors ${
+          isDragOver ? "rounded-lg ring-2 ring-(--color-brand)/40 bg-(--color-brand)/5" : ""
+        }`}
+      >
+        {collapsed ? (
+          <Link
+            href={item.href}
+            title={item.label}
+            className={`flex w-full justify-center rounded-lg py-2.5 hover:bg-zinc-950/5 ${
+              active ? "bg-zinc-950/5" : ""
             }`}
           >
-            {collapsed ? (
-              <Link
-                href={item.href}
-                title={item.label}
-                className={`flex w-full justify-center rounded-lg py-2.5 hover:bg-zinc-950/5 ${
-                  active ? "bg-zinc-950/5" : ""
-                }`}
-              >
-                <Icon
-                  className={`size-5 shrink-0 ${active ? "text-zinc-950" : "text-zinc-500"}`}
-                  strokeWidth={2}
-                />
-              </Link>
-            ) : (
-              <SidebarItem href={item.href} current={active}>
-                <Icon data-slot="icon" strokeWidth={2} />
-                <SidebarLabel>{item.label}</SidebarLabel>
-                <GripVertical
-                  className="ml-auto size-3.5 shrink-0 cursor-grab text-dc-text-3 opacity-0 group-hover/drag-item:opacity-100 transition-opacity"
-                  strokeWidth={2}
-                />
-              </SidebarItem>
+            <Icon
+              className={`size-5 shrink-0 ${active ? "text-zinc-950" : "text-zinc-500"}`}
+              strokeWidth={2}
+            />
+          </Link>
+        ) : (
+          <SidebarItem href={item.href} current={active}>
+            <Icon data-slot="icon" strokeWidth={2} />
+            <SidebarLabel>{item.label}</SidebarLabel>
+            {draggable && (
+              <GripVertical
+                className="ml-auto size-3.5 shrink-0 cursor-grab text-dc-text-3 opacity-0 group-hover/drag-item:opacity-100 transition-opacity"
+                strokeWidth={2}
+              />
             )}
-          </motion.div>
-        );
-      })}
+          </SidebarItem>
+        )}
+      </motion.div>
+    );
+  }
+
+  return (
+    <AnimatePresence initial={false}>
+      {pinnedItems.map((item, index) => renderNavItem(item, index, false))}
+      {orderedDraggable.map((item, index) => renderNavItem(item, pinnedItems.length + index, true))}
     </AnimatePresence>
   );
 }

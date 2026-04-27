@@ -1,31 +1,24 @@
-import { AlertCircle, ChevronDown, FileText, Search, Upload } from 'lucide-react';
+import { AlertCircle, ChevronDown, Search, Upload } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { QRCodeSVG } from 'qrcode.react';
 
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 import { isCurrentUserSuperAdmin } from '@/lib/auth/super-admin-context';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
-import { Badge } from '@/components/ui/badge';
 import { SOP_STATUS, type SopStatus } from '@/lib/types/sop';
+import type { Tag } from '@/lib/types/tags';
 import { UploadSopClient } from './_components/UploadSopClient';
+import { SopListClient, type SopRowWithTags } from './_components/SopListClient';
+import { SopTagFilterBar } from './_components/SopTagFilterBar';
 
 interface PageProps {
   searchParams: Promise<{
     q?: string;
     status?: string;
+    tag?: string;
   }>;
-}
-
-interface SopRow {
-  id: string;
-  title: string;
-  status: SopStatus;
-  updated_at: string;
-  archived_at: string | null;
-  departments: { id: string; name: string } | null;
 }
 
 interface QrRow {
@@ -33,23 +26,13 @@ interface QrRow {
   id: string;
 }
 
-const STATUS_LABEL: Record<SopStatus, { label: string; color: Parameters<typeof Badge>[0]['color'] }> = {
-  draft:                { label: 'Draft',                color: 'zinc' },
-  pending_terms:        { label: 'Pending Terms',         color: 'signal-warn' },
-  pending_translation:  { label: 'Pending Translation',   color: 'signal-info' },
-  pending_approval:     { label: 'Pending Approval',      color: 'signal-hub' },
-  published:            { label: 'Published',             color: 'signal-ok' },
-  archived:             { label: 'Archived',              color: 'signal-neutral' },
-};
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? '';
-
 export default async function SopsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const q = (params.q ?? '').trim();
   const statusFilter: SopStatus | 'all' = (SOP_STATUS as readonly string[]).includes(params.status ?? '')
     ? (params.status as SopStatus)
     : 'all';
+  const tagId = params.tag ?? null;
 
   let ctx;
   try {
@@ -65,7 +48,16 @@ export default async function SopsPage({ searchParams }: PageProps) {
   }
   const { userId, supabase, company_id, role, impersonating } = ctx;
 
-  // ── Fetch SOPs + departments in parallel ─────────────────────────────────
+  // ── Fetch SOPs (optionally filtered by tag) ─────────────────────────────────
+  let sopIds: string[] | null = null;
+  if (tagId) {
+    const { data: taggedRows } = await supabase
+      .from('sop_tags')
+      .select('sop_id')
+      .eq('tag_id', tagId);
+    sopIds = (taggedRows ?? []).map((r: { sop_id: string }) => r.sop_id);
+  }
+
   const sopsPromise = (async () => {
     let query = supabase
       .from('sops')
@@ -74,26 +66,34 @@ export default async function SopsPage({ searchParams }: PageProps) {
       .order('updated_at', { ascending: false });
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
     if (q) query = query.ilike('title', `%${q}%`);
+    if (sopIds !== null) {
+      if (sopIds.length === 0) return { data: [], error: null };
+      query = query.in('id', sopIds);
+    }
     return query;
   })();
 
-  const [{ data: sopRows, error: sopsError }, { data: deptCount }] = await Promise.all([
+  const [{ data: sopRows, error: sopsError }, allTagsResult, { data: deptCount }] = await Promise.all([
     sopsPromise,
+    supabase
+      .from('tags')
+      .select('*')
+      .eq('company_id', company_id)
+      .order('source', { ascending: false })
+      .order('name_en', { ascending: true }),
     supabase
       .from('departments')
       .select('id', { count: 'exact', head: true })
       .eq('company_id', company_id),
   ]);
-  // deptCount is unused in MVP; the variable exists so Supabase actually
-  // runs the count query as a sanity check that RLS lets the manager see
-  // their tenant data. Remove if it ever shows up in profiling.
   void deptCount;
 
-  const sops: SopRow[] = (sopRows ?? []) as unknown as SopRow[];
+  const allTags = (allTagsResult.data ?? []) as Tag[];
+  const baseSops = (sopRows ?? []) as unknown as Omit<SopRowWithTags, 'tags'>[];
 
-  // Resolve QR ids for any published SOP in the result set.
-  const publishedIds = sops.filter((s) => s.status === 'published').map((s) => s.id);
-  let qrByTargetId = new Map<string, string>();
+  // Resolve QR ids for published SOPs.
+  const publishedIds = baseSops.filter((s) => s.status === 'published').map((s) => s.id);
+  let qrByTargetId: Record<string, string> = {};
   if (publishedIds.length > 0) {
     const { data: qrRows } = await supabase
       .from('qr_codes')
@@ -101,17 +101,34 @@ export default async function SopsPage({ searchParams }: PageProps) {
       .eq('company_id', company_id)
       .eq('target_type', 'sop')
       .in('target_id', publishedIds);
-    qrByTargetId = new Map(
+    qrByTargetId = Object.fromEntries(
       ((qrRows ?? []) as QrRow[])
         .filter((q): q is QrRow & { target_id: string } => !!q.target_id)
         .map((q) => [q.target_id, q.id]),
     );
   }
 
-  // Departments for the upload dialog + the audience scope this manager
-  // can target. The creator scope is the same one QR creation uses —
-  // admins / HR managers are unrestricted; other managers can only set
-  // audience to their own department(s) and to manager / employee roles.
+  // Fetch tag assignments for the visible SOPs.
+  const visibleSopIds = baseSops.map((s) => s.id);
+  let tagsBySOPId = new Map<string, Tag[]>();
+  if (visibleSopIds.length > 0) {
+    const { data: assignments } = await supabase
+      .from('sop_tags')
+      .select('sop_id, tags(*)')
+      .in('sop_id', visibleSopIds);
+    for (const row of assignments ?? []) {
+      const r = row as { sop_id: string; tags: Tag };
+      if (!tagsBySOPId.has(r.sop_id)) tagsBySOPId.set(r.sop_id, []);
+      tagsBySOPId.get(r.sop_id)!.push(r.tags);
+    }
+  }
+
+  const sops: SopRowWithTags[] = baseSops.map((s) => ({
+    ...s,
+    tags: tagsBySOPId.get(s.id) ?? [],
+  }));
+
+  // Departments for the upload dialog.
   const [{ data: departments = [] }, creatorScope] = await Promise.all([
     supabase.from('departments').select('id, name').eq('company_id', company_id).order('name'),
     getCreatorScope({ supabase, userId, company_id, role, impersonating }),
@@ -159,7 +176,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
           >
             <option value="all">All statuses</option>
             {SOP_STATUS.map((s) => (
-              <option key={s} value={s}>{STATUS_LABEL[s].label}</option>
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
           <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
@@ -180,6 +197,15 @@ export default async function SopsPage({ searchParams }: PageProps) {
         )}
       </form>
 
+      {allTags.length > 0 && (
+        <SopTagFilterBar
+          allTags={allTags}
+          activeTagId={tagId}
+          q={q}
+          status={statusFilter}
+        />
+      )}
+
       {sopsError && (
         <div className="flex items-start gap-3 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5">
           <AlertCircle className="mt-0.5 size-5 shrink-0 text-(--color-signal-urgent)" />
@@ -190,69 +216,18 @@ export default async function SopsPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {!sopsError && sops.length === 0 && <EmptyState filtered={!!q || statusFilter !== 'all'} />}
+      {!sopsError && sops.length === 0 && (
+        <EmptyState filtered={!!q || statusFilter !== 'all' || !!tagId} />
+      )}
 
       {sops.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {sops.map((sop) => (
-            <SopRowItem
-              key={sop.id}
-              sop={sop}
-              qrId={qrByTargetId.get(sop.id) ?? null}
-            />
-          ))}
-        </ul>
+        <SopListClient
+          sops={sops}
+          allTags={allTags}
+          qrByTargetId={qrByTargetId}
+        />
       )}
     </div>
-  );
-}
-
-function SopRowItem({ sop, qrId }: { sop: SopRow; qrId: string | null }) {
-  const meta = STATUS_LABEL[sop.status];
-
-  return (
-    <li>
-      <Link
-        href={`/dashboard/sops/${sop.id}`}
-        className="group flex items-center gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-4 py-3 transition-colors hover:bg-dc-raised"
-      >
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)"
-        >
-          <FileText className="size-5" strokeWidth={1.75} />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-dc-text">{sop.title}</p>
-          <p className="mt-0.5 text-xs text-dc-text-3">
-            {sop.departments?.name ?? 'No department'}
-            <span className="mx-1.5">·</span>
-            Updated {new Date(sop.updated_at).toLocaleDateString()}
-          </p>
-        </div>
-
-        <Badge color={meta.color}>{meta.label}</Badge>
-
-        {qrId ? (
-          <span
-            aria-label="QR thumbnail"
-            className="hidden shrink-0 rounded-md bg-white p-1 sm:block"
-          >
-            <QRCodeSVG
-              value={`${APP_URL}/s/${qrId}`}
-              size={48}
-              bgColor="#ffffff"
-              fgColor="#000000"
-              level="M"
-              includeMargin={false}
-            />
-          </span>
-        ) : (
-          <span aria-hidden className="hidden size-[48px] shrink-0 sm:block" />
-        )}
-      </Link>
-    </li>
   );
 }
 
