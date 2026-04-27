@@ -5,20 +5,22 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Single entry point for every Claude Sonnet call in OpsFluency.
+ * Single entry point for every Claude API call in OpsFluency.
  *
  * Per `CLAUDE.md` → "AI call conventions":
- * - 60s hard timeout via `AbortController`
+ * - 60s hard timeout via `AbortController` (180s for SOP conversion — see sop-conversion.ts)
  * - 1 retry on 429 / 5xx with jittered backoff (500–1500ms)
  * - Every call writes one `ai_call_log` row (model, tokens, duration, ids)
  * - Never log the full prompt or response at INFO level
  * - Callers never import `@anthropic-ai/sdk` directly
  *
- * Concrete prompt pipelines (`convertSop`, `flagTerms`, etc.) wrap `callSonnet`
- * and live alongside the SOP import feature when it lands.
+ * Both Sonnet (quality-critical steps) and Haiku (structural conversion)
+ * go through `callSonnet`. Pass `input.model` to select Haiku; omit for
+ * Sonnet (default).
  */
 
 export const SONNET_MODEL = "claude-sonnet-4-6";
+export const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 const DEFAULT_TIMEOUT_MS = 180_000;
 const MAX_RETRIES = 1;
 
@@ -55,7 +57,7 @@ export interface SonnetFailure {
     duration_ms?: number;
     /** 1-based attempt count when the failure surfaced. */
     attempt?: number;
-    /** Sonnet model id (kept here so the error payload is fully self-describing). */
+    /** Model id (kept here so the error payload is fully self-describing). */
     model?: string;
   };
 }
@@ -98,19 +100,38 @@ export interface SonnetCallInput<T> {
   parse: (rawText: string) => T;
   /** Optional external signal; the timeout is applied in addition. */
   signal?: AbortSignal;
+  /**
+   * Which Claude model to use. Defaults to `SONNET_MODEL`.
+   * Pass `HAIKU_MODEL` for structural / formatting tasks where reasoning
+   * depth is less critical and throughput / cost matter more.
+   */
+  model?: string;
 }
 
 /**
- * Runs a single Sonnet call with timeout, one retry on transient errors,
- * a parsing step, and a cost-log write. Never throws for recognized failure
- * modes — returns `{ ok: false, error }` so callers can discriminate.
+ * Runs a single Claude API call with timeout, one retry on transient errors,
+ * a parsing step, prompt caching on the system prompt, and a cost-log write.
+ * Never throws for recognized failure modes — returns `{ ok: false, error }`
+ * so callers can discriminate.
  */
 export async function callSonnet<T>(
   input: SonnetCallInput<T>,
   ctx: SonnetCallContext,
 ): Promise<SonnetResult<T>> {
   const start = Date.now();
+  const modelToUse = input.model ?? SONNET_MODEL;
   let lastError: unknown;
+
+  // Cache the system prompt so repeat calls within the same session
+  // (e.g. a manager uploading several SOPs) hit the cache after the
+  // first write and pay 0.1× the input rate on those tokens.
+  const systemBlocks: Anthropic.Messages.TextBlockParam[] = [
+    {
+      type: "text",
+      text: input.systemPrompt,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const controller = new AbortController();
@@ -123,12 +144,9 @@ export async function callSonnet<T>(
     try {
       const response = await getClient().messages.create(
         {
-          model: SONNET_MODEL,
+          model: modelToUse,
           max_tokens: input.maxTokens,
-          system: input.systemPrompt,
-          // The Anthropic SDK narrows image media_type to a specific union;
-          // SOP_UPLOAD_MIME_TYPES enforces the same set on input. Cast at the
-          // SDK boundary so the call site stays clean.
+          system: systemBlocks,
           messages: [
             {
               role: "user",
@@ -153,7 +171,7 @@ export async function callSonnet<T>(
       if (response.stop_reason === "max_tokens") {
         await logCall({
           ctx,
-          model: SONNET_MODEL,
+          model: modelToUse,
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
           durationMs: Date.now() - start,
@@ -163,11 +181,11 @@ export async function callSonnet<T>(
           error: {
             code: "AI_TRUNCATED",
             retry_allowed: false,
-            message: `Sonnet hit the ${input.maxTokens}-token output cap. Document is unusually long — split it or raise maxTokens.`,
+            message: `Model hit the ${input.maxTokens}-token output cap. Document is unusually long — split it or raise maxTokens.`,
             raw: rawText.slice(0, 2048),
             duration_ms: Date.now() - start,
             attempt: attempt + 1,
-            model: SONNET_MODEL,
+            model: modelToUse,
           },
         };
       }
@@ -178,7 +196,7 @@ export async function callSonnet<T>(
       } catch {
         await logCall({
           ctx,
-          model: SONNET_MODEL,
+          model: modelToUse,
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
           durationMs: Date.now() - start,
@@ -191,14 +209,14 @@ export async function callSonnet<T>(
             raw: rawText.slice(0, 2048),
             duration_ms: Date.now() - start,
             attempt: attempt + 1,
-            model: SONNET_MODEL,
+            model: modelToUse,
           },
         };
       }
 
       await logCall({
         ctx,
-        model: SONNET_MODEL,
+        model: modelToUse,
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
         durationMs: Date.now() - start,
@@ -221,10 +239,10 @@ export async function callSonnet<T>(
           error: {
             code: "AI_TIMEOUT",
             retry_allowed: true,
-            message: `Sonnet did not respond within ${DEFAULT_TIMEOUT_MS / 1000}s`,
+            message: `Model did not respond within ${DEFAULT_TIMEOUT_MS / 1000}s`,
             duration_ms: Date.now() - start,
             attempt: attempt + 1,
-            model: SONNET_MODEL,
+            model: modelToUse,
           },
         };
       }
@@ -243,7 +261,7 @@ export async function callSonnet<T>(
             message: err instanceof Error ? err.message : "429 from Anthropic",
             duration_ms: Date.now() - start,
             attempt: attempt + 1,
-            model: SONNET_MODEL,
+            model: modelToUse,
           },
         };
       }
@@ -256,7 +274,7 @@ export async function callSonnet<T>(
           message: err instanceof Error ? err.message : String(err),
           duration_ms: Date.now() - start,
           attempt: attempt + 1,
-          model: SONNET_MODEL,
+          model: modelToUse,
         },
       };
     } finally {
@@ -272,7 +290,7 @@ export async function callSonnet<T>(
       message: lastError instanceof Error ? lastError.message : String(lastError),
       duration_ms: Date.now() - start,
       attempt: MAX_RETRIES + 1,
-      model: SONNET_MODEL,
+      model: modelToUse,
     },
   };
 }
@@ -342,7 +360,6 @@ async function logCall({
       duration_ms: durationMs,
     });
   } catch {
-    // Log table may not exist yet (pre-Phase-5) — never fail the main call
-    // over a missed telemetry row.
+    // Telemetry must never fail the main call.
   }
 }

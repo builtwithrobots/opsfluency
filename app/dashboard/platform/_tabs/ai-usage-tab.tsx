@@ -4,27 +4,29 @@ import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { getAdminClient } from "@/lib/supabase/admin";
 
-const ROLLUP_DAYS = 30;
+import { TenantDeleteButton } from "./tenant-delete-button";
 
 type UnitKind = "token" | "character";
 
-// Rough public pricing as of 2026-Q1. These are best-effort estimates
-// for the platform dashboard, not billing-grade. When Anthropic or
-// Google updates prices, update this table; surfacing it as a constant
-// keeps the source visible in code review instead of hiding inside a
-// calc.
+const PRESET_DAYS = [7, 30, 90] as const;
+type PresetDays = (typeof PRESET_DAYS)[number];
+
+function isPresetDays(n: number): n is PresetDays {
+  return PRESET_DAYS.includes(n as PresetDays);
+}
+
+// Rough public pricing as of 2026-Q1. Best-effort for the platform
+// dashboard — always reconcile against each provider's billing portal.
 //
-// $ per 1M units. The unit is `unit_kind`-dependent: tokens for
-// Anthropic, source characters for Google. Google bills source only,
-// so its `output` rate is 0.
+// $ per 1M units. Unit is `unit_kind`-dependent: tokens for Anthropic,
+// source characters for Google. Google bills source only (output rate 0).
 const PRICE_PER_M_UNITS: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-6":   { input: 3,    output: 15 },
-  "claude-haiku-4-5":    { input: 0.8,  output: 4 },
+  "claude-haiku-4-5-20251001": { input: 0.80, output: 4 },
+  "claude-haiku-4-5":    { input: 0.80, output: 4 },
   "google-translate-v2": { input: 20,   output: 0 },
-  // Fallback for any unrecognized model — use Sonnet pricing as a
-  // conservative upper-bound estimate so unknown models never look
-  // cheaper than they are.
-  default:                { input: 3,    output: 15 },
+  // Conservative upper-bound fallback so unknown models never look cheaper.
+  default:               { input: 3,    output: 15 },
 };
 
 interface AiCallRow {
@@ -51,12 +53,13 @@ interface TenantRollup {
   company_id: string;
   company_name: string | null;
   calls: number;
-  /** Cost attributable to token-billed providers (Anthropic). */
   anthropic_cost: number;
-  /** Cost attributable to character-billed providers (Google Translate). */
   google_cost: number;
-  /** Sum of the per-vendor costs — also the table's sort key. */
   total_cost: number;
+  input_tokens: number;
+  output_tokens: number;
+  input_chars: number;
+  output_chars: number;
 }
 
 interface UsageData {
@@ -71,22 +74,16 @@ interface UsageData {
   topTenants: TenantRollup[];
 }
 
-function estimateCost(
-  model: string,
-  inputUnits: number,
-  outputUnits: number,
-): number {
+function estimateCost(model: string, inputUnits: number, outputUnits: number): number {
   const price = PRICE_PER_M_UNITS[model] ?? PRICE_PER_M_UNITS.default;
   return (inputUnits * price.input + outputUnits * price.output) / 1_000_000;
 }
 
-async function loadUsage(): Promise<UsageData> {
-  // ai_call_log is REVOKE'd from anon + authenticated. Service-role
-  // only. Window is a rolling 30 days — long enough to smooth out
-  // spiky days, short enough to stay a single-query read.
+async function loadUsage(days: number): Promise<UsageData> {
+  // ai_call_log is REVOKE'd from anon + authenticated. Service-role only.
   const admin = getAdminClient();
 
-  const since = new Date(Date.now() - ROLLUP_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data: calls, error } = await admin
     .from("ai_call_log")
     .select("model, input_units, output_units, unit_kind, duration_ms, company_id, created_at")
@@ -103,9 +100,6 @@ async function loadUsage(): Promise<UsageData> {
   let totalInputChars = 0;
   let totalOutputChars = 0;
 
-  // Per-model rollup keyed by (model, unit_kind) — a future model that
-  // billed both wouldn't merge into a single row. Today every model
-  // has exactly one unit_kind, but the key shape stays correct.
   const modelMap = new Map<string, ModelRollup>();
   const tenantMap = new Map<string, TenantRollup>();
 
@@ -140,23 +134,30 @@ async function loadUsage(): Promise<UsageData> {
     modelMap.set(mKey, m);
 
     if (r.company_id) {
-      const tKey = r.company_id;
-      const t = tenantMap.get(tKey) ?? {
-        company_id: tKey,
+      const t = tenantMap.get(r.company_id) ?? {
+        company_id: r.company_id,
         company_name: null,
         calls: 0,
         anthropic_cost: 0,
         google_cost: 0,
         total_cost: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        input_chars: 0,
+        output_chars: 0,
       };
       t.calls += 1;
-      // Split tenant spend by vendor so abuse jumps out — a tenant
-      // suddenly burning Google chars while their Sonnet usage is
-      // flat is a different problem from one calling convert in a loop.
-      if (r.unit_kind === "token") t.anthropic_cost += cost;
-      else t.google_cost += cost;
+      if (r.unit_kind === "token") {
+        t.anthropic_cost += cost;
+        t.input_tokens += r.input_units;
+        t.output_tokens += r.output_units;
+      } else {
+        t.google_cost += cost;
+        t.input_chars += r.input_units;
+        t.output_chars += r.output_units;
+      }
       t.total_cost += cost;
-      tenantMap.set(tKey, t);
+      tenantMap.set(r.company_id, t);
     }
   }
 
@@ -195,6 +196,10 @@ async function loadUsage(): Promise<UsageData> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
 function fmtUnits(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
@@ -215,33 +220,64 @@ function unitKindLabel(kind: UnitKind, count: number): string {
   return count === 1 ? "character" : "characters";
 }
 
-export async function AiUsageTab() {
-  const data = await loadUsage();
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+interface AiUsageTabProps {
+  days?: number;
+}
+
+export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
+  const days = isPresetDays(rawDays) ? rawDays : 30;
+  const data = await loadUsage(days);
 
   const hasTokens = data.totalInputTokens + data.totalOutputTokens > 0;
   const hasChars = data.totalInputChars + data.totalOutputChars > 0;
 
   return (
     <section className="flex flex-col gap-6">
-      <div>
-        <Heading level={2} className="font-display text-xl">
-          AI usage — last {ROLLUP_DAYS} days
-        </Heading>
-        <Text className="mt-1 max-w-2xl text-sm">
-          Rolled up from <code className="rounded bg-dc-raised px-1 text-xs">ai_call_log</code>{" "}
-          across every provider — Anthropic Sonnet for SOP conversion (billed per
-          token) and Google Cloud Translation for English → Spanish (billed per
-          source character). Cost estimates are best-effort against published
-          pricing — always reconcile against each provider&apos;s billing portal
-          for anything finance-grade.
-        </Text>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Heading level={2} className="font-display text-xl">
+            AI usage
+          </Heading>
+          <Text className="mt-1 max-w-2xl text-sm">
+            Rolled up from{" "}
+            <code className="rounded bg-dc-raised px-1 text-xs">ai_call_log</code>{" "}
+            across every provider — Anthropic Haiku/Sonnet for SOP conversion (billed
+            per token) and Google Cloud Translation for English → Spanish (billed per
+            source character). Cost estimates are best-effort against published
+            pricing — always reconcile against each provider&apos;s billing portal
+            for anything finance-grade.
+          </Text>
+        </div>
+
+        {/* Date range presets */}
+        <nav className="flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised p-1">
+          {PRESET_DAYS.map((d) => (
+            <a
+              key={d}
+              href={`/dashboard/platform?tab=ai&days=${d}`}
+              className={[
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                d === days
+                  ? "bg-dc-surface text-dc-text shadow-xs"
+                  : "text-dc-text-3 hover:text-dc-text-2",
+              ].join(" ")}
+            >
+              {d}d
+            </a>
+          ))}
+        </nav>
       </div>
 
-      {/* Headline stats — cost is the universal currency, so it leads. */}
+      {/* Headline stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <SimpleStat
           label="Calls"
           value={data.totalCalls.toLocaleString()}
+          sub={`last ${days} days`}
           icon={<Cpu className="size-5" strokeWidth={2} />}
         />
         <SimpleStat
@@ -256,10 +292,7 @@ export async function AiUsageTab() {
         />
       </div>
 
-      {/* Per-unit breakdown — both cards always render so the row stays
-          balanced even before the first translation lands. The kind
-          with no data shows muted zeros so it's clear logging is wired
-          and just waiting for activity. */}
+      {/* Per-unit breakdown */}
       {(hasTokens || hasChars) && (
         <div className="grid gap-3 sm:grid-cols-2">
           <UnitBreakdown
@@ -285,7 +318,7 @@ export async function AiUsageTab() {
       <div>
         <Heading level={3} className="font-display text-base">By model</Heading>
         {!data.byModel.length ? (
-          <EmptyRow>No AI calls recorded in the last {ROLLUP_DAYS} days.</EmptyRow>
+          <EmptyRow>No AI calls recorded in the last {days} days.</EmptyRow>
         ) : (
           <div className="mt-2 overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
             <table className="w-full text-sm">
@@ -338,9 +371,7 @@ export async function AiUsageTab() {
         )}
       </div>
 
-      {/* Top tenants — split per-vendor so abuse signals are unambiguous.
-          A tenant whose Google column outruns their Anthropic column has
-          a different problem from one calling convert on repeat. */}
+      {/* Top tenants */}
       <div>
         <Heading level={3} className="font-display text-base">Top tenants by spend</Heading>
         {!data.topTenants.length ? (
@@ -355,13 +386,16 @@ export async function AiUsageTab() {
                   <th className="px-4 py-2.5 text-right">Anthropic</th>
                   <th className="px-4 py-2.5 text-right">Google</th>
                   <th className="px-4 py-2.5 text-right">Total</th>
+                  <th className="px-4 py-2.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--dc-edge)]">
                 {data.topTenants.map((t) => (
                   <tr key={t.company_id}>
                     <td className="px-4 py-2.5">
-                      {t.company_name ?? (
+                      {t.company_name ? (
+                        <span className="text-dc-text">{t.company_name}</span>
+                      ) : (
                         <span className="italic text-dc-text-3">deleted tenant</span>
                       )}
                       <span className="ml-2 font-mono text-xs text-dc-text-3">
@@ -371,14 +405,35 @@ export async function AiUsageTab() {
                     <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
                       {t.calls.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      {t.anthropic_cost > 0 ? fmtUsd(t.anthropic_cost) : <span className="text-dc-text-3">—</span>}
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {t.anthropic_cost > 0 ? (
+                        <div>
+                          <div className="font-medium text-dc-text-2">{fmtUsd(t.anthropic_cost)}</div>
+                          <div className="mt-0.5 text-[10px] text-dc-text-3 tabular-nums">
+                            {fmtUnits(t.input_tokens)} in · {fmtUnits(t.output_tokens)} out
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-dc-text-3">—</span>
+                      )}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      {t.google_cost > 0 ? fmtUsd(t.google_cost) : <span className="text-dc-text-3">—</span>}
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {t.google_cost > 0 ? (
+                        <div>
+                          <div className="font-medium text-dc-text-2">{fmtUsd(t.google_cost)}</div>
+                          <div className="mt-0.5 text-[10px] text-dc-text-3 tabular-nums">
+                            {fmtUnits(t.input_chars)} in · {fmtUnits(t.output_chars)} out
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-dc-text-3">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">
                       {fmtUsd(t.total_cost)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <TenantDeleteButton companyId={t.company_id} />
                     </td>
                   </tr>
                 ))}
@@ -391,13 +446,19 @@ export async function AiUsageTab() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
 function SimpleStat({
   label,
   value,
+  sub,
   icon,
 }: {
   label: string;
   value: string;
+  sub?: string;
   icon: React.ReactNode;
 }) {
   return (
@@ -406,6 +467,7 @@ function SimpleStat({
         <div>
           <p className="text-xs font-medium tracking-[0.1em] text-dc-text-3 uppercase">{label}</p>
           <p className="font-display mt-2 text-2xl font-semibold text-dc-text tabular-nums">{value}</p>
+          {sub && <p className="mt-0.5 text-[11px] text-dc-text-3">{sub}</p>}
         </div>
         <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)">
           {icon}
@@ -430,9 +492,6 @@ function UnitBreakdown({
   output: number;
   empty?: boolean;
 }) {
-  // When this kind has no data yet, dim the value text rather than
-  // hiding the card. The grid stays balanced and the super admin can
-  // see the slot exists and is just waiting for activity.
   const valueClass = empty
     ? "mt-1 text-lg font-semibold text-dc-text-3 tabular-nums"
     : "mt-1 text-lg font-semibold text-dc-text tabular-nums";
