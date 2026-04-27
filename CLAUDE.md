@@ -629,13 +629,13 @@ Server Actions return `{ ok: false, error: { code, ... } }` instead of throwing 
 
 SOP import runs two AI calls per document. The split reduces per-SOP cost ~55% compared to a single combined Sonnet call, with no quality regression because each model is doing only the task it's well-suited for.
 
-**Call 1 — Haiku (`claude-haiku-4-5-20251001`):** raw document → clean Markdown.
-Structural/formatting work: parse layout, preserve headings/steps/tables/warnings, strip page chrome. Deterministic enough that Haiku handles it well. `max_tokens: 16384`. Glossary is NOT injected here — glossary is only needed for term flagging.
+**Call 1 — Sonnet (`claude-sonnet-4-6`):** raw document → clean Markdown.
+Sonnet for both calls — SOPs are safety-critical documents and managers should not need to proof the Markdown output for structural errors. Sonnet's consistency over complex tables, implied warnings, and ambiguous layouts is worth the cost over Haiku. `max_tokens: 16384`. Glossary is NOT injected here — only needed for term flagging.
 
 **Call 2 — Sonnet (`claude-sonnet-4-6`):** Markdown + company glossary → flagged site-specific terms.
-Reasoning-heavy: must distinguish generic English from in-house proper nouns, acronyms, and equipment jargon. Sonnet's quality here gates translation accuracy for every worker. Input is the compact Markdown (not the raw document), so the Sonnet call is ~60% cheaper than the previous single-call design. `max_tokens: 4096`.
+Reasoning-heavy: must distinguish generic English from in-house proper nouns, acronyms, and equipment jargon. Input is the compact Markdown (not the raw document), so this call is significantly cheaper than a single combined call. `max_tokens: 4096`.
 
-Both calls write separate `ai_call_log` rows so the AI usage tab can show per-model attribution correctly.
+Both calls write separate `ai_call_log` rows so the AI usage tab can show per-call cost attribution correctly.
 
 **Never use Claude for translation.** Google Cloud Translation API with glossary injection is purpose-built for this, significantly cheaper, and produces consistent results.
 
@@ -644,7 +644,7 @@ Both calls write separate `ai_call_log` rows so the AI usage tab can show per-mo
 - Haiku call: static conversion instructions → `{ "markdown": "..." }` JSON only, no fences.
 - Sonnet call: static flagging instructions + injected glossary → `{ "flagged_terms": [{ "term", "reason", "suggested_definition_en", "suggested_term_es" }] }` JSON only.
 
-All Claude calls go through `callSonnet()` in `lib/ai/sonnet.ts`. Pass `model: HAIKU_MODEL` for Haiku; omit or pass `model: SONNET_MODEL` for Sonnet. Callers never import `@anthropic-ai/sdk` directly — if a call site does, that's a bug.
+All Claude calls go through `callSonnet()` in `lib/ai/sonnet.ts`. Pass `model: SONNET_MODEL` or omit for Sonnet (default). `HAIKU_MODEL` is exported for Phase 2 high-frequency lightweight tasks — never for SOP conversion. Callers never import `@anthropic-ai/sdk` directly — if a call site does, that's a bug.
 
 ### AI call conventions (every Claude and Google Translate call)
 

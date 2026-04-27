@@ -36,10 +36,12 @@ SOP import now runs **two Claude calls** per document, not one:
 
 | Call | Model | Task | max_tokens |
 |---|---|---|---|
-| 1 | `claude-haiku-4-5-20251001` | Raw document → clean Markdown | 16,384 |
+| 1 | `claude-sonnet-4-6` | Raw document → clean Markdown | 16,384 |
 | 2 | `claude-sonnet-4-6` | Markdown + glossary → flagged site-specific terms | 4,096 |
 
-Sonnet's input is the compact Markdown (not the raw document), so it processes ~60% fewer tokens than the old single-call design. Both calls use `cache_control: { type: 'ephemeral' }` on the system prompt — repeat uploads within a session pay $0.10/M (Haiku) or $0.30/M (Sonnet) on cached tokens instead of the full input rate.
+Sonnet for both steps — SOPs are safety-critical documents and managers should not need to proof the Markdown output for structural errors. The quality floor matters more than the cost difference (~$4 on a 100-SOP onboarding).
+
+Call 2's input is the compact Markdown (not the raw document), so the split is still cheaper than the original single-call design. Both calls use `cache_control: { type: 'ephemeral' }` on the system prompt — cached reads pay $0.30/M instead of $3/M on Sonnet input tokens.
 
 ### Pricing used
 
@@ -61,16 +63,13 @@ Restated for the new two-call architecture (Haiku + Sonnet):
 
 | Component | Estimated cost | Per SOP |
 |---|---|---|
-| Haiku — Markdown conversion | ~$0.028 | $0.014 |
-| Sonnet — term flagging (Markdown input only) | ~$0.019 | $0.010 |
+| Sonnet — Markdown conversion | ~$0.058 | $0.058 |
+| Sonnet — term flagging (Markdown input only) | ~$0.019 | $0.019 |
 | Google Translation | ~$0.168 | $0.168 |
-| **Total (new architecture)** | **~$0.215** | **~$0.192** |
+| **Total (current architecture)** | **~$0.245** | **~$0.245** |
 
-> Haiku input/output rates verified April 2026: $1.00/$5.00 per M tokens (previously documented as
-> $0.80/$4.00 — the old rates were incorrect). Impact on per-SOP cost is +$0.003; immaterial in practice.
-
-**Cost per page: ~$0.04** (new) / ~$0.05 (old). Holds well for 3–10 page SOPs.
-Short SOPs (1–2 pages) run slightly higher per page because the system prompt and glossary are fixed overhead regardless of document length.
+**Cost per page: ~$0.05.** Holds well for 3–10 page SOPs.
+Short SOPs (1–2 pages) run slightly higher per page because the system prompt is fixed overhead regardless of document length.
 
 ### Where cost actually lives
 
@@ -222,7 +221,7 @@ SOP conversions hold a serverless function open for up to 180s (the Haiku + Sonn
 
 | Lever | Savings | Quality risk | Status |
 |---|---|---|---|
-| **Haiku for Markdown conversion** (Call 1 of 2) | ~69% on Anthropic costs; ~27% total | None — Haiku handles structural conversion well; Sonnet still owns the reasoning-heavy flagging step | ✅ **Shipped** (PR #135) |
+| **Haiku for Markdown conversion** (Call 1 of 2) | ~27% total cost reduction | Real — complex tables, implied warnings, scanned PDFs. Managers would need to proof conversion output. Not worth it for safety-critical documents. | ❌ **Evaluated and rejected** — quality floor > cost savings |
 | **Prompt caching** on system prompts | 10–20% on input tokens; up to 90% on repeat calls within a session | None | ✅ **Shipped** (PR #135) |
 | **Pre-extract text from digital PDFs** — skip vision when PDF has a text layer | 5–10× cheaper Haiku input on text-layer PDFs (most Word→PDF exports) | Modest — loses some table/diagram fidelity. A/B on real SOPs first | Not started |
 | **Google Translation v3 + registered glossary** | Eliminates placeholder-substitution workaround; potentially better term consistency | Low | Not started — worth revisiting when glossary size grows |

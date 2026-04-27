@@ -2,15 +2,16 @@ import "server-only";
 
 import type { GlossaryRow } from "@/lib/types/glossary";
 
-import { HAIKU_MODEL, SONNET_MODEL, callSonnet, type SonnetResult, type SonnetUserContent } from "./sonnet";
+import { SONNET_MODEL, callSonnet, type SonnetResult, type SonnetUserContent } from "./sonnet";
 
 /**
- * SOP conversion — two-call pipeline.
+ * SOP conversion — two-call pipeline, both calls on Sonnet.
  *
- * Call 1 — Haiku: raw document → clean Markdown.
- *   Structural / formatting work. Haiku is fast and cheap here because
- *   the task is deterministic: parse layout, emit Markdown. No reasoning
- *   about meaning required.
+ * Call 1 — Sonnet: raw document → clean Markdown.
+ *   Sonnet for both steps because SOPs are safety-critical documents.
+ *   Managers should not need to proof the Markdown output for structural
+ *   errors — Sonnet's consistency over complex tables, implied warnings,
+ *   and ambiguous layouts justifies the cost over Haiku.
  *
  * Call 2 — Sonnet: Markdown + glossary → flagged site-specific terms.
  *   Reasoning-heavy: Sonnet must distinguish generic English from
@@ -46,7 +47,7 @@ export interface SopConversionResult {
 // Call 1 — Haiku: document → Markdown
 // ---------------------------------------------------------------------------
 
-const HAIKU_CONVERSION_SYSTEM = `You are an expert technical writer at OpsFluency, a tool that delivers bilingual SOPs to warehouse and manufacturing workers via QR code. Convert a Standard Operating Procedure document into clean, mobile-friendly Markdown.
+const CONVERSION_SYSTEM_PROMPT = `You are an expert technical writer at OpsFluency, a tool that delivers bilingual SOPs to warehouse and manufacturing workers via QR code. Convert a Standard Operating Procedure document into clean, mobile-friendly Markdown.
 
 Rules:
 1. Output JSON only in exactly this shape, no Markdown fences, no commentary:
@@ -153,11 +154,11 @@ async function runPipeline(
 ): Promise<SonnetResult<SopConversionResult>> {
   const ctx = { sopId: base.sopId, companyId: base.companyId };
 
-  // Step 1 — Haiku converts the raw document to Markdown.
+  // Step 1 — Sonnet converts the raw document to Markdown.
   const conversionResult = await callSonnet<MarkdownOnly>(
     {
-      model: HAIKU_MODEL,
-      systemPrompt: HAIKU_CONVERSION_SYSTEM,
+      model: SONNET_MODEL,
+      systemPrompt: CONVERSION_SYSTEM_PROMPT,
       userMessage,
       maxTokens: 16384,
       parse: parseMarkdownResponse,
@@ -171,8 +172,8 @@ async function runPipeline(
   const { markdown } = conversionResult.data;
 
   // Step 2 — Sonnet flags site-specific terms from the compact Markdown.
-  // Input is ~60% smaller than the raw document, so Sonnet cost is
-  // significantly lower than running a single combined Sonnet call.
+  // Input is the Markdown only (not the raw document), so this call is
+  // significantly cheaper than a single combined call would be.
   const flaggingResult = await callSonnet<FlaggedTermsOnly>(
     {
       model: SONNET_MODEL,
