@@ -9,6 +9,8 @@ import { formatPhoneDisplay } from "@/lib/employees/phone";
 import { InviteFormClient } from "./_components/InviteFormClient";
 import { JoinQrClient } from "./_components/JoinQrClient";
 import { PendingInvitesList, type InviteRow } from "./_components/PendingInvitesList";
+import { BulkUploadClient } from "./_components/BulkUploadClient";
+import { EditEmployeeButton } from "./_components/EditEmployeeButton";
 
 interface EmployeeProfile {
   clerk_user_id: string;
@@ -31,7 +33,7 @@ export default async function EmployeesPage() {
     supabase.from("companies").select("name").eq("id", company_id).single(),
     supabase
       .from("company_members")
-      .select("id, clerk_user_id, joined_at")
+      .select("id, clerk_user_id, role, joined_at")
       .eq("company_id", company_id)
       .eq("role", "employee")
       .order("joined_at", { ascending: false }),
@@ -64,12 +66,17 @@ export default async function EmployeesPage() {
     depts.map((d: { id: string; name: string }) => [d.id, d.name]),
   );
 
-  // department names keyed by company_members.id
+  // Department names AND ids keyed by company_members.id
   const deptsByMemberId = new Map<string, string[]>();
+  const deptIdsByMemberId = new Map<string, string[]>();
   for (const a of (deptAssignmentsResult.data ?? []) as { member_id: string; department_id: string }[]) {
-    if (!deptsByMemberId.has(a.member_id)) deptsByMemberId.set(a.member_id, []);
+    if (!deptsByMemberId.has(a.member_id)) {
+      deptsByMemberId.set(a.member_id, []);
+      deptIdsByMemberId.set(a.member_id, []);
+    }
     const name = deptMap[a.department_id];
     if (name) deptsByMemberId.get(a.member_id)!.push(name);
+    deptIdsByMemberId.get(a.member_id)!.push(a.department_id);
   }
 
   const profileByClerkId = new Map<string, EmployeeProfile>(
@@ -81,7 +88,7 @@ export default async function EmployeesPage() {
   // Enrich members with Clerk identity
   const clerk = await clerkClient();
   const enriched = await Promise.all(
-    ((membersResult.data ?? []) as { id: string; clerk_user_id: string; joined_at: string | null }[]).map(async (m) => {
+    ((membersResult.data ?? []) as { id: string; clerk_user_id: string; role: string; joined_at: string | null }[]).map(async (m) => {
       try {
         const user = await clerk.users.getUser(m.clerk_user_id);
         return {
@@ -119,7 +126,10 @@ export default async function EmployeesPage() {
             assignments.
           </Text>
         </div>
-        <InviteFormClient departments={depts} />
+        <div className="flex items-center gap-2">
+          <BulkUploadClient departments={depts} />
+          <InviteFormClient departments={depts} />
+        </div>
       </header>
 
       {/* Join QR */}
@@ -140,7 +150,7 @@ export default async function EmployeesPage() {
             </span>
           )}
         </div>
-        <PendingInvitesList invites={invites} deptMap={deptMap} />
+        <PendingInvitesList invites={invites} deptMap={deptMap} departments={depts} />
       </section>
 
       {/* Active employees */}
@@ -162,9 +172,10 @@ export default async function EmployeesPage() {
           </div>
         ) : (
           <ul className="divide-y divide-[color:var(--dc-edge)] overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
-            {enriched.map((m: { id: string; clerk_user_id: string; joined_at: string | null; email: string; displayName: string | null; imageUrl: string | null }) => {
+            {enriched.map((m: { id: string; clerk_user_id: string; role: string; joined_at: string | null; email: string; displayName: string | null; imageUrl: string | null }) => {
               const profile = profileByClerkId.get(m.clerk_user_id);
               const memberDepts = deptsByMemberId.get(m.id) ?? [];
+              const memberDeptIds = deptIdsByMemberId.get(m.id) ?? [];
               const joinedDate = m.joined_at
                 ? new Date(m.joined_at).toLocaleDateString()
                 : null;
@@ -230,6 +241,16 @@ export default async function EmployeesPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Edit */}
+                  <EditEmployeeButton
+                    memberId={m.id}
+                    clerkUserId={m.clerk_user_id}
+                    displayName={m.displayName}
+                    currentRole={m.role}
+                    departments={depts}
+                    memberDeptIds={memberDeptIds}
+                  />
                 </li>
               );
             })}

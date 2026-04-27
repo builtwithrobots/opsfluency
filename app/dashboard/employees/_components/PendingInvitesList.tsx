@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 
 import { deleteInvite } from "../_actions/employees";
 import { formatPhoneDisplay } from "@/lib/employees/phone";
+import { EditInviteButton } from "./EditInviteButton";
 
 export interface InviteRow {
   id: string;
@@ -13,12 +14,18 @@ export interface InviteRow {
   invited_at: string;
 }
 
+interface Dept {
+  id: string;
+  name: string;
+}
+
 interface Props {
   invites: InviteRow[];
   deptMap: Record<string, string>;
+  departments: Dept[];
 }
 
-export function PendingInvitesList({ invites, deptMap }: Props) {
+export function PendingInvitesList({ invites, deptMap, departments }: Props) {
   if (!invites.length) {
     return (
       <div className="rounded-xl border border-dashed border-[color:var(--dc-edge)] bg-dc-surface px-6 py-8 text-center">
@@ -100,17 +107,21 @@ export function PendingInvitesList({ invites, deptMap }: Props) {
               </div>
             </div>
 
-            {/* Delete */}
-            <form action={deleteInvite}>
-              <input type="hidden" name="id" value={invite.id} />
-              <button
-                type="submit"
-                className="flex items-center gap-1.5 rounded-md border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-(--color-signal-urgent) uppercase hover:bg-(--color-signal-urgent)/20"
-              >
-                <Trash2 className="size-3" strokeWidth={2} />
-                Delete
-              </button>
-            </form>
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <EditInviteButton invite={invite} departments={departments} />
+
+              <form action={deleteInvite}>
+                <input type="hidden" name="id" value={invite.id} />
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 rounded-md border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-(--color-signal-urgent) uppercase hover:bg-(--color-signal-urgent)/20"
+                >
+                  <Trash2 className="size-3" strokeWidth={2} />
+                  Delete
+                </button>
+              </form>
+            </div>
           </li>
         );
       })}
