@@ -46,7 +46,7 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
 
   const { data: sop } = await supabase
     .from('sops')
-    .select('id, title, status, audience_department_ids, audience_roles')
+    .select('id, title, status')
     .eq('id', id)
     .maybeSingle();
   if (!sop) notFound();
@@ -63,14 +63,30 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
     );
   }
 
-  // Audience gate. Admins and HR managers always pass via passesAudience's
-  // built-in admin carve-out + the unrestricted-creator-scope mapping. For
-  // everyone else we resolve their department list and run the same shared
-  // helper that powers the QR scan flow.
-  const audience: QrAudience = {
-    department_ids: ((sop as unknown as { audience_department_ids?: string[] }).audience_department_ids ?? []) as string[],
-    roles: ((sop as unknown as { audience_roles?: Role[] }).audience_roles ?? []) as Role[],
-  };
+  // Audience gate. Audience columns live behind migration
+  // 20260427000002 — read them in a separate try/catch so a missing
+  // column never blocks worker access. If the read fails, we fall
+  // through to "no audience set" which `passesAudience` treats as
+  // "everyone in the company" — the safe legacy behaviour.
+  let audience: QrAudience = { department_ids: [], roles: [] };
+  try {
+    const { data: audienceRow, error: audienceErr } = await supabase
+      .from('sops')
+      .select('audience_department_ids, audience_roles')
+      .eq('id', id)
+      .maybeSingle();
+    if (audienceErr) {
+      console.warn('[worker sop] audience read failed', { id, code: audienceErr.code, message: audienceErr.message });
+    } else if (audienceRow) {
+      audience = {
+        department_ids: ((audienceRow as { audience_department_ids?: string[] | null }).audience_department_ids ?? []) as string[],
+        roles: ((audienceRow as { audience_roles?: Role[] | null }).audience_roles ?? []) as Role[],
+      };
+    }
+  } catch (err) {
+    console.warn('[worker sop] audience read threw', { id, message: err instanceof Error ? err.message : String(err) });
+  }
+
   const { data: memberRow } = await supabase
     .from('company_members')
     .select('id')

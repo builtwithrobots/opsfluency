@@ -82,11 +82,40 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
 
   const { data: sop, error: sopErr } = await supabase
     .from('sops')
-    .select('id, title, status, department_id, audience_department_ids, audience_roles, created_at, updated_at, archived_at, departments(id, name)')
+    .select('id, title, status, department_id, created_at, updated_at, archived_at, departments(id, name)')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
   if (sopErr || !sop) notFound();
+
+  // Audience columns live behind migration 20260427000002. Read them in a
+  // separate try/catch so a missing-column or transient PostgREST error
+  // never takes down the whole detail page — the manager can still see
+  // their SOP, edit content, and run translation; they just can't open
+  // the Audience tab until the migration lands. Fall back to empty
+  // (= "everyone in the company"), which is the safest legacy behaviour.
+  let sopAudience: { department_ids: string[]; roles: Role[] } = {
+    department_ids: [],
+    roles: [],
+  };
+  try {
+    const { data: audienceRow, error: audienceErr } = await supabase
+      .from('sops')
+      .select('audience_department_ids, audience_roles')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (audienceErr) {
+      console.warn('[sop detail] audience read failed', { id, code: audienceErr.code, message: audienceErr.message });
+    } else if (audienceRow) {
+      sopAudience = {
+        department_ids: ((audienceRow as { audience_department_ids?: string[] | null }).audience_department_ids ?? []) as string[],
+        roles: ((audienceRow as { audience_roles?: Role[] | null }).audience_roles ?? []) as Role[],
+      };
+    }
+  } catch (err) {
+    console.warn('[sop detail] audience read threw', { id, message: err instanceof Error ? err.message : String(err) });
+  }
 
   const status = sop.status as SopStatus;
   const deptRaw = sop.departments as unknown as { id: string; name: string } | { id: string; name: string }[] | null;
@@ -141,10 +170,6 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     allDepartments = deptRows ?? [];
     creatorScope = scope;
   }
-  const sopAudience = {
-    department_ids: ((sop as unknown as { audience_department_ids?: string[] }).audience_department_ids ?? []) as string[],
-    roles: ((sop as unknown as { audience_roles?: Role[] }).audience_roles ?? []) as Role[],
-  };
 
   // Disable App view until conversion has produced something for the worker
   // page to render — otherwise the iframe would show the "Not ready yet"
