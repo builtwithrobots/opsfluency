@@ -8,6 +8,8 @@
 --   5. Backfill: seed four department tags for all existing companies
 --   6. Redefine bootstrap_company to seed department tags for new companies
 
+set search_path = public;
+
 begin;
 
 -- ── 1. tags ───────────────────────────────────────────────────────────────────
