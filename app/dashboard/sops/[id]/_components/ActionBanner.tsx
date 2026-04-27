@@ -9,6 +9,14 @@ import { TermsGateClient } from './TermsGateClient';
 import { RunTranslationButton } from './RunTranslationButton';
 import { ApprovePanelClient } from './ApprovePanelClient';
 
+export interface ExistingGlossaryEntry {
+  id: string;
+  term_en: string;
+  definition_en: string | null;
+  term_es: string;
+  definition_es: string | null;
+}
+
 interface ActionBannerProps {
   sopId: string;
   status: SopStatus;
@@ -21,9 +29,10 @@ interface ActionBannerProps {
     content_es: string | null;
   } | null;
   qrCodeId: string | null;
+  existingGlossary?: ExistingGlossaryEntry[];
 }
 
-export function ActionBanner({ sopId, status, latestVersion, qrCodeId }: ActionBannerProps) {
+export function ActionBanner({ sopId, status, latestVersion, qrCodeId, existingGlossary = [] }: ActionBannerProps) {
   if (status === 'draft') {
     return (
       <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-4">
@@ -49,6 +58,7 @@ export function ActionBanner({ sopId, status, latestVersion, qrCodeId }: ActionB
       <TermsGateClient
         sopId={sopId}
         flaggedTerms={latestVersion?.flagged_terms ?? []}
+        existingGlossary={existingGlossary}
       />
     );
   }

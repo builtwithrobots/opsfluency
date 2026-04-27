@@ -113,6 +113,19 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     .eq('id', company_id)
     .single();
 
+  // Active glossary — only needed during pending_terms so the conflict
+  // panel in TermsGateClient can flag terms that already exist before
+  // the manager hits Save (and we 23505 on the unique index).
+  let existingGlossary: { id: string; term_en: string; definition_en: string | null; term_es: string; definition_es: string | null }[] = [];
+  if (status === 'pending_terms') {
+    const { data: rows } = await supabase
+      .from('glossary_terms')
+      .select('id, term_en, definition_en, term_es, definition_es')
+      .eq('company_id', company_id)
+      .is('deleted_at', null);
+    existingGlossary = rows ?? [];
+  }
+
   // Disable App view until conversion has produced something for the worker
   // page to render — otherwise the iframe would show the "Not ready yet"
   // empty state, which is correct but not useful.
@@ -167,6 +180,7 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
         status={status}
         latestVersion={latest}
         qrCodeId={qrRow?.id ?? null}
+        existingGlossary={existingGlossary}
       />
 
       {/* Tabs */}

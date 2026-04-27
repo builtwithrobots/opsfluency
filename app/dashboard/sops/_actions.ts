@@ -102,7 +102,9 @@ async function transitionStatus(
 
 const CreateSopFromUploadSchema = z.object({
   title: z.string().min(1).max(200),
-  department_id: z.string().uuid().nullable().optional(),
+  // Required: every SOP must belong to a department so workers in that
+  // department see it on their home feed and managers can scope reviews.
+  department_id: z.string().uuid(),
   filename: z.string().min(1).max(300),
   mime_type: z.enum(SOP_UPLOAD_MIME_TYPES),
   file_base64: z.string().min(1),
@@ -119,6 +121,17 @@ export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ 
       return fail('INVALID_INPUT', 'File exceeds 10 MB');
     }
 
+    // Verify the department belongs to this company. Catches stale UI
+    // state (e.g., dept deleted between page render and submit) before
+    // we strand a sops row + uploaded file.
+    const { data: dept } = await supabase
+      .from('departments')
+      .select('id')
+      .eq('id', input.department_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (!dept) return fail('INVALID_INPUT', 'department not found');
+
     // 1. Insert sops master row (status=draft, template=null).
     const { data: sop, error: sopErr } = await supabase
       .from('sops')
@@ -126,7 +139,7 @@ export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ 
         company_id,
         title: input.title,
         template: null,
-        department_id: input.department_id ?? null,
+        department_id: input.department_id,
         status: 'draft' as SopStatus,
         created_by: userId,
       })
@@ -281,11 +294,27 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
 
 // ── 3. Define flagged terms ───────────────────────────────────────────────────
 
+/**
+ * Per-term resolution sent from the TermsGateClient when a flagged term
+ * collides with an existing glossary entry (or is brand new):
+ *
+ *   - `use_new`      — write the manager's values. INSERT if no existing
+ *                      row matches `lower(term_en)`, UPDATE the matched
+ *                      row by id otherwise. Default for non-conflicts.
+ *   - `use_existing` — leave the glossary alone. Default for conflicts.
+ *   - `skip`         — same as `use_existing` for the glossary side; the
+ *                      semantic difference (false-positive flag, not a
+ *                      glossary term at all) only matters for telemetry
+ *                      we may add later.
+ */
+const TermResolutionSchema = z.enum(['use_new', 'use_existing', 'skip']);
+
 const DefinedTermSchema = z.object({
   term_en: z.string().min(1).max(200),
   definition_en: z.string().max(2000).optional().nullable(),
   term_es: z.string().min(1).max(200),
   definition_es: z.string().max(2000).optional().nullable(),
+  resolution: TermResolutionSchema.default('use_new'),
 });
 
 const DefineFlaggedTermsSchema = z.object({
@@ -307,23 +336,84 @@ export async function defineFlaggedTerms(raw: unknown): Promise<ActionResult<{ s
     if (!sop) return fail('NOT_FOUND');
     if (sop.status !== 'pending_terms') return fail('INVALID_TRANSITION');
 
-    // Upsert each term into glossary_terms. Unique (company_id, lower(term_en)).
-    if (input.terms.length > 0) {
-      const rows = input.terms.map((t) => ({
-        company_id,
-        term_en: t.term_en,
-        definition_en: t.definition_en ?? null,
-        term_es: t.term_es,
-        definition_es: t.definition_es ?? null,
-        created_by: userId,
-      }));
-      const { error: upErr } = await supabase
+    // Apply resolutions term-by-term. We deliberately skip the previous
+    // `.upsert(..., { onConflict: 'company_id,term_en' })` approach: the
+    // unique index is on `lower(term_en)` (case-insensitive, partial on
+    // deleted_at IS NULL) which Supabase's PostgREST upsert can't target,
+    // so any case mismatch on a re-uploaded SOP raised 23505. Doing the
+    // dedup explicitly here is also where per-term resolutions land.
+    const writes = input.terms.filter((t) => t.resolution === 'use_new');
+    if (writes.length > 0) {
+      // Fetch active glossary entries that match any of the lowered
+      // English terms in one round-trip. RLS scopes by company_id; we add
+      // the explicit filter as defense-in-depth and so Postgres uses the
+      // (company_id, ...) leading-column index.
+      const lowered = Array.from(new Set(writes.map((t) => t.term_en.toLowerCase())));
+      const { data: existingRows } = await supabase
         .from('glossary_terms')
-        .upsert(rows, { onConflict: 'company_id,term_en' });
-      if (upErr) return fail('INTERNAL', upErr.message);
+        .select('id, term_en')
+        .eq('company_id', company_id)
+        .is('deleted_at', null)
+        .in('term_en', lowered.flatMap((l) => [l, l.toUpperCase()])); // best-effort prefilter; we re-check by lower() below
+
+      // Build the lookup ourselves so case-folded matches work even when
+      // the prefilter missed (the .in() above can't do `lower(term_en)`).
+      const existingByLower = new Map<string, string>(); // lower(term_en) → row id
+      for (const r of existingRows ?? []) {
+        existingByLower.set((r.term_en as string).toLowerCase(), r.id as string);
+      }
+
+      // Some prefilter misses are inevitable — fall back to a second
+      // narrower fetch only for terms we didn't see, by id. This stays
+      // O(1) round-trips total because the second query is also batched.
+      const missing = lowered.filter((l) => !existingByLower.has(l));
+      if (missing.length > 0) {
+        const { data: more } = await supabase
+          .from('glossary_terms')
+          .select('id, term_en')
+          .eq('company_id', company_id)
+          .is('deleted_at', null);
+        for (const r of more ?? []) {
+          const lower = (r.term_en as string).toLowerCase();
+          if (!existingByLower.has(lower)) existingByLower.set(lower, r.id as string);
+        }
+      }
+
+      const inserts: Array<Record<string, unknown>> = [];
+      const updates: Array<{ id: string; row: Record<string, unknown> }> = [];
+      for (const t of writes) {
+        const lower = t.term_en.toLowerCase();
+        const id = existingByLower.get(lower);
+        const row = {
+          term_en: t.term_en,
+          definition_en: t.definition_en ?? null,
+          term_es: t.term_es,
+          definition_es: t.definition_es ?? null,
+        };
+        if (id) {
+          updates.push({ id, row });
+        } else {
+          inserts.push({ company_id, created_by: userId, ...row });
+        }
+      }
+
+      if (inserts.length > 0) {
+        const { error: insErr } = await supabase.from('glossary_terms').insert(inserts);
+        if (insErr) return fail('INTERNAL', insErr.message);
+      }
+      for (const u of updates) {
+        const { error: updErr } = await supabase
+          .from('glossary_terms')
+          .update(u.row)
+          .eq('id', u.id)
+          .eq('company_id', company_id);
+        if (updErr) return fail('INTERNAL', updErr.message);
+      }
     }
 
-    // Clear flagged_terms on the latest version — they're all defined now.
+    // Clear flagged_terms on the latest version — every flag has now been
+    // resolved (written, kept-existing, or skipped). The SOP is ready for
+    // translation regardless of which path each term took.
     const version = await getLatestVersion(supabase, input.sop_id);
     if (version) {
       await supabase
