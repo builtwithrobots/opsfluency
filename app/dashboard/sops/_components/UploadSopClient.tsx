@@ -119,6 +119,10 @@ export function UploadSopClient({ departments }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !title.trim()) return;
+    if (!departmentId) {
+      setError('Pick a department before uploading.');
+      return;
+    }
     setError(null);
 
     let base64: string;
@@ -132,7 +136,7 @@ export function UploadSopClient({ departments }: Props) {
     startTransition(async () => {
       const result = await createSopFromUpload({
         title: title.trim(),
-        department_id: departmentId || null,
+        department_id: departmentId,
         filename: file.name,
         mime_type: file.type as SopUploadMimeType,
         file_base64: base64,
@@ -233,19 +237,39 @@ export function UploadSopClient({ departments }: Props) {
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="sop-dept" className="text-sm font-medium text-dc-text">
-                Department
+                Department <span aria-hidden className="text-(--color-signal-urgent)">*</span>
               </label>
-              <select
-                id="sop-dept"
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
-              >
-                <option value="">No department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+              {departments.length === 0 ? (
+                <div
+                  className="rounded-lg border border-dashed border-(--color-signal-warn) bg-(--color-signal-warn)/5 px-3 py-2 text-xs text-dc-text-2"
+                  role="alert"
+                >
+                  Your org doesn&apos;t have any departments yet.{' '}
+                  <a
+                    href="/dashboard/departments"
+                    className="font-medium text-(--color-brand) underline hover:no-underline"
+                  >
+                    Create one first
+                  </a>
+                  , then come back to upload.
+                </div>
+              ) : (
+                <select
+                  id="sop-dept"
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  required
+                  aria-invalid={!departmentId}
+                  className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
+                >
+                  <option value="" disabled>
+                    Select a department…
+                  </option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {error && (
@@ -262,7 +286,11 @@ export function UploadSopClient({ departments }: Props) {
             <Button plain onClick={() => setOpen(false)} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit" color="brand" disabled={isPending || !file || !title.trim()}>
+            <Button
+              type="submit"
+              color="brand"
+              disabled={isPending || !file || !title.trim() || !departmentId || departments.length === 0}
+            >
               {isPending ? 'Uploading…' : 'Upload & continue'}
             </Button>
           </DialogActions>
