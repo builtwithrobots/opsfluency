@@ -131,6 +131,65 @@ async function runChecks(): Promise<HealthCheck[]> {
     });
   }
 
+  // 5. Storage buckets. Missing buckets silently break SOP uploads and
+  // QR print headers — they need to exist before any tenant can
+  // actually use the product.
+  try {
+    const admin = getAdminClient();
+    const buckets = ["sop-uploads", "company-logos"] as const;
+    const missing: string[] = [];
+    for (const name of buckets) {
+      const { error } = await admin.storage.getBucket(name);
+      if (error) missing.push(name);
+    }
+    checks.push({
+      label: "Supabase storage buckets",
+      severity: missing.length === 0 ? "ok" : "fail",
+      detail:
+        missing.length === 0
+          ? "Both required buckets (sop-uploads, company-logos) exist."
+          : `Missing bucket${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}. Create them in the Supabase Storage dashboard.`,
+    });
+  } catch (e) {
+    checks.push({
+      label: "Supabase storage buckets",
+      severity: "fail",
+      detail: e instanceof Error ? e.message : "Unknown error",
+    });
+  }
+
+  // 6. Stuck SOPs. SOPs that have been sitting in a mid-pipeline status
+  // (pending_terms or pending_translation) for more than 7 days likely
+  // represent a manager who abandoned the import or a silent pipeline
+  // failure. A warn here prompts investigation; it doesn't block anything.
+  try {
+    const admin = getAdminClient();
+    const sevenDaysAgo = new Date(
+      Date.now() - 7 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const { count, error } = await admin
+      .from("sops")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending_terms", "pending_translation"])
+      .lt("updated_at", sevenDaysAgo);
+    if (error) throw error;
+    const n = count ?? 0;
+    checks.push({
+      label: "Stuck SOP pipeline",
+      severity: n === 0 ? "ok" : "warn",
+      detail:
+        n === 0
+          ? "No SOPs have been stuck mid-pipeline for more than 7 days."
+          : `${n} SOP${n === 1 ? "" : "s"} in pending_terms or pending_translation for >7 days. Check with the relevant tenant.`,
+    });
+  } catch (e) {
+    checks.push({
+      label: "Stuck SOP pipeline",
+      severity: "fail",
+      detail: e instanceof Error ? e.message : "Unknown error",
+    });
+  }
+
   return checks;
 }
 

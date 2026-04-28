@@ -16,42 +16,42 @@ import { TenantsTab } from "./_tabs/tenants-tab";
 // client without each re-verifying.
 
 type TabId =
-  | "tenants"
-  | "seed"
-  | "admins"
-  | "impersonation"
   | "ai"
-  | "health";
+  | "health"
+  | "tenants"
+  | "impersonation"
+  | "seed"
+  | "admins";
 
 const VALID_TABS: readonly TabId[] = [
-  "tenants",
-  "seed",
-  "admins",
-  "impersonation",
   "ai",
   "health",
+  "tenants",
+  "impersonation",
+  "seed",
+  "admins",
 ] as const;
 
 function resolveTab(raw: string | undefined): TabId {
-  return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : "tenants";
+  return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : "ai";
 }
 
 interface PageProps {
-  searchParams: Promise<{ tab?: string; preset?: string; q?: string; days?: string }>;
+  searchParams: Promise<{ tab?: string; preset?: string; q?: string; days?: string; expand?: string }>;
 }
 
 export default async function PlatformPage({ searchParams }: PageProps) {
-  const { tab: rawTab, days: rawDays } = await searchParams;
+  const { tab: rawTab, days: rawDays, expand } = await searchParams;
   const tab = resolveTab(rawTab);
   const days = rawDays ? Math.max(1, parseInt(rawDays, 10) || 30) : 30;
 
   const tabs: TabDef[] = [
-    { id: "tenants",       label: "Tenants",         href: "/dashboard/platform?tab=tenants" },
-    { id: "seed",          label: "Seed / demo",     href: "/dashboard/platform?tab=seed" },
-    { id: "admins",        label: "Super admins",    href: "/dashboard/platform?tab=admins" },
-    { id: "impersonation", label: "Impersonation",   href: "/dashboard/platform?tab=impersonation" },
     { id: "ai",            label: "AI usage",        href: "/dashboard/platform?tab=ai" },
     { id: "health",        label: "Platform health", href: "/dashboard/platform?tab=health" },
+    { id: "tenants",       label: "Tenants",         href: "/dashboard/platform?tab=tenants" },
+    { id: "impersonation", label: "Impersonation",   href: "/dashboard/platform?tab=impersonation" },
+    { id: "seed",          label: "Seed / demo",     href: "/dashboard/platform?tab=seed" },
+    { id: "admins",        label: "Super admins",    href: "/dashboard/platform?tab=admins" },
   ];
 
   return (
@@ -70,7 +70,7 @@ export default async function PlatformPage({ searchParams }: PageProps) {
 
       <DashboardTabs tabs={tabs} activeTab={tab} />
 
-      {tab === "tenants" && <TenantsTab />}
+      {tab === "tenants" && <TenantsTab expandedId={expand} />}
       {tab === "seed" && <SeedTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "impersonation" && <ImpersonationTab />}

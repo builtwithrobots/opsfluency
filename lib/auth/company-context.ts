@@ -89,7 +89,7 @@ export async function getCompanyContext(
 
   const { data: member } = await supabase
     .from("company_members")
-    .select("company_id, role")
+    .select("company_id, role, locked_at")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -118,6 +118,10 @@ export async function getCompanyContext(
   }
 
   const role = member.role as Role;
+
+  if ((member as { locked_at?: string | null }).locked_at) {
+    throw new AuthError("FORBIDDEN", "This account has been locked by an administrator.");
+  }
 
   if (required && role !== "admin" && role !== required) {
     throw new AuthError("FORBIDDEN");
