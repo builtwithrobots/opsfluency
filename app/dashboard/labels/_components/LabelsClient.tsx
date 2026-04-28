@@ -32,6 +32,18 @@ const inputBase =
 type Draft = { name_en: string; name_es: string; color: string };
 const EMPTY_DRAFT: Draft = { name_en: "", name_es: "", color: TAG_COLORS[5] };
 
+// ── Hex color helpers ─────────────────────────────────────────────────────────
+
+function normalizeHex(val: string): string | null {
+  const v = val.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(v)) return v;
+  if (/^#[0-9a-f]{3}$/.test(v)) {
+    const [, r, g, b] = v.split("");
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return null;
+}
+
 // ── Color picker popover ──────────────────────────────────────────────────────
 
 function ColorPickerDropdown({
@@ -44,7 +56,13 @@ function ColorPickerDropdown({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [hexInput, setHexInput] = useState(color.replace(/^#/, ""));
   const ref = useRef<HTMLDivElement>(null);
+
+  // Sync hex field when the popover opens so it reflects the current color.
+  useEffect(() => {
+    if (open) setHexInput(color.replace(/^#/, ""));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -54,6 +72,22 @@ function ColorPickerDropdown({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+
+  function handleHexChange(raw: string) {
+    // Allow typing without the leading # — strip any # the user typed too.
+    const stripped = raw.replace(/#/g, "").slice(0, 6);
+    setHexInput(stripped);
+    const norm = normalizeHex(`#${stripped}`);
+    if (norm) onChange(norm);
+  }
+
+  function selectPreset(c: string) {
+    onChange(c);
+    setHexInput(c.replace(/^#/, ""));
+    setOpen(false);
+  }
+
+  const previewColor = normalizeHex(`#${hexInput}`) ?? color;
 
   return (
     <div ref={ref} className="relative shrink-0">
@@ -66,7 +100,7 @@ function ColorPickerDropdown({
       >
         <span
           className="size-4 rounded-full shrink-0"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: previewColor }}
           aria-hidden
         />
         <ChevronDown
@@ -77,20 +111,50 @@ function ColorPickerDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-max grid grid-cols-4 gap-1.5 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface p-2.5 shadow-(--shadow-float)">
-          {TAG_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-label={`Select color ${c}`}
-              aria-pressed={color === c}
-              onClick={() => { onChange(c); setOpen(false); }}
-              className={`size-6 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-brand) ${
-                color === c ? "ring-2 ring-offset-2 ring-(--color-brand)" : ""
-              }`}
-              style={{ backgroundColor: c }}
+        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-44 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface p-2.5 shadow-(--shadow-float)">
+          {/* Preset swatches */}
+          <div className="grid grid-cols-4 gap-1.5 mb-3">
+            {TAG_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`Select color ${c}`}
+                aria-pressed={color === c}
+                onClick={() => selectPreset(c)}
+                className={`size-6 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-brand) ${
+                  color === c ? "ring-2 ring-offset-2 ring-(--color-brand)" : ""
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="mb-2.5 h-px bg-[color:var(--dc-edge)]" />
+
+          {/* Hex input */}
+          <div className="flex items-center gap-2">
+            <span
+              className="size-5 shrink-0 rounded-full border border-black/10"
+              style={{ backgroundColor: previewColor }}
+              aria-hidden
             />
-          ))}
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-dc-text-3">
+                #
+              </span>
+              <input
+                type="text"
+                value={hexInput}
+                onChange={(e) => handleHexChange(e.target.value)}
+                maxLength={6}
+                placeholder="3b82f6"
+                spellCheck={false}
+                aria-label="Hex color value"
+                className="w-full rounded border border-[color:var(--dc-edge)] bg-dc-raised py-1 pl-5 pr-2 font-mono text-xs text-dc-text focus:border-(--color-brand) focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
