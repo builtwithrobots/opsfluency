@@ -43,6 +43,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform");
       redirect("/onboarding");
     }
+    if (e instanceof AuthError && e.code === "AUTH_BRIDGE_FAILED") redirect("/dashboard");
     throw e;
   }
 
