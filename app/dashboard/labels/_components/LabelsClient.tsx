@@ -77,7 +77,7 @@ function ColorPickerDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-50 grid grid-cols-4 gap-1.5 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface p-2.5 shadow-(--shadow-float)">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-max grid grid-cols-4 gap-1.5 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface p-2.5 shadow-(--shadow-float)">
           {TAG_COLORS.map((c) => (
             <button
               key={c}
@@ -478,8 +478,8 @@ function LabelCard({
   if (isEditing) {
     return (
       <div className="rounded-xl border border-(--color-brand)/30 bg-dc-surface p-4 shadow-(--shadow-card)">
-        {/* Color + names row */}
-        <div className="flex items-center gap-2 mb-3">
+        {/* Row 1: color picker + English */}
+        <div className="flex items-center gap-2 mb-2">
           <ColorPickerDropdown
             color={editDraft.color}
             onChange={(c) => setEditDraft((p) => ({ ...p, color: c }))}
@@ -497,8 +497,8 @@ function LabelCard({
             autoFocus
           />
         </div>
+        {/* Row 2: Spanish + translate */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="w-[72px] shrink-0" aria-hidden /> {/* align with color picker */}
           <input
             type="text"
             value={editDraft.name_es}
@@ -577,7 +577,7 @@ function LabelCard({
 
   // ── Normal view mode ──
   return (
-    <div className="group relative rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-4 shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-raised)">
+    <div className="relative rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-4 shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-raised)">
       {/* Color + names */}
       <div className="flex items-start gap-3">
         <span
@@ -610,44 +610,52 @@ function LabelCard({
         )}
       </div>
 
-      {/* Usage + actions footer */}
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs text-dc-text-3">
-          {usage === 0 ? (
-            "Unused"
-          ) : (
-            <>
-              {tag.sop_count > 0 && `${tag.sop_count} SOP${tag.sop_count !== 1 ? "s" : ""}`}
-              {tag.sop_count > 0 && tag.term_count > 0 && " · "}
-              {tag.term_count > 0 && `${tag.term_count} term${tag.term_count !== 1 ? "s" : ""}`}
-            </>
-          )}
-        </span>
-
-        {!isDept && (
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            {!isArchived && (
-              <IconBtn label="Edit" onClick={onStartEdit} disabled={isPending}>
-                <Pencil className="size-3.5" strokeWidth={1.75} />
-              </IconBtn>
+      {/* Usage badges */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {usage === 0 ? (
+          <span className="inline-flex items-center rounded-full bg-dc-raised px-2 py-0.5 text-[11px] text-dc-text-3">
+            Unused
+          </span>
+        ) : (
+          <>
+            {tag.sop_count > 0 && (
+              <span className="inline-flex items-center rounded-full bg-dc-raised px-2 py-0.5 text-[11px] font-medium text-dc-text-3">
+                {tag.sop_count} SOP{tag.sop_count !== 1 ? "s" : ""}
+              </span>
             )}
-            {isArchived ? (
-              <IconBtn label="Restore" onClick={onRestore} disabled={isPending}>
-                <ArchiveRestore className="size-3.5" strokeWidth={1.75} />
-              </IconBtn>
-            ) : (
-              <IconBtn label="Archive" onClick={onArchive} disabled={isPending}>
-                <Archive className="size-3.5" strokeWidth={1.75} />
-              </IconBtn>
+            {tag.term_count > 0 && (
+              <span className="inline-flex items-center rounded-full bg-dc-raised px-2 py-0.5 text-[11px] font-medium text-dc-text-3">
+                {tag.term_count} term{tag.term_count !== 1 ? "s" : ""}
+              </span>
             )}
-            {canDelete && (
-              <IconBtn label="Delete" onClick={onDeleteRequest} disabled={isPending} danger>
-                <Trash2 className="size-3.5" strokeWidth={1.75} />
-              </IconBtn>
-            )}
-          </div>
+          </>
         )}
       </div>
+
+      {/* Actions — always visible for custom labels */}
+      {!isDept && (
+        <div className="mt-2 flex items-center gap-0.5 border-t border-[color:var(--dc-edge)] pt-2">
+          {!isArchived && (
+            <IconBtn label="Edit" onClick={onStartEdit} disabled={isPending}>
+              <Pencil className="size-3.5" strokeWidth={1.75} />
+            </IconBtn>
+          )}
+          {isArchived ? (
+            <IconBtn label="Restore" onClick={onRestore} disabled={isPending}>
+              <ArchiveRestore className="size-3.5" strokeWidth={1.75} />
+            </IconBtn>
+          ) : (
+            <IconBtn label="Archive" onClick={onArchive} disabled={isPending}>
+              <Archive className="size-3.5" strokeWidth={1.75} />
+            </IconBtn>
+          )}
+          {canDelete && (
+            <IconBtn label="Delete" onClick={onDeleteRequest} disabled={isPending} danger>
+              <Trash2 className="size-3.5" strokeWidth={1.75} />
+            </IconBtn>
+          )}
+        </div>
+      )}
 
       {error && !isEditing && (
         <p role="alert" className="mt-2 text-xs text-(--color-signal-urgent)">{error}</p>
