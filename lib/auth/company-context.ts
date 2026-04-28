@@ -89,7 +89,7 @@ export async function getCompanyContext(
 
   const { data: member } = await supabase
     .from("company_members")
-    .select("company_id, role, locked_at")
+    .select("company_id, role")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
@@ -119,7 +119,17 @@ export async function getCompanyContext(
 
   const role = member.role as Role;
 
-  if ((member as { locked_at?: string | null }).locked_at) {
+  // Check locked_at in a separate query so a missing column (migration not
+  // yet applied) returns null rather than breaking the entire auth flow.
+  // PostgREST errors on unknown columns produce { data: null }, which makes
+  // locked_at falsy and auth proceeds normally until the migration runs.
+  const { data: lockRow } = await supabase
+    .from("company_members")
+    .select("locked_at")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  if (lockRow?.locked_at) {
     throw new AuthError("FORBIDDEN", "This account has been locked by an administrator.");
   }
 
