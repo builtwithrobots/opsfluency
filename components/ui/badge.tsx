@@ -43,24 +43,28 @@ const colors = {
   brand:            'bg-(--color-brand)/15          text-(--color-brand)          group-data-hover:bg-(--color-brand)/25',
 }
 
-type BadgeProps = { color?: keyof typeof colors }
+type BadgeProps = { color?: keyof typeof colors; dot?: boolean }
 
-export function Badge({ color = 'zinc', className, ...props }: BadgeProps & React.ComponentPropsWithoutRef<'span'>) {
+export function Badge({ color = 'zinc', dot, className, children, ...props }: BadgeProps & React.ComponentPropsWithoutRef<'span'>) {
   return (
     <span
       {...props}
       className={clsx(
         className,
-        'inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline',
+        'inline-flex items-center gap-x-1.5 rounded-full px-2 py-0.5 text-xs/5 font-medium forced-colors:outline',
         colors[color]
       )}
-    />
+    >
+      {dot && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current opacity-70" />}
+      {children}
+    </span>
   )
 }
 
 export const BadgeButton = forwardRef(function BadgeButton(
   {
     color = 'zinc',
+    dot,
     className,
     children,
     ...props
@@ -72,19 +76,19 @@ export const BadgeButton = forwardRef(function BadgeButton(
 ) {
   const classes = clsx(
     className,
-    'group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-(--color-brand)'
+    'group relative inline-flex rounded-full focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-(--color-brand)'
   )
 
   return typeof props.href === 'string' ? (
     <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
       <TouchTarget>
-        <Badge color={color}>{children}</Badge>
+        <Badge color={color} dot={dot}>{children}</Badge>
       </TouchTarget>
     </Link>
   ) : (
     <Headless.Button {...props} className={classes} ref={ref}>
       <TouchTarget>
-        <Badge color={color}>{children}</Badge>
+        <Badge color={color} dot={dot}>{children}</Badge>
       </TouchTarget>
     </Headless.Button>
   )

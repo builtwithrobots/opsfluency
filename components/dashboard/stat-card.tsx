@@ -26,6 +26,7 @@ interface DashboardStatCardProps {
   accent?: Accent;
   context?: string;
   delay?: number;
+  className?: string;
 }
 
 export function DashboardStatCard({
@@ -35,6 +36,7 @@ export function DashboardStatCard({
   accent = "brand",
   context,
   delay = 0,
+  className,
 }: DashboardStatCardProps) {
   return (
     <motion.div
@@ -42,7 +44,7 @@ export function DashboardStatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay, ease: "easeOut" }}
       whileHover={{ y: -2 }}
-      className="group relative overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5 shadow-xs transition-shadow duration-200 hover:shadow-md"
+      className={`group relative overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5 shadow-(--shadow-card) transition-shadow duration-200 hover:shadow-(--shadow-raised)${className ? ` ${className}` : ""}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
