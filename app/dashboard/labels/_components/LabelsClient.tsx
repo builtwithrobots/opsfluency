@@ -241,9 +241,18 @@ function TranslateButton({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+type SourceFilter = "all" | "department" | "custom";
+
+const SOURCE_FILTERS: { value: SourceFilter; label: string }[] = [
+  { value: "all",        label: "All" },
+  { value: "department", label: "Department" },
+  { value: "custom",     label: "Custom" },
+];
+
 export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [showCreate, setShowCreate] = useState(false);
@@ -256,13 +265,15 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
   const [translateTarget, setTranslateTarget] = useState<"edit" | "create" | null>(null);
 
   const lowerQ = query.toLowerCase();
-  const filtered = lowerQ
-    ? tags.filter(
-        (t) =>
-          t.name_en.toLowerCase().includes(lowerQ) ||
-          t.name_es.toLowerCase().includes(lowerQ),
-      )
-    : tags;
+  const filtered = tags.filter((t) => {
+    const matchesQuery =
+      !lowerQ ||
+      t.name_en.toLowerCase().includes(lowerQ) ||
+      t.name_es.toLowerCase().includes(lowerQ);
+    const matchesSource =
+      sourceFilter === "all" || t.source === sourceFilter;
+    return matchesQuery && matchesSource;
+  });
   const active = filtered.filter((t) => !t.archived_at);
   const archived = filtered.filter((t) => t.archived_at);
 
@@ -338,7 +349,7 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Toolbar */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-dc-text-3"
@@ -354,6 +365,30 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
             className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised py-2 pl-9 pr-3 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
           />
         </div>
+
+        {/* Source filter */}
+        <div
+          role="group"
+          aria-label="Filter by source"
+          className="flex rounded-md border border-[color:var(--dc-edge)] bg-dc-raised p-0.5 gap-0.5"
+        >
+          {SOURCE_FILTERS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSourceFilter(value)}
+              aria-pressed={sourceFilter === value}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                sourceFilter === value
+                  ? "bg-dc-surface text-dc-text shadow-xs"
+                  : "text-dc-text-3 hover:text-dc-text"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {!showCreate && (
           <Button
             color="brand"
