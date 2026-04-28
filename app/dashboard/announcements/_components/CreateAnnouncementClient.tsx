@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 
 import { createAnnouncement } from "@/app/dashboard/announcements/_actions";
 import { Button } from "@/components/ui/button";
@@ -26,15 +27,21 @@ const inputClass =
 const labelClass =
   "block text-xs font-medium tracking-[0.1em] text-dc-text-3 uppercase mb-1.5";
 
+const ORG_WIDE = "__org_wide__";
+
 export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [deptId, setDeptId] = useState<string | null>(
-    canPostOrgWide ? null : (departments[0]?.id ?? null),
-  );
+  // Selected audience: either [ORG_WIDE] or a list of dept IDs
+  const defaultSelected = canPostOrgWide
+    ? [ORG_WIDE]
+    : departments[0]
+    ? [departments[0].id]
+    : [];
+  const [selected, setSelected] = useState<string[]>(defaultSelected);
   const [priority, setPriority] = useState<"normal" | "urgent">("normal");
   const [pinned, setPinned] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
@@ -43,29 +50,62 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
   function reset() {
     setTitle("");
     setBody("");
-    setDeptId(canPostOrgWide ? null : (departments[0]?.id ?? null));
+    setSelected(defaultSelected);
     setPriority("normal");
     setPinned(false);
     setExpiresAt("");
     setError(null);
   }
 
+  function toggleOption(value: string) {
+    if (value === ORG_WIDE) {
+      setSelected([ORG_WIDE]);
+      return;
+    }
+    setSelected((prev) => {
+      const without = prev.filter((v) => v !== ORG_WIDE);
+      return without.includes(value)
+        ? without.filter((v) => v !== value)
+        : [...without, value];
+    });
+  }
+
+  const isOrgWide = selected.includes(ORG_WIDE);
+  const selectedDepts = isOrgWide
+    ? []
+    : departments.filter((d) => selected.includes(d.id));
+
+  // Human-readable audience summary for the reminder
+  const audienceSummary = isOrgWide
+    ? "all teams"
+    : selectedDepts.map((d) => d.name).join(", ");
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (selected.length === 0) return;
     setError(null);
 
-    startTransition(async () => {
-      const result = await createAnnouncement({
-        title_en: title,
-        body_en: body,
-        department_id: deptId,
-        priority,
-        pinned,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-      });
+    const targets: (string | null)[] = isOrgWide
+      ? [null]
+      : selectedDepts.map((d) => d.id);
 
-      if (!result.ok) {
-        setError(result.error.message ?? "Something went wrong. Please try again.");
+    startTransition(async () => {
+      const results = await Promise.all(
+        targets.map((dept_id) =>
+          createAnnouncement({
+            title_en: title,
+            body_en: body,
+            department_id: dept_id,
+            priority,
+            pinned,
+            expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          }),
+        ),
+      );
+
+      const failed = results.find((r) => !r.ok);
+      if (failed && !failed.ok) {
+        setError(failed.error.message ?? "Something went wrong. Please try again.");
         return;
       }
 
@@ -126,26 +166,60 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
           Spanish translation is generated automatically from your company&apos;s glossary.
         </p>
 
-        {/* Audience */}
-        <div>
-          <label htmlFor="ann-dept" className={labelClass}>
-            Audience
-          </label>
-          <select
-            id="ann-dept"
-            className={inputClass}
-            value={deptId ?? ""}
-            onChange={(e) => setDeptId(e.target.value === "" ? null : e.target.value)}
-            disabled={isPending}
-          >
-            {canPostOrgWide && <option value="">All Teams (org-wide)</option>}
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
+        {/* Audience checkboxes */}
+        <fieldset>
+          <legend className={labelClass}>Audience</legend>
+          <div className="flex flex-col gap-1.5">
+            {canPostOrgWide && (
+              <label className={`flex cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2.5 text-sm transition-colors ${
+                isOrgWide
+                  ? "border-(--color-brand) bg-(--color-brand)/8 text-dc-text"
+                  : "border-[color:var(--dc-edge)] text-dc-text-2 hover:bg-dc-raised"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={isOrgWide}
+                  onChange={() => toggleOption(ORG_WIDE)}
+                  disabled={isPending}
+                  className="size-4 accent-(--color-brand) shrink-0"
+                />
+                <span className="font-medium">All Teams</span>
+                <span className="ml-auto text-xs text-dc-text-3">org-wide</span>
+              </label>
+            )}
+            {departments.map((dept) => (
+              <label
+                key={dept.id}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2.5 text-sm transition-colors ${
+                  !isOrgWide && selected.includes(dept.id)
+                    ? "border-(--color-brand) bg-(--color-brand)/8 text-dc-text"
+                    : "border-[color:var(--dc-edge)] text-dc-text-2 hover:bg-dc-raised"
+                } ${isOrgWide ? "opacity-40 pointer-events-none" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={!isOrgWide && selected.includes(dept.id)}
+                  onChange={() => toggleOption(dept.id)}
+                  disabled={isPending || isOrgWide}
+                  className="size-4 accent-(--color-brand) shrink-0"
+                />
+                {dept.name}
+              </label>
             ))}
-          </select>
-        </div>
+          </div>
+        </fieldset>
+
+        {/* Broadcast reminder */}
+        {selected.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-400/8 px-3 py-2.5">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-500" strokeWidth={2} aria-hidden />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              This message will be broadcast to{" "}
+              <span className="font-semibold">every employee in {audienceSummary}</span>.
+              Make sure your message is ready before posting.
+            </p>
+          </div>
+        )}
 
         {/* Priority + Pinned */}
         <div className="flex flex-wrap gap-4">
@@ -220,12 +294,19 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
         <Button
           type="submit"
           color="dark"
-          disabled={isPending || !title.trim() || !body.trim()}
+          disabled={isPending || !title.trim() || !body.trim() || selected.length === 0}
           className="w-full justify-center"
         >
-          {isPending ? "Posting…" : "Post Announcement"}
+          {isPending
+            ? "Posting…"
+            : isOrgWide
+            ? "Post to All Teams"
+            : selectedDepts.length === 1
+            ? `Post to ${selectedDepts[0].name}`
+            : `Post to ${selectedDepts.length} Teams`}
         </Button>
       </form>
     </div>
   );
 }
+
