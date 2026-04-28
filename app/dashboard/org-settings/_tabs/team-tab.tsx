@@ -1,5 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server";
-import { ShieldCheck, UserRound } from "lucide-react";
+import { Crown, ShieldCheck, UserRound } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -10,10 +10,15 @@ import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { getCompanyContext } from "@/lib/auth/company-context";
 
+import { PendingTeamInvitesList } from "../_components/PendingTeamInvitesList";
+import { TeamBulkUploadClient } from "../_components/TeamBulkUploadClient";
+import { TeamInviteFormClient } from "../_components/TeamInviteFormClient";
+
 interface MemberRow {
   id: string;
   clerk_user_id: string;
   role: string;
+  is_owner: boolean;
   joined_at: string | null;
   invited_at: string | null;
 }
@@ -23,28 +28,48 @@ interface EnrichedMember extends MemberRow {
   displayName: string | null;
 }
 
+interface PendingInvite {
+  id: string;
+  token: string;
+  email: string;
+  name: string | null;
+  role: string;
+  invited_at: string;
+}
+
 async function loadTeam(
   supabase: SupabaseClient,
   company_id: string,
   currentUserId: string,
-): Promise<{ members: EnrichedMember[]; currentUserId: string }> {
-  const { data, error } = await supabase
-    .from("company_members")
-    .select("id, clerk_user_id, role, joined_at, invited_at")
-    .eq("company_id", company_id)
-    .in("role", ["admin", "manager"])
-    .order("joined_at", { ascending: true });
+): Promise<{ members: EnrichedMember[]; pendingInvites: PendingInvite[]; currentUserId: string }> {
+  const [{ data: rows, error }, { data: invites }] = await Promise.all([
+    supabase
+      .from("company_members")
+      .select("id, clerk_user_id, role, is_owner, joined_at, invited_at")
+      .eq("company_id", company_id)
+      .in("role", ["admin", "manager"])
+      .order("joined_at", { ascending: true }),
+    supabase
+      .from("team_invites")
+      .select("id, token, email, name, role, invited_at")
+      .eq("company_id", company_id)
+      .is("claimed_at", null)
+      .order("invited_at", { ascending: false }),
+  ]);
   if (error) throw error;
 
-  const rows: MemberRow[] = data ?? [];
-  if (!rows.length) return { members: [], currentUserId };
+  const memberRows: MemberRow[] = (rows ?? []).map((r) => ({
+    ...r,
+    is_owner: Boolean(r.is_owner),
+  }));
 
   const clerk = await clerkClient();
   const enriched = await Promise.all(
-    rows.map(async (m) => {
+    memberRows.map(async (m) => {
       try {
         const user = await clerk.users.getUser(m.clerk_user_id);
-        const email = user.emailAddresses[0]?.emailAddress ?? m.clerk_user_id;
+        const email =
+          user.emailAddresses[0]?.emailAddress ?? m.clerk_user_id;
         const displayName =
           [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
         return { ...m, email, displayName };
@@ -54,21 +79,31 @@ async function loadTeam(
     }),
   );
 
-  return { members: enriched, currentUserId };
+  return {
+    members: enriched,
+    pendingInvites: (invites ?? []) as PendingInvite[],
+    currentUserId,
+  };
 }
 
 export async function TeamTab() {
   const { supabase, company_id, userId } = await getCompanyContext("admin");
-  const { members, currentUserId } = await loadTeam(supabase, company_id, userId);
+  const { members, pendingInvites, currentUserId } = await loadTeam(
+    supabase,
+    company_id,
+    userId,
+  );
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   return (
-    <section className="flex flex-col gap-8 max-w-3xl">
-      {/* Member roster */}
+    <section className="flex max-w-3xl flex-col gap-8">
+      {/* ── Active members ── */}
       <div>
         <Heading level={2} className="font-display text-xl">
           Admins &amp; managers
         </Heading>
-        <Text className="mt-1 text-sm max-w-2xl">
+        <Text className="mt-1 max-w-2xl text-sm">
           Admins have full org access including billing and settings. Managers
           can manage SOPs, employees, announcements, and monitors scoped to
           their departments.
@@ -99,15 +134,9 @@ export async function TeamTab() {
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--dc-edge)] bg-dc-raised">
                       {isAdmin ? (
-                        <ShieldCheck
-                          className="size-4 text-(--color-brand)"
-                          strokeWidth={2}
-                        />
+                        <ShieldCheck className="size-4 text-(--color-brand)" strokeWidth={2} />
                       ) : (
-                        <UserRound
-                          className="size-4 text-dc-text-3"
-                          strokeWidth={2}
-                        />
+                        <UserRound className="size-4 text-dc-text-3" strokeWidth={2} />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -115,11 +144,21 @@ export async function TeamTab() {
                         <p className="truncate text-sm font-medium text-dc-text">
                           {m.displayName ?? m.email}
                         </p>
-                        {isSelf ? (
+
+                        {/* ORG OWNER badge */}
+                        {m.is_owner && (
+                          <span className="flex items-center gap-1 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-600 dark:text-amber-400 uppercase">
+                            <Crown className="size-2.5" strokeWidth={2} />
+                            Org owner
+                          </span>
+                        )}
+
+                        {isSelf && (
                           <span className="rounded border border-(--color-brand)/30 bg-(--color-brand)/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-(--color-brand) uppercase">
                             You
                           </span>
-                        ) : null}
+                        )}
+
                         <span
                           className={
                             isAdmin
@@ -137,7 +176,8 @@ export async function TeamTab() {
                     </div>
                   </div>
 
-                  {!isSelf ? (
+                  {/* Actions — locked for self and org owner */}
+                  {!isSelf && !m.is_owner ? (
                     <div className="flex shrink-0 items-center gap-2">
                       <form action={changeMemberRole}>
                         <input type="hidden" name="member_id" value={m.id} />
@@ -167,27 +207,39 @@ export async function TeamTab() {
         )}
       </div>
 
-      {/* Invite placeholder */}
+      {/* ── Pending invites ── */}
+      {pendingInvites.length > 0 && (
+        <div>
+          <Heading level={2} className="font-display text-xl">
+            Pending invites
+          </Heading>
+          <Text className="mt-1 max-w-2xl text-sm">
+            These invites haven&apos;t been claimed yet. Copy the link to
+            resend, or revoke a link with the trash icon.
+          </Text>
+          <div className="mt-4">
+            <PendingTeamInvitesList
+              invites={pendingInvites}
+              appUrl={appUrl}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Invite section ── */}
       <div>
         <Heading level={2} className="font-display text-xl">
           Invite admin or manager
         </Heading>
-        <Text className="mt-1 text-sm max-w-2xl">
-          To add a new admin or manager, have them sign up at{" "}
-          <span className="font-medium text-dc-text">
-            {process.env.NEXT_PUBLIC_APP_URL ?? "your app URL"}
-          </span>{" "}
-          and complete onboarding. Then return here to adjust their role. A
-          dedicated invite flow is coming in the next release.
+        <Text className="mt-1 max-w-2xl text-sm">
+          Enter a work email and role to generate a secure invite link. Share
+          the link with the recipient — they sign in (or create an account)
+          and the role is assigned automatically. Use bulk upload for multiple
+          invites at once.
         </Text>
-        <div className="mt-4 rounded-xl border border-dashed border-[color:var(--dc-edge)] bg-dc-surface px-6 py-8 text-center">
-          <p className="text-sm font-medium text-dc-text-2">
-            Invitation flow coming soon
-          </p>
-          <p className="mt-1 text-xs text-dc-text-3">
-            Email-based invites with role pre-assignment will be available in
-            the next sprint.
-          </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <TeamInviteFormClient />
+          <TeamBulkUploadClient />
         </div>
       </div>
     </section>
