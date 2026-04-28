@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import type { Metadata } from 'next';
@@ -5,6 +7,7 @@ import type { Metadata } from 'next';
 import { resolveQrTarget } from '@/lib/qr/resolve';
 import { passesAudience, isAudienceUnrestricted } from '@/lib/qr/audience';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { isRateLimited } from '@/lib/qr/rate-limit';
 import { AccessDeniedView } from '@/components/qr/AccessDeniedView';
 import QrGone from './gone';
 
@@ -23,14 +26,6 @@ export default async function QrScanPage({ params }: Props) {
 
   const { qr, destination } = result;
 
-  // Fire-and-forget scan log. Don't await — we don't want latency on the redirect.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
-  void fetch(`${appUrl}/api/qr/scans`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ qr_code_id }),
-  }).catch(() => {/* best-effort; never block the redirect */});
-
   const { userId } = await auth();
 
   // Unauthenticated path: send to sign-in with the scan URL preserved as the
@@ -40,6 +35,29 @@ export default async function QrScanPage({ params }: Props) {
   if (!userId) {
     const back = `/s/${qr_code_id}`;
     redirect(`/sign-in?redirect_url=${encodeURIComponent(back)}`);
+  }
+
+  // Log the scan directly via the admin client before any redirect().
+  // A fire-and-forget fetch() was used here previously, but redirect() throws
+  // a Next.js NEXT_REDIRECT error that aborts the process before the fetch
+  // completes — scans were silently dropped. Awaiting a direct DB insert
+  // adds ~10-30 ms but guarantees the row lands.
+  const hdrs = await headers();
+  const ip =
+    hdrs.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    hdrs.get('x-real-ip') ??
+    'unknown';
+  const ipHash = createHash('sha256').update(ip).digest('hex');
+
+  if (!isRateLimited(ipHash, qr_code_id)) {
+    const admin = getAdminClient();
+    await admin.from('qr_scans').insert({
+      qr_code_id,
+      company_id: qr.company_id,
+      scanned_by: userId ?? null,
+      ip_hash: ipHash,
+      user_agent: hdrs.get('user-agent') ?? null,
+    });
   }
 
   // Audience gate. Resolve the scanner's role + departments, then run the
