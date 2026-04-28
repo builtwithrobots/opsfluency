@@ -39,10 +39,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   // Only company_members is live in the schema right now. Other counts will
   // light up as their tables land — see supabase/migrations/.
-  const { count: memberCount } = await supabase
-    .from("company_members")
-    .select("id", { count: "exact", head: true })
-    .eq("company_id", company_id);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ count: memberCount }, { count: scanCount7d }] = await Promise.all([
+    supabase
+      .from("company_members")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", company_id),
+    supabase
+      .from("qr_scans")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", company_id)
+      .gte("scanned_at", sevenDaysAgo),
+  ]);
 
   return (
     <div className="flex flex-col gap-10">
@@ -91,7 +100,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         />
         <DashboardStatCard
           label="QR scans (7d)"
-          value="—"
+          value={scanCount7d ?? 0}
           icon={<ScanLine className="size-5" strokeWidth={2} />}
           accent="signal-live"
           delay={0.1}

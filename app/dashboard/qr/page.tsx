@@ -73,6 +73,9 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
   let fetchError: string | null = null;
   let creatorScope: Awaited<ReturnType<typeof getCreatorScope>> | null = null;
 
+  type ScanCounts = Map<string, { total: number; last7d: number }>;
+  let scanCounts: ScanCounts = new Map();
+
   if (tab === 'all') {
     try {
       let query = supabase
@@ -96,6 +99,23 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
       creatorScope = await getCreatorScope({
         supabase, userId, company_id, role, impersonating,
       });
+
+      // Fetch scan counts for all visible QR codes in one query and
+      // aggregate in JS — avoids N+1 and keeps a simple schema.
+      if (qrCodes.length > 0) {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: scans } = await supabase
+          .from('qr_scans')
+          .select('qr_code_id, scanned_at')
+          .in('qr_code_id', qrCodes.map(qr => qr.id));
+
+        for (const row of (scans ?? [])) {
+          const entry = scanCounts.get(row.qr_code_id) ?? { total: 0, last7d: 0 };
+          entry.total++;
+          if (row.scanned_at >= sevenDaysAgo) entry.last7d++;
+          scanCounts.set(row.qr_code_id, entry);
+        }
+      }
     } catch {
       fetchError = 'Unable to load QR codes.';
     }
@@ -179,6 +199,7 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
           appUrl={appUrl}
           userId={userId}
           creatorScope={creatorScope}
+          scanCounts={scanCounts}
         />
       )}
 
@@ -210,6 +231,7 @@ interface QrAllTabProps {
   appUrl: string;
   userId: string;
   creatorScope: Awaited<ReturnType<typeof getCreatorScope>> | null;
+  scanCounts: Map<string, { total: number; last7d: number }>;
 }
 
 function QrAllTab({
@@ -220,6 +242,7 @@ function QrAllTab({
   appUrl,
   userId,
   creatorScope,
+  scanCounts,
 }: QrAllTabProps) {
   if (fetchError) {
     return (
@@ -307,6 +330,7 @@ function QrAllTab({
                   appUrl={appUrl}
                   index={i}
                   canManage={canManage}
+                  counts={scanCounts.get(qr.id) ?? { total: 0, last7d: 0 }}
                 />
               );
             })}
@@ -500,9 +524,10 @@ interface QrCardProps {
   appUrl: string;
   index: number;
   canManage: boolean;
+  counts: { total: number; last7d: number };
 }
 
-function QrCard({ qr, appUrl, index, canManage }: QrCardProps) {
+function QrCard({ qr, appUrl, index, canManage, counts }: QrCardProps) {
   const scanUrl = `${appUrl}/s/${qr.id}`;
   const archived = !!qr.archived_at;
 
@@ -546,11 +571,18 @@ function QrCard({ qr, appUrl, index, canManage }: QrCardProps) {
         </a>
       </div>
 
-      {/* Footer row: date + actions */}
+      {/* Footer row: scan count + actions */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[color:var(--dc-edge)] pt-3">
-        <div className="flex items-center gap-1.5 text-xs text-dc-text-3">
-          <ScanLine className="h-3.5 w-3.5" />
-          {new Date(archived ? qr.archived_at! : qr.created_at).toLocaleDateString()}
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-dc-text-3">
+            <ScanLine className="h-3.5 w-3.5 shrink-0" />
+            <span>{counts.total.toLocaleString()} {counts.total === 1 ? 'scan' : 'scans'}</span>
+          </div>
+          {counts.last7d > 0 && (
+            <p className="pl-5 text-[10px] text-dc-text-3">
+              {counts.last7d.toLocaleString()} this week
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <QrCardActions
