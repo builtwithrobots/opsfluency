@@ -67,7 +67,7 @@
    ──────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    --dc-bg:      #F0F2F5;
+    --dc-bg:      #F8FAFC;
     --dc-surface: #FFFFFF;
     --dc-raised:  #F9FAFB;
     --dc-overlay: #F3F4F6;
@@ -76,6 +76,11 @@
     --dc-text-3:  #9CA3AF;
     --dc-edge:    #E5E7EB;
     --dc-edge-2:  #D1D5DB;
+
+    --shadow-card:    0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-raised:  0 4px 8px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-float:   0 8px 24px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
+    --shadow-overlay: 0 16px 40px rgba(0,0,0,0.14), 0 8px 16px rgba(0,0,0,0.08);
   }
 
   .dark {
@@ -88,6 +93,11 @@
     --dc-text-3:  #4A5068;
     --dc-edge:    #252A3A;
     --dc-edge-2:  #363D54;
+
+    --shadow-card:    0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+    --shadow-raised:  0 4px 8px rgba(0,0,0,0.40), 0 2px 4px rgba(0,0,0,0.24);
+    --shadow-float:   0 8px 24px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30);
+    --shadow-overlay: 0 16px 40px rgba(0,0,0,0.60), 0 8px 16px rgba(0,0,0,0.36);
   }
 
   /* Tailwind v4 border-color compatibility */

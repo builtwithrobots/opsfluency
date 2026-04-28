@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { ArrowUpRight, Bell, FileText, QrCode, ScanLine, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,8 +7,10 @@ import { Heading, Subheading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
+import { getRequestClient } from "@/lib/supabase/server";
 
 import { DashboardStatCard } from "@/components/dashboard/stat-card";
+import { StatGridSkeleton } from "@/components/dashboard/stat-grid-skeleton";
 import { EmptyActivityCard } from "@/components/dashboard/empty-activity-card";
 import { WelcomeBanner } from "@/components/dashboard/welcome-banner";
 
@@ -15,27 +18,8 @@ interface DashboardPageProps {
   searchParams: Promise<{ welcome?: string }>;
 }
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  let ctx;
-  try {
-    ctx = await getCompanyContext();
-  } catch (e) {
-    // Super admins have no company_members row and therefore nothing
-    // meaningful on the member-scoped home page. Route them to their
-    // own landing.
-    if (e instanceof AuthError && e.code === "NO_COMPANY") {
-      if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform");
-    }
-    throw e;
-  }
-
-  const { supabase, company_id, role } = ctx;
-  const { welcome } = await searchParams;
-  const showWelcome = welcome === "1";
-
-  const { data: company } = showWelcome
-    ? await supabase.from("companies").select("name").eq("id", company_id).single()
-    : { data: null };
+async function DashboardStats({ company_id }: { company_id: string }) {
+  const supabase = await getRequestClient();
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -67,6 +51,82 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
 
   return (
+    <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {/* Primary metrics — span 2 columns each */}
+      <div className="col-span-2">
+        <DashboardStatCard
+          label="Published SOPs"
+          value={publishedSopCount ?? 0}
+          icon={<FileText className="size-5" strokeWidth={2} />}
+          accent="brand"
+          context="live procedures"
+          delay={0}
+          className="p-6"
+        />
+      </div>
+      <div className="col-span-2">
+        <DashboardStatCard
+          label="QR scans"
+          value={scanCount7d ?? 0}
+          icon={<ScanLine className="size-5" strokeWidth={2} />}
+          accent="brand"
+          context="last 7 days"
+          delay={0.05}
+          className="p-6"
+        />
+      </div>
+      {/* Secondary metrics — 1 column each */}
+      <DashboardStatCard
+        label="Live QR codes"
+        value={liveQrCount ?? 0}
+        icon={<QrCode className="size-5" strokeWidth={2} />}
+        accent="neutral"
+        context="never expire"
+        delay={0.1}
+      />
+      <DashboardStatCard
+        label="Team members"
+        value={memberCount ?? 0}
+        icon={<Users className="size-5" strokeWidth={2} />}
+        accent="neutral"
+        context="across all depts"
+        delay={0.15}
+      />
+      <DashboardStatCard
+        label="Pending approvals"
+        value="—"
+        icon={<Bell className="size-5" strokeWidth={2} />}
+        accent="neutral"
+        context="translations to review"
+        delay={0.2}
+      />
+    </section>
+  );
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  let ctx;
+  try {
+    ctx = await getCompanyContext();
+  } catch (e) {
+    // Super admins have no company_members row and therefore nothing
+    // meaningful on the member-scoped home page. Route them to their
+    // own landing.
+    if (e instanceof AuthError && e.code === "NO_COMPANY") {
+      if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform");
+    }
+    throw e;
+  }
+
+  const { supabase, company_id, role } = ctx;
+  const { welcome } = await searchParams;
+  const showWelcome = welcome === "1";
+
+  const { data: company } = showWelcome
+    ? await supabase.from("companies").select("name").eq("id", company_id).single()
+    : { data: null };
+
+  return (
     <div className="flex flex-col gap-8">
       {showWelcome ? <WelcomeBanner companyName={company?.name ?? "your workspace"} /> : null}
 
@@ -91,48 +151,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         )}
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <DashboardStatCard
-          label="Published SOPs"
-          value={publishedSopCount ?? 0}
-          icon={<FileText className="size-5" strokeWidth={2} />}
-          accent="brand"
-          context="live procedures"
-          delay={0}
-        />
-        <DashboardStatCard
-          label="Live QR codes"
-          value={liveQrCount ?? 0}
-          icon={<QrCode className="size-5" strokeWidth={2} />}
-          accent="brand"
-          context="never expire"
-          delay={0.05}
-        />
-        <DashboardStatCard
-          label="Team members"
-          value={memberCount ?? 0}
-          icon={<Users className="size-5" strokeWidth={2} />}
-          accent="neutral"
-          context="across all depts"
-          delay={0.1}
-        />
-        <DashboardStatCard
-          label="QR scans"
-          value={scanCount7d ?? 0}
-          icon={<ScanLine className="size-5" strokeWidth={2} />}
-          accent="neutral"
-          context="last 7 days"
-          delay={0.15}
-        />
-        <DashboardStatCard
-          label="Pending approvals"
-          value="—"
-          icon={<Bell className="size-5" strokeWidth={2} />}
-          accent="neutral"
-          context="translations to review"
-          delay={0.2}
-        />
-      </section>
+      <Suspense fallback={<StatGridSkeleton />}>
+        <DashboardStats company_id={company_id} />
+      </Suspense>
 
       <div className="border-t border-[color:var(--dc-edge)]" />
 

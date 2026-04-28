@@ -108,7 +108,7 @@ function SopRowItem({
           </p>
         </Link>
 
-        <Badge color={meta.color}>{meta.label}</Badge>
+        <Badge color={meta.color} dot>{meta.label}</Badge>
 
         {/* Tag pills */}
         {sop.tags.length > 0 && (
