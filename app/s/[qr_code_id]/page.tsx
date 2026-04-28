@@ -51,13 +51,16 @@ export default async function QrScanPage({ params }: Props) {
 
   if (!isRateLimited(ipHash, qr_code_id)) {
     const admin = getAdminClient();
-    await admin.from('qr_scans').insert({
+    const { error: scanErr } = await admin.from('qr_scans').insert({
       qr_code_id,
       company_id: qr.company_id,
       scanned_by: userId ?? null,
       ip_hash: ipHash,
       user_agent: hdrs.get('user-agent') ?? null,
     });
+    if (scanErr) {
+      console.error('[qr-scan] insert failed:', scanErr.code, scanErr.message);
+    }
   }
 
   // Audience gate. Resolve the scanner's role + departments, then run the
