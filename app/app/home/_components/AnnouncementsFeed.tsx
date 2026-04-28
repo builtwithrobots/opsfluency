@@ -17,7 +17,6 @@ interface Props {
     heading: string;
     empty: string;
     markAllRead: string;
-    unreadCount: (n: number) => string;
     allTeams: string;
     urgent: string;
     pinned: string;
@@ -35,6 +34,10 @@ function timeAgo(iso: string, lang: WorkerLanguage): string {
   const days = Math.floor(hrs / 24);
   if (days < 30) return lang === "es" ? `hace ${days}d` : `${days}d ago`;
   return new Date(iso).toLocaleDateString(lang === "es" ? "es" : "en");
+}
+
+function unreadCountLabel(n: number, lang: WorkerLanguage): string {
+  return lang === "es" ? `${n} sin leer` : `${n} unread`;
 }
 
 export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
@@ -81,7 +84,7 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
           {unreadCount > 0 && (
             <span
               className="flex size-5 items-center justify-center rounded-full bg-(--color-brand) text-[10px] font-bold text-white"
-              aria-label={strings.unreadCount(unreadCount)}
+              aria-label={unreadCountLabel(unreadCount, lang)}
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
