@@ -1,36 +1,23 @@
-import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import { ShieldCheck, UserRound } from "lucide-react";
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { claimTeamInvite } from "./_actions/claim";
+import { ClaimTeamForm } from "./_components/ClaimTeamForm";
 
 interface PageProps {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ error?: string }>;
 }
 
-const ERROR_MESSAGES: Record<string, string> = {
-  already_claimed:
-    "This invite link has already been used. Ask an admin to send a new one.",
-  already_member:
-    "Your account is already linked to a company. Each account can belong to only one company.",
-};
-
-export default async function JoinTeamPage({ params, searchParams }: PageProps) {
+export default async function JoinTeamPage({ params }: PageProps) {
   const { token } = await params;
-  const { error } = await searchParams;
-
   const admin = getAdminClient();
 
-  // Load invite (public — admin client bypasses RLS; no Clerk session needed)
   const { data: invite } = await admin
     .from("team_invites")
-    .select("id, company_id, email, name, role, invited_at, claimed_at")
+    .select("company_id, email, name, role, invited_at, claimed_at")
     .eq("token", token)
     .maybeSingle();
 
-  // Load company name
   const companyName = invite
     ? (
         await admin
@@ -40,20 +27,6 @@ export default async function JoinTeamPage({ params, searchParams }: PageProps) 
           .single()
       ).data?.name ?? "your company"
     : null;
-
-  // If already signed in, check if they're already a member
-  const { userId } = await auth();
-  let alreadyMember = false;
-  if (userId && invite && !invite.claimed_at) {
-    const { data: existing } = await admin
-      .from("company_members")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .maybeSingle();
-    alreadyMember = Boolean(existing);
-  }
-
-  const isAdmin = invite?.role === "admin";
 
   // Invalid token
   if (!invite) {
@@ -66,41 +39,20 @@ export default async function JoinTeamPage({ params, searchParams }: PageProps) 
     );
   }
 
-  // Already claimed or error from redirect
-  if (invite.claimed_at || error === "already_claimed") {
+  // Already claimed
+  if (invite.claimed_at) {
     return (
       <JoinShell companyName={companyName ?? undefined}>
         <p className="text-sm text-dc-text-2">
-          {ERROR_MESSAGES.already_claimed}
+          This invite link has already been used. Ask an admin to send you a
+          new one.
         </p>
       </JoinShell>
     );
   }
 
-  if (error === "already_member" || alreadyMember) {
-    return (
-      <JoinShell companyName={companyName ?? undefined}>
-        <p className="text-sm text-dc-text-2">
-          {ERROR_MESSAGES.already_member}
-        </p>
-        <a
-          href="/dashboard"
-          className="mt-4 inline-block rounded-lg bg-(--color-brand) px-5 py-2.5 text-sm font-semibold text-white hover:bg-(--color-brand-hover)"
-        >
-          Go to dashboard
-        </a>
-      </JoinShell>
-    );
-  }
+  const isAdmin = invite.role === "admin";
 
-  // If no session → sign in first, come back here
-  if (!userId) {
-    redirect(
-      `/sign-in?redirect_url=${encodeURIComponent(`/join/team/${token}`)}`,
-    );
-  }
-
-  // Signed in, invite valid — show accept UI
   return (
     <JoinShell companyName={companyName ?? undefined}>
       <div className="flex flex-col gap-6">
@@ -121,31 +73,20 @@ export default async function JoinTeamPage({ params, searchParams }: PageProps) 
               Invited as{" "}
               <span className="font-medium capitalize text-dc-text-2">
                 {invite.role}
-              </span>{" "}
-              · {companyName}
+              </span>
+              {" · "}
+              {companyName}
             </p>
           </div>
         </div>
 
         <p className="text-sm text-dc-text-2">
-          You&apos;re signed in. Click below to accept the invitation and open
-          your dashboard.
+          Click below to accept. We&apos;ll set up your account for{" "}
+          <span className="font-medium text-dc-text">{invite.email}</span> and
+          sign you in automatically — no separate sign-up needed.
         </p>
 
-        {/* Server Action form — no JS required */}
-        <form
-          action={async () => {
-            "use server";
-            await claimTeamInvite(token);
-          }}
-        >
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-(--color-brand) px-5 py-3 text-sm font-semibold text-white hover:bg-(--color-brand-hover)"
-          >
-            Accept invitation &amp; go to dashboard
-          </button>
-        </form>
+        <ClaimTeamForm token={token} action={claimTeamInvite} />
       </div>
     </JoinShell>
   );
