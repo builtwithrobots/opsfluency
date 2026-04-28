@@ -89,7 +89,6 @@ function ColorPickerDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [hexInput, setHexInput] = useState(color.replace(/^#/, ""));
-  const nativeRef = useRef<HTMLInputElement>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   // Sync hex field when the popover opens.
@@ -149,22 +148,6 @@ function ColorPickerDropdown({
 
       {open && (
         <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-52 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface p-3 shadow-(--shadow-float)">
-
-          {/* Full color swatch — clicking opens the OS native picker */}
-          <div className="mb-3 flex items-center gap-2">
-            <div className="relative h-8 flex-1 overflow-hidden rounded-md border border-[color:var(--dc-edge)] cursor-pointer">
-              <div className="absolute inset-0" style={{ backgroundColor: validColor }} />
-              <input
-                ref={nativeRef}
-                type="color"
-                value={validColor}
-                onChange={(e) => apply(e.target.value)}
-                aria-label="Open color picker"
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-            </div>
-            <span className="shrink-0 text-[10px] text-dc-text-3">Click to pick</span>
-          </div>
 
           {/* Hue slider */}
           <div className="mb-3">

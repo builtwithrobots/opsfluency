@@ -76,7 +76,16 @@ export async function updateDepartment(formData: FormData): Promise<void> {
     .eq("company_id", company_id);
   if (error) throw error;
 
+  // Keep department-sourced label colors in sync.
+  await supabase
+    .from("tags")
+    .update({ color: parsed.color_hex })
+    .eq("department_id", parsed.id)
+    .eq("company_id", company_id)
+    .eq("source", "department");
+
   revalidatePath("/dashboard/departments");
+  revalidatePath("/dashboard/labels");
   // No redirect — the client component closes the edit form after awaiting this action.
 }
 

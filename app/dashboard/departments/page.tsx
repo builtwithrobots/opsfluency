@@ -4,11 +4,10 @@ import { Text } from "@/components/ui/text";
 
 import { DepartmentsTab } from "./_tabs/departments-tab";
 import { MembersTab } from "./_tabs/members-tab";
-import { SopsTab } from "./_tabs/sops-tab";
 
-type TabId = "departments" | "members" | "sops";
+type TabId = "departments" | "members";
 
-const VALID_TABS: readonly TabId[] = ["departments", "members", "sops"] as const;
+const VALID_TABS: readonly TabId[] = ["departments", "members"] as const;
 
 function resolveTab(raw: string | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : "departments";
@@ -25,7 +24,6 @@ export default async function DepartmentsPage({ searchParams }: PageProps) {
   const tabs: TabDef[] = [
     { id: "departments", label: "Departments", href: "/dashboard/departments?tab=departments" },
     { id: "members",     label: "Members",     href: "/dashboard/departments?tab=members" },
-    { id: "sops",        label: "SOPs",        href: "/dashboard/departments?tab=sops" },
   ];
 
   return (
@@ -33,7 +31,7 @@ export default async function DepartmentsPage({ searchParams }: PageProps) {
       <header>
         <Heading>Departments</Heading>
         <Text className="mt-1.5 max-w-2xl">
-          Manage your company&apos;s departments, assign team members, and view associated SOPs.
+          Manage your company&apos;s departments and assign team members.
         </Text>
       </header>
 
@@ -41,7 +39,6 @@ export default async function DepartmentsPage({ searchParams }: PageProps) {
 
       {tab === "departments" && <DepartmentsTab editing={editing} />}
       {tab === "members"     && <MembersTab selectedDeptId={dept} />}
-      {tab === "sops"        && <SopsTab />}
     </div>
   );
 }

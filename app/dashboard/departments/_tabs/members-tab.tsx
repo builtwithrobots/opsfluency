@@ -95,9 +95,11 @@ export async function MembersTab({ selectedDeptId }: Props) {
   const { supabase, company_id } = await getCompanyContext("manager");
   const depts = await loadDepts(supabase, company_id);
 
-  const selectedDept = selectedDeptId
-    ? depts.find((d) => d.id === selectedDeptId) ?? null
-    : null;
+  // Default to the first department when no dept param is in the URL.
+  const selectedDept =
+    (selectedDeptId ? depts.find((d) => d.id === selectedDeptId) : null) ??
+    depts[0] ??
+    null;
 
   const panel =
     selectedDept
@@ -123,7 +125,7 @@ export async function MembersTab({ selectedDeptId }: Props) {
             {depts.map((dept) => {
               const iconKey = dept.icon_key in DEPT_ICONS ? dept.icon_key : "building-2";
               const { Icon } = DEPT_ICONS[iconKey];
-              const isActive = dept.id === selectedDeptId;
+              const isActive = dept.id === selectedDept?.id;
 
               return (
                 <li key={dept.id}>
