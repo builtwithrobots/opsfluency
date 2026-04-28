@@ -239,7 +239,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Heading level={2} className="font-display text-xl">
+          <Heading level={2} className="text-xl">
             AI usage
           </Heading>
           <Text className="mt-1 max-w-2xl text-sm">
@@ -316,7 +316,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
 
       {/* By model */}
       <div>
-        <Heading level={3} className="font-display text-base">By model</Heading>
+        <Heading level={3} className="text-base">By model</Heading>
         {!data.byModel.length ? (
           <EmptyRow>No AI calls recorded in the last {days} days.</EmptyRow>
         ) : (
@@ -373,7 +373,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
 
       {/* Top tenants */}
       <div>
-        <Heading level={3} className="font-display text-base">Top tenants by spend</Heading>
+        <Heading level={3} className="text-base">Top tenants by spend</Heading>
         {!data.topTenants.length ? (
           <EmptyRow>No tenant-attributed calls recorded.</EmptyRow>
         ) : (
@@ -466,7 +466,7 @@ function SimpleStat({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium tracking-[0.1em] text-dc-text-3 uppercase">{label}</p>
-          <p className="font-display mt-2 text-2xl font-semibold text-dc-text tabular-nums">{value}</p>
+          <p className="mt-2 text-2xl font-semibold text-dc-text tabular-nums">{value}</p>
           {sub && <p className="mt-0.5 text-[11px] text-dc-text-3">{sub}</p>}
         </div>
         <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)">

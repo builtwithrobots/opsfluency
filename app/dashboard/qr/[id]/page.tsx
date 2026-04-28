@@ -40,10 +40,7 @@ export default async function QrDetailPage({ params }: Props) {
             <ArrowLeft data-slot="icon" strokeWidth={2} />
             Back to QR codes
           </Button>
-          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-            Print editor
-          </p>
-          <Heading className="font-display mt-2">
+          <Heading>
             {qr.label || 'QR Code'}
           </Heading>
           <Text className="mt-1 font-mono text-xs">

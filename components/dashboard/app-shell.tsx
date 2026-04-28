@@ -2,7 +2,7 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, ChevronLeft, ChevronRight, CircleHelp, Eye, GripVertical, Smartphone } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleHelp, Eye, GripVertical, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -46,12 +46,14 @@ function BrandMark() {
   return (
     <motion.span
       aria-hidden
-      className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)"
+      className="relative flex size-8 shrink-0 items-center justify-center rounded-md bg-(--color-brand)"
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <Building2 className="size-5 text-white" strokeWidth={2} />
+      <span className="font-display text-[11px] font-bold tracking-tight text-white select-none">
+        OF
+      </span>
     </motion.span>
   );
 }
@@ -327,8 +329,13 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
         <div className="flex items-center gap-3 px-2 py-2">
           <BrandMark />
           {!collapsed && (
-            <span className={`${brandNameClasses} font-bold`}>
-              OPS<span className="text-(--color-brand)">FLUENCY</span>
+            <span className="flex flex-col min-w-0">
+              <span className={`${brandNameClasses} font-bold leading-none`}>
+                OPS<span className="text-(--color-brand)">FLUENCY</span>
+              </span>
+              <span className="mt-0.5 text-[10px] font-medium tracking-[0.12em] text-dc-text-3 uppercase leading-none">
+                Frontline Intelligence
+              </span>
             </span>
           )}
         </div>

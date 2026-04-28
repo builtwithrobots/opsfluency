@@ -38,10 +38,7 @@ export default async function EmulatorPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-          Tools
-        </p>
-        <Heading className="font-display">Worker app emulator</Heading>
+        <Heading>Worker app emulator</Heading>
         <Text className="max-w-2xl">
           Preview what employees see in the worker PWA. Changes you make
           on the dashboard appear here on reload, useful for verifying

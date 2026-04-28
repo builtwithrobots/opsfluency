@@ -133,11 +133,8 @@ export default async function GlossaryPage({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-          Manager
-        </p>
-        <Heading className="font-display mt-2">Glossary</Heading>
-        <Text className="mt-2 max-w-2xl">
+        <Heading>Glossary</Heading>
+        <Text className="mt-1.5 max-w-2xl">
           Bilingual terms used across every translated SOP. New terms arrive automatically
           when you import an SOP and define the terms Sonnet flags. Edits here flow into
           every future translation.
@@ -179,7 +176,7 @@ function EmptyState() {
       <Heading
         level={2}
         id="glossary-empty-heading"
-        className="font-display mt-4 text-xl"
+        className="mt-4 text-xl"
       >
         Your glossary is empty
       </Heading>

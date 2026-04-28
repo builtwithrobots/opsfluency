@@ -171,13 +171,9 @@ export default async function QrCodesPage({ searchParams }: PageProps) {
       {/* Page header */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-            QR Codes
-          </p>
-          <Heading className="font-display mt-2">QR Code library</Heading>
-          <Text className="mt-2 max-w-2xl">
-            Permanent scan URLs for SOPs, announcements, and any destination.
-            Print and post - they never expire.
+          <Heading>QR Code library</Heading>
+          <Text className="mt-1.5 max-w-2xl">
+            Permanent scan URLs for SOPs, announcements, and any destination. Print and post — they never expire.
           </Text>
         </div>
         <Button href="/dashboard/qr/new" color="brand">
@@ -499,10 +495,7 @@ function QrEmptyState() {
           <QrCode className="size-7" strokeWidth={1.5} />
         </span>
         <div>
-          <p className="font-display text-sm tracking-[0.15em] text-(--color-brand) uppercase">
-            Getting started
-          </p>
-          <h3 className="mt-1 text-xl font-semibold text-dc-text">No QR codes yet</h3>
+          <h3 className="text-xl font-semibold text-dc-text">No QR codes yet</h3>
           <p className="mt-1 max-w-md text-dc-text-2">
             Create a QR code and print it to any surface. The URL never changes - scans always
             resolve to the current content.

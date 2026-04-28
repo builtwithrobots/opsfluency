@@ -43,13 +43,10 @@ export default async function NewQrPage() {
           <ArrowLeft data-slot="icon" strokeWidth={2} />
           Back to QR codes
         </Button>
-        <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-          QR Codes
-        </p>
-        <Heading className="font-display mt-2">New QR code</Heading>
-        <Text className="mt-2 max-w-2xl">
-          Pick a destination, label it, and choose who should be able to scan
-          it. The preview on the right shows exactly what a worker will see.
+        <Heading>New QR code</Heading>
+        <Text className="mt-1.5 max-w-2xl">
+          Pick a destination, label it, and choose who should be able to scan it.
+          The preview on the right shows exactly what a worker will see.
         </Text>
       </header>
 

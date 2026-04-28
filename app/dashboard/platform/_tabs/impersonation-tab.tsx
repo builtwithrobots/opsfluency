@@ -51,7 +51,7 @@ export async function ImpersonationTab() {
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Impersonation audit log
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">

@@ -95,7 +95,7 @@ export async function DepartmentsTab({ editing }: Props) {
       {/* Department list — client component handles drag-to-reorder and inline editing */}
       <div>
         <div className="flex items-center gap-2">
-          <Heading level={2} className="font-display text-xl">
+          <Heading level={2} className="text-xl">
             All departments
           </Heading>
           {/* CSS-only tooltip — no JS needed */}
@@ -133,7 +133,7 @@ export async function DepartmentsTab({ editing }: Props) {
       {/* Create form */}
       <div className="overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
         <div className="border-b border-[color:var(--dc-edge)] px-5 py-4">
-          <Heading level={2} className="font-display text-xl flex items-center gap-2">
+          <Heading level={2} className="text-xl flex items-center gap-2">
             <Plus className="size-4 text-dc-text-3" strokeWidth={2} />
             New department
           </Heading>

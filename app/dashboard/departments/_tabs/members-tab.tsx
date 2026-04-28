@@ -164,7 +164,7 @@ export async function MembersTab({ selectedDeptId }: Props) {
           <>
             {/* Roster heading */}
             <div>
-              <Heading level={2} className="font-display text-xl">
+              <Heading level={2} className="text-xl">
                 {selectedDept.name}
               </Heading>
               <Text className="mt-1 text-sm">

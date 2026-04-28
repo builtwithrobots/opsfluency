@@ -199,7 +199,7 @@ export async function HealthTab() {
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Platform health
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">

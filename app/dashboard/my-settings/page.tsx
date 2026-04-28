@@ -7,13 +7,9 @@ export default function MySettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-          Account
-        </p>
-        <Heading className="font-display mt-2">My Settings</Heading>
-        <Text className="mt-2 max-w-2xl">
-          Manage your personal account preferences, notification settings, and
-          display options.
+        <Heading>My Settings</Heading>
+        <Text className="mt-1.5 max-w-2xl">
+          Manage your personal account preferences, notification settings, and display options.
         </Text>
       </header>
 

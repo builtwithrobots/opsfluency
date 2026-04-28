@@ -43,7 +43,7 @@ export async function GeneralTab({ saved }: Props) {
       {/* ── Card 1: Company information ─────────────────────────────────── */}
       <div className="overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
         <div className="border-b border-[color:var(--dc-edge)] px-5 py-4">
-          <Heading level={2} className="font-display text-xl">
+          <Heading level={2} className="text-xl">
             Company information
           </Heading>
           <Text className="mt-1 text-sm">
@@ -157,7 +157,7 @@ export async function GeneralTab({ saved }: Props) {
       <div className="overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
         <div className="flex items-center justify-between gap-4 border-b border-[color:var(--dc-edge)] px-5 py-4">
           <div>
-            <Heading level={2} className="font-display text-xl">
+            <Heading level={2} className="text-xl">
               Logo
             </Heading>
             <Text className="mt-0.5 text-sm">

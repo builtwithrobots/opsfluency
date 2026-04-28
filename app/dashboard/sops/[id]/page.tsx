@@ -198,10 +198,7 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
         </Button>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-              SOP
-            </p>
-            <Heading className="font-display mt-2 truncate">{sop.title}</Heading>
+            <Heading className="truncate">{sop.title}</Heading>
             <Text className="mt-1 flex items-center gap-2 text-xs">
               {dept ? <span>{dept.name}</span> : <span className="text-dc-text-3">No department</span>}
               <span className="text-dc-text-3">·</span>

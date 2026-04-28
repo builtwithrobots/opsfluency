@@ -67,19 +67,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-8">
       {showWelcome ? <WelcomeBanner companyName={company?.name ?? "your workspace"} /> : null}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-            Overview
-          </p>
-          <Heading className="font-display mt-2">Command center</Heading>
-          <Text className="mt-2 max-w-2xl">
-            Everything running on the floor, in one place. Publish SOPs, invite
-            teammates, post announcements, and pair monitor screens — the full
-            {" "}OpsFluency stack lights up as each module lands.
+          <Heading>Command center</Heading>
+          <Text className="mt-1.5 max-w-2xl">
+            Publish SOPs, invite teammates, post announcements, and pair monitor screens.
           </Text>
         </div>
         {role !== "employee" && (
@@ -102,37 +97,44 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           value={publishedSopCount ?? 0}
           icon={<FileText className="size-5" strokeWidth={2} />}
           accent="brand"
+          context="live procedures"
           delay={0}
         />
         <DashboardStatCard
           label="Live QR codes"
           value={liveQrCount ?? 0}
           icon={<QrCode className="size-5" strokeWidth={2} />}
-          accent="signal-ok"
+          accent="brand"
+          context="never expire"
           delay={0.05}
         />
         <DashboardStatCard
           label="Team members"
           value={memberCount ?? 0}
           icon={<Users className="size-5" strokeWidth={2} />}
-          accent="signal-info"
+          accent="neutral"
+          context="across all depts"
           delay={0.1}
         />
         <DashboardStatCard
-          label="QR scans (7d)"
+          label="QR scans"
           value={scanCount7d ?? 0}
           icon={<ScanLine className="size-5" strokeWidth={2} />}
-          accent="signal-live"
+          accent="neutral"
+          context="last 7 days"
           delay={0.15}
         />
         <DashboardStatCard
           label="Pending approvals"
           value="—"
           icon={<Bell className="size-5" strokeWidth={2} />}
-          accent="signal-warn"
+          accent="neutral"
+          context="translations to review"
           delay={0.2}
         />
       </section>
+
+      <div className="border-t border-[color:var(--dc-edge)]" />
 
       <section className="flex flex-col gap-4">
         <div className="flex items-end justify-between">
