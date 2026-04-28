@@ -4,12 +4,11 @@ import { Text } from "@/components/ui/text";
 
 import { BillingTab } from "./_tabs/billing-tab";
 import { GeneralTab } from "./_tabs/general-tab";
-import { LabelsTab } from "./_tabs/labels-tab";
 import { TeamTab } from "./_tabs/team-tab";
 
-type TabId = "general" | "team" | "billing" | "labels";
+type TabId = "general" | "team" | "billing";
 
-const VALID_TABS: readonly TabId[] = ["general", "team", "billing", "labels"] as const;
+const VALID_TABS: readonly TabId[] = ["general", "team", "billing"] as const;
 
 function resolveTab(raw: string | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : "general";
@@ -26,7 +25,6 @@ export default async function OrgSettingsPage({ searchParams }: PageProps) {
   const tabs: TabDef[] = [
     { id: "general", label: "General",  href: "/dashboard/org-settings?tab=general" },
     { id: "team",    label: "Team",     href: "/dashboard/org-settings?tab=team" },
-    { id: "labels",  label: "Labels",   href: "/dashboard/org-settings?tab=labels" },
     { id: "billing", label: "Billing",  href: "/dashboard/org-settings?tab=billing" },
   ];
 
@@ -35,7 +33,7 @@ export default async function OrgSettingsPage({ searchParams }: PageProps) {
       <header>
         <Heading>Org Settings</Heading>
         <Text className="mt-1.5 max-w-2xl">
-          Manage your company profile, team members, labels, and subscription.
+          Manage your company profile, team members, and subscription.
         </Text>
       </header>
 
@@ -43,7 +41,6 @@ export default async function OrgSettingsPage({ searchParams }: PageProps) {
 
       {tab === "general" && <GeneralTab saved={saved === "1"} />}
       {tab === "team"    && <TeamTab />}
-      {tab === "labels"  && <LabelsTab />}
       {tab === "billing" && <BillingTab />}
     </div>
   );

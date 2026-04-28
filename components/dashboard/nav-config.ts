@@ -8,6 +8,7 @@ import {
   ScanLine,
   Settings2,
   ShieldCheck,
+  Tag,
   User,
   Users,
   type LucideIcon,
@@ -62,6 +63,7 @@ const primary: NavSection = {
     { href: "/dashboard/qr",   label: "QR Codes", icon: QrCode,    match: "prefix", visibility: { member: ["manager"] } },
     { href: "/dashboard/sops", label: "SOPs",     icon: FileText,  match: "prefix", visibility: { member: ["manager"] } },
     { href: "/dashboard/glossary", label: "Glossary", icon: Languages, match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard/labels",   label: "Labels",   icon: Tag,       match: "prefix", visibility: { member: ["admin"] } },
     // Cross-boundary link into the worker PWA scanner. Employees never see
     // this entry (the dashboard isn't theirs anyway); admins and managers
     // jump into /app/scan, which renders the same scanner workers use, with
