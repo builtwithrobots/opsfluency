@@ -1,5 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server";
-import { Crown, ShieldCheck, UserRound } from "lucide-react";
+import { Crown, Info, ShieldCheck, UserRound, Users } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -113,6 +113,37 @@ export async function TeamTab() {
 
   return (
     <section className="flex max-w-3xl flex-col gap-8">
+      {/* ── Role reference card ── */}
+      <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface">
+        <div className="flex items-center gap-2 border-b border-[color:var(--dc-edge)] px-4 py-3">
+          <Info className="size-4 shrink-0 text-dc-text-3" strokeWidth={2} />
+          <span className="text-sm font-semibold text-dc-text">Roles in your org</span>
+        </div>
+        <div className="divide-y divide-[color:var(--dc-edge)]">
+          <div className="flex items-start gap-3 px-4 py-3">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-(--color-brand)" strokeWidth={2} />
+            <div>
+              <p className="text-sm font-medium text-dc-text">Admin</p>
+              <p className="mt-0.5 text-xs text-dc-text-3">Full org access — billing, settings, all departments, all managers. Can invite and remove other admins and managers.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 px-4 py-3">
+            <UserRound className="mt-0.5 size-4 shrink-0 text-dc-text-3" strokeWidth={2} />
+            <div>
+              <p className="text-sm font-medium text-dc-text">Manager</p>
+              <p className="mt-0.5 text-xs text-dc-text-3">Scoped to their assigned departments — can manage SOPs, employees, announcements, and monitors within those departments.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 px-4 py-3">
+            <Users className="mt-0.5 size-4 shrink-0 text-dc-text-3" strokeWidth={2} />
+            <div>
+              <p className="text-sm font-medium text-dc-text">Employee</p>
+              <p className="mt-0.5 text-xs text-dc-text-3">Can view SOPs, scan QR codes, read announcements, and use HR chat. Managed from the <span className="font-medium text-dc-text">Employees</span> tab, not here.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Active members ── */}
       <div>
         <Heading level={2} className="font-display text-xl">
