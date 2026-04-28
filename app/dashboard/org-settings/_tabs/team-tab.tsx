@@ -28,6 +28,11 @@ interface EnrichedMember extends MemberRow {
   displayName: string | null;
 }
 
+interface Dept {
+  id: string;
+  name: string;
+}
+
 interface PendingInvite {
   id: string;
   token: string;
@@ -35,27 +40,39 @@ interface PendingInvite {
   name: string | null;
   role: string;
   invited_at: string;
+  department_ids: string[];
 }
 
 async function loadTeam(
   supabase: SupabaseClient,
   company_id: string,
   currentUserId: string,
-): Promise<{ members: EnrichedMember[]; pendingInvites: PendingInvite[]; currentUserId: string }> {
-  const [{ data: rows, error }, { data: invites }] = await Promise.all([
-    supabase
-      .from("company_members")
-      .select("id, clerk_user_id, role, is_owner, joined_at, invited_at")
-      .eq("company_id", company_id)
-      .in("role", ["admin", "manager"])
-      .order("joined_at", { ascending: true }),
-    supabase
-      .from("team_invites")
-      .select("id, token, email, name, role, invited_at")
-      .eq("company_id", company_id)
-      .is("claimed_at", null)
-      .order("invited_at", { ascending: false }),
-  ]);
+): Promise<{
+  members: EnrichedMember[];
+  pendingInvites: PendingInvite[];
+  departments: Dept[];
+  currentUserId: string;
+}> {
+  const [{ data: rows, error }, { data: invites }, { data: depts }] =
+    await Promise.all([
+      supabase
+        .from("company_members")
+        .select("id, clerk_user_id, role, is_owner, joined_at, invited_at")
+        .eq("company_id", company_id)
+        .in("role", ["admin", "manager"])
+        .order("joined_at", { ascending: true }),
+      supabase
+        .from("team_invites")
+        .select("id, token, email, name, role, invited_at, department_ids")
+        .eq("company_id", company_id)
+        .is("claimed_at", null)
+        .order("invited_at", { ascending: false }),
+      supabase
+        .from("departments")
+        .select("id, name")
+        .eq("company_id", company_id)
+        .order("name", { ascending: true }),
+    ]);
   if (error) throw error;
 
   const memberRows: MemberRow[] = (rows ?? []).map((r) => ({
@@ -82,17 +99,15 @@ async function loadTeam(
   return {
     members: enriched,
     pendingInvites: (invites ?? []) as PendingInvite[],
+    departments: (depts ?? []) as Dept[],
     currentUserId,
   };
 }
 
 export async function TeamTab() {
   const { supabase, company_id, userId } = await getCompanyContext("admin");
-  const { members, pendingInvites, currentUserId } = await loadTeam(
-    supabase,
-    company_id,
-    userId,
-  );
+  const { members, pendingInvites, departments, currentUserId } =
+    await loadTeam(supabase, company_id, userId);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
@@ -220,6 +235,7 @@ export async function TeamTab() {
           <div className="mt-4">
             <PendingTeamInvitesList
               invites={pendingInvites}
+              departments={departments}
               appUrl={appUrl}
             />
           </div>
@@ -238,8 +254,8 @@ export async function TeamTab() {
           invites at once.
         </Text>
         <div className="mt-4 flex flex-wrap gap-3">
-          <TeamInviteFormClient />
-          <TeamBulkUploadClient />
+          <TeamInviteFormClient departments={departments} />
+          <TeamBulkUploadClient departments={departments} />
         </div>
       </div>
     </section>

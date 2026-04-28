@@ -19,7 +19,7 @@ export async function claimTeamInvite(
 
   const { data: invite } = await admin
     .from("team_invites")
-    .select("id, company_id, email, name, role, invited_at")
+    .select("id, company_id, email, name, role, invited_at, department_ids")
     .eq("token", token)
     .is("claimed_at", null)
     .maybeSingle();
@@ -80,17 +80,33 @@ export async function claimTeamInvite(
 
   const now = new Date().toISOString();
 
-  const { error: insertErr } = await admin.from("company_members").insert({
-    company_id: invite.company_id,
-    clerk_user_id: clerkUserId,
-    role: invite.role,
-    invited_at: invite.invited_at,
-    joined_at: now,
-    is_owner: false,
-  });
+  const { data: member, error: insertErr } = await admin
+    .from("company_members")
+    .insert({
+      company_id: invite.company_id,
+      clerk_user_id: clerkUserId,
+      role: invite.role,
+      invited_at: invite.invited_at,
+      joined_at: now,
+      is_owner: false,
+    })
+    .select("id")
+    .single();
 
-  if (insertErr) {
+  if (insertErr || !member) {
     return { error: "Failed to register membership. Please try again." };
+  }
+
+  // Assign departments from invite
+  const deptIds = (invite.department_ids ?? []) as string[];
+  if (deptIds.length > 0) {
+    await admin.from("employee_departments").insert(
+      deptIds.map((department_id: string) => ({
+        company_id: invite.company_id,
+        department_id,
+        member_id: member.id,
+      })),
+    );
   }
 
   // Tombstone

@@ -14,13 +14,22 @@ import {
   type TeamInviteResult,
 } from "../_actions/team-invite";
 
+interface Dept {
+  id: string;
+  name: string;
+}
+
+interface Props {
+  departments: Dept[];
+}
+
 const INITIAL: TeamInviteResult | null = null;
 const APP_URL =
   typeof window !== "undefined"
     ? window.location.origin
     : process.env.NEXT_PUBLIC_APP_URL ?? "";
 
-export function TeamInviteFormClient() {
+export function TeamInviteFormClient({ departments }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -31,8 +40,7 @@ export function TeamInviteFormClient() {
     INITIAL,
   );
 
-  const inviteUrl =
-    state?.ok ? `${APP_URL}/join/team/${state.token}` : null;
+  const inviteUrl = state?.ok ? `${APP_URL}/join/team/${state.token}` : null;
 
   const errorMsg =
     !state || state.ok
@@ -46,8 +54,6 @@ export function TeamInviteFormClient() {
   function handleClose() {
     setOpen(false);
     setCopied(false);
-    // Reset action state on next open — useActionState resets on remount
-    // but we can't reset it here, so we use key to force remount
   }
 
   function copyLink() {
@@ -84,7 +90,6 @@ export function TeamInviteFormClient() {
 
         <DialogBody>
           {inviteUrl ? (
-            /* ── Success: show copyable link ── */
             <div className="flex flex-col gap-4">
               <p className="text-sm text-dc-text-2">
                 Share this link with the invitee. It expires once claimed.
@@ -107,14 +112,17 @@ export function TeamInviteFormClient() {
                 </button>
               </div>
               <p className="text-xs text-dc-text-3">
-                The link also appears in the Pending invites list below, where
-                you can copy it again at any time.
+                The link also appears in the Pending invites list, where you
+                can copy it again at any time.
               </p>
             </div>
           ) : (
-            /* ── Form ── */
-            <form id="team-invite-form" action={action} className="flex flex-col gap-5">
-              {/* Email — required */}
+            <form
+              id="team-invite-form"
+              action={action}
+              className="flex flex-col gap-5"
+            >
+              {/* Email */}
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
                   Work email{" "}
@@ -127,13 +135,9 @@ export function TeamInviteFormClient() {
                   placeholder="jane@yourcompany.com"
                   className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-(--color-brand) focus:outline-none"
                 />
-                <p className="text-xs text-dc-text-3">
-                  Used to identify the invite — the invitee can sign up with
-                  any email via the link.
-                </p>
               </label>
 
-              {/* Name — optional */}
+              {/* Name */}
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
                   Name{" "}
@@ -150,7 +154,8 @@ export function TeamInviteFormClient() {
               {/* Role */}
               <fieldset className="flex flex-col gap-2">
                 <legend className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
-                  Role <span className="text-(--color-signal-urgent)">*</span>
+                  Role{" "}
+                  <span className="text-(--color-signal-urgent)">*</span>
                 </legend>
                 <div className="flex gap-3">
                   {(["manager", "admin"] as const).map((r) => (
@@ -172,10 +177,38 @@ export function TeamInviteFormClient() {
                   ))}
                 </div>
                 <p className="text-xs text-dc-text-3">
-                  Admins have full org access including billing. Managers can
-                  manage SOPs and employees scoped to their departments.
+                  Admins have full org access. Managers are scoped to their
+                  departments.
                 </p>
               </fieldset>
+
+              {/* Departments */}
+              {departments.length > 0 && (
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
+                    Departments{" "}
+                    <span className="font-normal text-dc-text-3">
+                      (optional)
+                    </span>
+                  </legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {departments.map((d) => (
+                      <label
+                        key={d.id}
+                        className="flex cursor-pointer items-center gap-2"
+                      >
+                        <input
+                          type="checkbox"
+                          name="department_ids"
+                          value={d.id}
+                          className="rounded border-[color:var(--dc-edge)] accent-(--color-brand)"
+                        />
+                        <span className="text-sm text-dc-text">{d.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
 
               {errorMsg && (
                 <p className="rounded-lg border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/10 px-3 py-2 text-sm text-(--color-signal-urgent)">

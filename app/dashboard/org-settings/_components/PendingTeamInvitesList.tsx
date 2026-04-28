@@ -5,6 +5,11 @@ import { Check, Copy, Mail, ShieldCheck, Trash2, UserRound } from "lucide-react"
 
 import { deleteTeamInvite } from "../_actions/team-invite";
 
+interface Dept {
+  id: string;
+  name: string;
+}
+
 interface PendingInvite {
   id: string;
   token: string;
@@ -12,16 +17,31 @@ interface PendingInvite {
   name: string | null;
   role: string;
   invited_at: string;
+  department_ids: string[];
 }
 
 interface Props {
   invites: PendingInvite[];
+  departments: Dept[];
   appUrl: string;
 }
 
-function InviteRow({ invite, appUrl }: { invite: PendingInvite; appUrl: string }) {
+function InviteRow({
+  invite,
+  departments,
+  appUrl,
+}: {
+  invite: PendingInvite;
+  departments: Dept[];
+  appUrl: string;
+}) {
   const [copied, setCopied] = useState(false);
   const link = `${appUrl}/join/team/${invite.token}`;
+
+  const deptMap = new Map(departments.map((d) => [d.id, d.name]));
+  const assignedDepts = invite.department_ids
+    .map((id) => deptMap.get(id))
+    .filter(Boolean) as string[];
 
   function copyLink() {
     navigator.clipboard.writeText(link).then(() => {
@@ -60,17 +80,24 @@ function InviteRow({ invite, appUrl }: { invite: PendingInvite; appUrl: string }
               {isAdmin ? "Admin" : "Manager"}
             </span>
           </div>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-dc-text-3">
-            <Mail className="size-3 shrink-0" />
-            {invite.email}
-            {" · "}
-            Invited {new Date(invite.invited_at).toLocaleDateString()}
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-dc-text-3">
+            <span className="flex items-center gap-1">
+              <Mail className="size-3 shrink-0" />
+              {invite.email}
+            </span>
+            <span>·</span>
+            <span>Invited {new Date(invite.invited_at).toLocaleDateString()}</span>
+            {assignedDepts.length > 0 && (
+              <>
+                <span>·</span>
+                <span>{assignedDepts.join(", ")}</span>
+              </>
+            )}
           </p>
         </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        {/* Copy invite link */}
         <button
           type="button"
           onClick={copyLink}
@@ -85,7 +112,6 @@ function InviteRow({ invite, appUrl }: { invite: PendingInvite; appUrl: string }
           {copied ? "Copied!" : "Copy link"}
         </button>
 
-        {/* Delete invite */}
         <form action={deleteTeamInvite}>
           <input type="hidden" name="invite_id" value={invite.id} />
           <button
@@ -101,13 +127,13 @@ function InviteRow({ invite, appUrl }: { invite: PendingInvite; appUrl: string }
   );
 }
 
-export function PendingTeamInvitesList({ invites, appUrl }: Props) {
+export function PendingTeamInvitesList({ invites, departments, appUrl }: Props) {
   if (!invites.length) return null;
 
   return (
     <ul className="divide-y divide-[color:var(--dc-edge)] overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
       {invites.map((inv) => (
-        <InviteRow key={inv.id} invite={inv} appUrl={appUrl} />
+        <InviteRow key={inv.id} invite={inv} departments={departments} appUrl={appUrl} />
       ))}
     </ul>
   );
