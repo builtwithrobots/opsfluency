@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { PlusCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { createAnnouncement } from "@/app/dashboard/announcements/_actions";
@@ -29,12 +28,13 @@ const labelClass =
 
 export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [deptId, setDeptId] = useState<string | null>(canPostOrgWide ? null : (departments[0]?.id ?? null));
+  const [deptId, setDeptId] = useState<string | null>(
+    canPostOrgWide ? null : (departments[0]?.id ?? null),
+  );
   const [priority, setPriority] = useState<"normal" | "urgent">("normal");
   const [pinned, setPinned] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
@@ -48,11 +48,6 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
     setPinned(false);
     setExpiresAt("");
     setError(null);
-  }
-
-  function handleClose() {
-    reset();
-    setOpen(false);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -75,35 +70,17 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
       }
 
       reset();
-      setOpen(false);
       router.refresh();
     });
   }
 
-  if (!open) {
-    return (
-      <Button onClick={() => setOpen(true)} color="dark">
-        <PlusCircle data-slot="icon" />
-        New Announcement
-      </Button>
-    );
-  }
-
   return (
-    <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-5">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-(--shadow-card)">
+      <div className="border-b border-[color:var(--dc-edge)] px-5 py-3.5">
         <h3 className="text-sm font-semibold text-dc-text">New Announcement</h3>
-        <button
-          type="button"
-          onClick={handleClose}
-          className="rounded-md p-1 text-dc-text-3 hover:bg-dc-raised hover:text-dc-text"
-          aria-label="Cancel"
-        >
-          <X className="size-4" />
-        </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-5">
         {/* Title */}
         <div>
           <label htmlFor="ann-title" className={labelClass}>
@@ -132,7 +109,7 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
           </label>
           <textarea
             id="ann-body"
-            className={`${inputClass} min-h-[100px] resize-y`}
+            className={`${inputClass} min-h-[120px] resize-y`}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             maxLength={ANNOUNCEMENT_BODY_MAX}
@@ -149,7 +126,7 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
           Spanish translation is generated automatically from your company&apos;s glossary.
         </p>
 
-        {/* Department */}
+        {/* Audience */}
         <div>
           <label htmlFor="ann-dept" className={labelClass}>
             Audience
@@ -240,18 +217,14 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
           </p>
         )}
 
-        <div className="flex justify-end gap-2">
-          <Button plain onClick={handleClose} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            color="dark"
-            disabled={isPending || !title.trim() || !body.trim()}
-          >
-            {isPending ? "Posting…" : "Post Announcement"}
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          color="dark"
+          disabled={isPending || !title.trim() || !body.trim()}
+          className="w-full justify-center"
+        >
+          {isPending ? "Posting…" : "Post Announcement"}
+        </Button>
       </form>
     </div>
   );

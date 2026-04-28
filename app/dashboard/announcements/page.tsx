@@ -66,22 +66,28 @@ export default async function AnnouncementsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Heading>Announcements</Heading>
-          <Text className="mt-1.5 max-w-2xl">
-            Post messages to your team. Spanish translations are generated
-            automatically using your company glossary.
-          </Text>
-        </div>
+      <header>
+        <Heading>Announcements</Heading>
+        <Text className="mt-1.5 max-w-2xl">
+          Post messages to your team. Spanish translations are generated
+          automatically using your company glossary.
+        </Text>
       </header>
 
-      <CreateAnnouncementClient
-        departments={departments}
-        canPostOrgWide={scope.unrestricted}
-      />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+        {/* Left — create form (always visible) */}
+        <div className="lg:self-start">
+          <CreateAnnouncementClient
+            departments={departments}
+            canPostOrgWide={scope.unrestricted}
+          />
+        </div>
 
-      <AnnouncementTableClient announcements={announcements} />
+        {/* Right — existing announcements */}
+        <div className="min-w-0">
+          <AnnouncementTableClient announcements={announcements} />
+        </div>
+      </div>
     </div>
   );
 }
