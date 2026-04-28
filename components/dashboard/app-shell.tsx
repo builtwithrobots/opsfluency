@@ -2,7 +2,7 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, ChevronLeft, ChevronRight, CircleHelp, Eye, GripVertical } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, CircleHelp, Eye, GripVertical, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -442,6 +442,9 @@ export function AppShell({ viewer, children }: AppShellProps) {
           <NavbarSpacer />
           <NavbarSection>
             <ThemeToggle />
+            <NavbarItem href="/dashboard/emulator" aria-label="Worker app emulator">
+              <Smartphone strokeWidth={2} />
+            </NavbarItem>
             <NavbarItem aria-label="Account">
               <UserButton />
             </NavbarItem>
