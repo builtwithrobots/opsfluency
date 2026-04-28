@@ -117,13 +117,9 @@ export default async function EmployeesPage() {
       {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-            Manager
-          </p>
-          <Heading className="font-display mt-2">Employees</Heading>
-          <Text className="mt-2 max-w-2xl">
-            Invite employees, track who&apos;s joined, and manage department
-            assignments.
+          <Heading>Employees</Heading>
+          <Text className="mt-1.5 max-w-2xl">
+            Invite employees, track who&apos;s joined, and manage department assignments.
           </Text>
         </div>
         <div className="flex items-center gap-2">

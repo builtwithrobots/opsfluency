@@ -67,7 +67,7 @@ export async function SeedTab() {
     <section className="flex flex-col gap-8">
       {/* Presets */}
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Seed a new demo tenant
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">
@@ -119,7 +119,7 @@ export async function SeedTab() {
 
       {/* Existing demo tenants */}
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Existing demo tenants
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">

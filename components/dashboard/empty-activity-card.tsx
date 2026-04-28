@@ -42,15 +42,12 @@ export function EmptyActivityCard() {
         transition={{ duration: 1.2, ease: "easeOut" }}
       />
       <div className="relative">
-        <p className="font-display text-sm tracking-[0.15em] text-(--color-brand) uppercase">
-          Getting started
-        </p>
-        <h3 className="mt-2 text-xl font-semibold text-dc-text">
+        <h3 className="text-xl font-semibold text-dc-text">
           Your first SOP takes about five minutes.
         </h3>
-        <p className="mt-2 max-w-xl text-dc-text-2">
-          OpsFluency&apos;s pipeline converts, translates, and publishes in one pass.
-          Each step below becomes clickable as the module ships.
+        <p className="mt-1.5 max-w-xl text-dc-text-2">
+          OpsFluency converts, translates, and publishes in one pass.
+          Each step below links to the right place.
         </p>
 
         <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">

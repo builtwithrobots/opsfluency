@@ -68,11 +68,8 @@ export default async function AnnouncementsPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-            Communications
-          </p>
-          <Heading className="font-display mt-2">Announcements</Heading>
-          <Text className="mt-2 max-w-2xl">
+          <Heading>Announcements</Heading>
+          <Text className="mt-1.5 max-w-2xl">
             Post messages to your team. Spanish translations are generated
             automatically using your company glossary.
           </Text>

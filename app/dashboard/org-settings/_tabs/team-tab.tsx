@@ -146,7 +146,7 @@ export async function TeamTab() {
 
       {/* ── Active members ── */}
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Admins &amp; managers
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">
@@ -256,7 +256,7 @@ export async function TeamTab() {
       {/* ── Pending invites ── */}
       {pendingInvites.length > 0 && (
         <div>
-          <Heading level={2} className="font-display text-xl">
+          <Heading level={2} className="text-xl">
             Pending invites
           </Heading>
           <Text className="mt-1 max-w-2xl text-sm">
@@ -275,7 +275,7 @@ export async function TeamTab() {
 
       {/* ── Invite section ── */}
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Invite admin or manager
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">

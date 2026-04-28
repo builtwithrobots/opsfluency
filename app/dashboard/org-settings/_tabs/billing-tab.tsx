@@ -23,7 +23,7 @@ export async function BillingTab() {
   return (
     <section className="flex flex-col gap-8 max-w-2xl">
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Subscription
         </Heading>
         <Text className="mt-1 text-sm">

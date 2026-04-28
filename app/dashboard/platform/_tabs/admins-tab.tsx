@@ -38,7 +38,7 @@ export async function AdminsTab() {
     <section className="flex flex-col gap-8">
       {/* Existing roster */}
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Super admin roster
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">
@@ -103,7 +103,7 @@ export async function AdminsTab() {
 
       {/* Add new */}
       <div>
-        <Heading level={2} className="font-display text-xl">
+        <Heading level={2} className="text-xl">
           Grant super admin
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">

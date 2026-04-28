@@ -57,14 +57,11 @@ export default async function PlatformPage({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-          Platform
-        </p>
-        <Heading className="font-display mt-2">Super admin console</Heading>
-        <Text className="mt-2 max-w-2xl">
+        <Heading>Super admin console</Heading>
+        <Text className="mt-1.5 max-w-2xl">
           Cross-tenant operations: browse every company, seed demo tenants,
-          manage the super-admin roster, audit impersonation, and watch AI
-          spend. Every destructive action here is audit-logged.
+          manage the super-admin roster, audit impersonation, and watch AI spend.
+          Every destructive action here is audit-logged.
         </Text>
       </header>
 

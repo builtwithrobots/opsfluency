@@ -138,11 +138,8 @@ export default async function SopsPage({ searchParams }: PageProps) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-            SOPs
-          </p>
-          <Heading className="font-display mt-2">Standard Operating Procedures</Heading>
-          <Text className="mt-2 max-w-2xl">
+          <Heading>Standard Operating Procedures</Heading>
+          <Text className="mt-1.5 max-w-2xl">
             Upload, review, translate, and publish bilingual procedures. Each published SOP gets a
             permanent QR code your workers can scan.
           </Text>
@@ -253,10 +250,7 @@ function EmptyState({ filtered }: { filtered: boolean }) {
           <Upload className="size-7" strokeWidth={1.5} />
         </span>
         <div>
-          <p className="font-display text-sm tracking-[0.15em] text-(--color-brand) uppercase">
-            Get started
-          </p>
-          <h3 className="mt-1 text-xl font-semibold text-dc-text">Upload your first SOP</h3>
+          <h3 className="text-xl font-semibold text-dc-text">Upload your first SOP</h3>
           <p className="mt-1 max-w-md text-dc-text-2">
             Drop a PDF, photo, or text file. Claude reads it, builds clean Markdown, flags
             site-specific terms, and translates to Spanish — all in one pass.
