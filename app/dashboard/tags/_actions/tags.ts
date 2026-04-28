@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
-import { TAG_NAME_MAX, TAG_COLORS, type Tag, type TagWithUsage } from "@/lib/types/tags";
+import { TAG_NAME_MAX, type Tag, type TagWithUsage } from "@/lib/types/tags";
 
 type ActionResult<T = undefined> =
   | (T extends undefined ? { ok: true } : { ok: true; data: T })
@@ -24,12 +24,12 @@ function handleAuthError<T = undefined>(e: unknown): ActionResult<T> | null {
   return null;
 }
 
-const tagColors = TAG_COLORS as readonly string[];
-
 const TagNameInput = z.object({
   name_en: z.string().trim().min(1, "Required").max(TAG_NAME_MAX),
   name_es: z.string().trim().min(1, "Required").max(TAG_NAME_MAX),
-  color: z.string().refine((c) => tagColors.includes(c), { message: "Invalid color" }),
+  color: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Color must be a valid hex value"),
 });
 
 const IdInput = z.object({ id: z.string().uuid() });
