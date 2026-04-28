@@ -1,8 +1,10 @@
-import { Bell, FileText, ScanLine } from "lucide-react";
+import { FileText, ScanLine } from "lucide-react";
 import Link from "next/link";
 
 import { LanguageToggleClient } from "./_components/LanguageToggleClient";
+import { AnnouncementsFeed } from "./_components/AnnouncementsFeed";
 import { getCompanyContext } from "@/lib/auth/company-context";
+import type { AnnouncementWithRead } from "@/lib/types/announcements";
 import type { WorkerLanguage } from "@/lib/types/sop";
 
 interface Props {
@@ -10,7 +12,6 @@ interface Props {
 }
 
 export const metadata = {
-  // Worker pages are always behind auth — keep them out of search.
   robots: "noindex",
   title: "Home · OpsFluency",
 };
@@ -21,6 +22,12 @@ const STRINGS = {
     subtitle: "Procedures, announcements, and HR all in one place.",
     announcementsHeading: "Announcements",
     announcementsEmpty: "No announcements yet. Check back later.",
+    announcementsMarkAllRead: "Mark all as read",
+    announcementsAllTeams: "All Teams",
+    announcementsUrgent: "URGENT",
+    announcementsPinned: "Pinned",
+    announcementsJustNow: "just now",
+    announcementsUnreadCount: (n: number) => `${n} unread`,
     departmentsHeading: "Your departments",
     departmentsEmpty: "Your manager hasn't assigned you to a department yet.",
     quickActionsHeading: "Quick actions",
@@ -34,6 +41,12 @@ const STRINGS = {
     subtitle: "Procedimientos, anuncios y RR.HH. todo en un solo lugar.",
     announcementsHeading: "Anuncios",
     announcementsEmpty: "No hay anuncios todavía. Vuelve más tarde.",
+    announcementsMarkAllRead: "Marcar todo como leído",
+    announcementsAllTeams: "Todos los equipos",
+    announcementsUrgent: "URGENTE",
+    announcementsPinned: "Fijado",
+    announcementsJustNow: "ahora mismo",
+    announcementsUnreadCount: (n: number) => `${n} sin leer`,
     departmentsHeading: "Tus departamentos",
     departmentsEmpty: "Tu gerente aún no te ha asignado a un departamento.",
     quickActionsHeading: "Acciones rápidas",
@@ -51,7 +64,7 @@ export default async function WorkerHomePage({ searchParams }: Props) {
   const [{ data: member }, { data: company }] = await Promise.all([
     supabase
       .from("company_members")
-      .select("preferred_language")
+      .select("id, preferred_language")
       .eq("clerk_user_id", userId)
       .eq("company_id", company_id)
       .maybeSingle(),
@@ -67,6 +80,66 @@ export default async function WorkerHomePage({ searchParams }: Props) {
     sp.lang === "es" ? "es" : sp.lang === "en" ? "en" : persisted;
   const t = STRINGS[lang];
   const companyName = company?.name ?? "";
+  const memberId: string = member?.id ?? "";
+
+  // Fetch employee's department memberships
+  const { data: empDepts } = memberId
+    ? await supabase
+        .from("employee_departments")
+        .select("department_id")
+        .eq("member_id", memberId)
+    : { data: [] };
+
+  const deptIds = (empDepts ?? []).map((r: { department_id: string }) => r.department_id);
+
+  // Fetch visible announcements: org-wide OR in employee's departments, not expired
+  // Pinned first, then newest
+  const now = new Date().toISOString();
+  let annQuery = supabase
+    .from("announcements")
+    .select("*, departments(name)")
+    .eq("company_id", company_id)
+    .or(`expires_at.is.null,expires_at.gt.${now}`)
+    .order("pinned", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (deptIds.length > 0) {
+    annQuery = annQuery.or(
+      `department_id.is.null,department_id.in.(${deptIds.join(",")})`,
+    );
+  } else {
+    annQuery = annQuery.is("department_id", null);
+  }
+
+  const { data: rawAnnouncements } = await annQuery;
+
+  // Fetch read receipts for this member
+  const announcementIds = (rawAnnouncements ?? []).map(
+    (a: { id: string }) => a.id,
+  );
+
+  const { data: reads } =
+    memberId && announcementIds.length > 0
+      ? await supabase
+          .from("announcement_reads")
+          .select("announcement_id")
+          .eq("company_member_id", memberId)
+          .in("announcement_id", announcementIds)
+      : { data: [] };
+
+  const readSet = new Set((reads ?? []).map((r: { announcement_id: string }) => r.announcement_id));
+
+  const announcements: AnnouncementWithRead[] = (rawAnnouncements ?? []).map(
+    (a: {
+      id: string;
+      departments: { name: string } | null;
+      [key: string]: unknown;
+    }) => ({
+      ...(a as unknown as AnnouncementWithRead),
+      is_read: readSet.has(a.id),
+      department_name: (a.departments as { name: string } | null)?.name ?? null,
+    }),
+  );
 
   return (
     <main className="mx-auto min-h-[100dvh] max-w-2xl px-5 py-6 sm:px-6 sm:py-10" lang={lang}>
@@ -88,18 +161,22 @@ export default async function WorkerHomePage({ searchParams }: Props) {
         <LanguageToggleClient current={lang} />
       </header>
 
-      <section aria-labelledby="announcements-heading" className="mb-8">
-        <h2
-          id="announcements-heading"
-          className="mb-3 text-sm font-semibold tracking-wide text-dc-text-2 uppercase"
-        >
-          {t.announcementsHeading}
-        </h2>
-        <div className="rounded-xl border border-dc-edge bg-dc-surface p-5 text-center">
-          <Bell className="mx-auto size-6 text-dc-text-3" strokeWidth={2} aria-hidden />
-          <p className="mt-2 text-sm text-dc-text-2">{t.announcementsEmpty}</p>
-        </div>
-      </section>
+      <div className="mb-8">
+        <AnnouncementsFeed
+          announcements={announcements}
+          lang={lang}
+          strings={{
+            heading: t.announcementsHeading,
+            empty: t.announcementsEmpty,
+            markAllRead: t.announcementsMarkAllRead,
+            allTeams: t.announcementsAllTeams,
+            urgent: t.announcementsUrgent,
+            pinned: t.announcementsPinned,
+            justNow: t.announcementsJustNow,
+            unreadCount: t.announcementsUnreadCount,
+          }}
+        />
+      </div>
 
       <section aria-labelledby="departments-heading" className="mb-8">
         <h2
