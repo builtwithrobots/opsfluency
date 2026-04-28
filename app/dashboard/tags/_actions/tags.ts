@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
-import { TAG_NAME_MAX, TAG_COLORS, type Tag } from "@/lib/types/tags";
+import { TAG_NAME_MAX, TAG_COLORS, type Tag, type TagWithUsage } from "@/lib/types/tags";
 
 type ActionResult<T = undefined> =
   | (T extends undefined ? { ok: true } : { ok: true; data: T })
@@ -26,13 +26,13 @@ function handleAuthError<T = undefined>(e: unknown): ActionResult<T> | null {
 
 const tagColors = TAG_COLORS as readonly string[];
 
-const CreateTagInput = z.object({
+const TagNameInput = z.object({
   name_en: z.string().trim().min(1, "Required").max(TAG_NAME_MAX),
   name_es: z.string().trim().min(1, "Required").max(TAG_NAME_MAX),
   color: z.string().refine((c) => tagColors.includes(c), { message: "Invalid color" }),
 });
 
-const DeleteTagInput = z.object({ id: z.string().uuid() });
+const IdInput = z.object({ id: z.string().uuid() });
 
 const SetTermTagsInput = z.object({
   termId: z.string().uuid(),
@@ -46,7 +46,13 @@ const SetSopTagsInput = z.object({
 
 const PG_UNIQUE_VIOLATION = "23505";
 
-// ── List ──────────────────────────────────────────────────────────────────────
+function revalidateTaggedPages() {
+  revalidatePath("/dashboard/glossary");
+  revalidatePath("/dashboard/sops");
+  revalidatePath("/dashboard/org-settings");
+}
+
+// ── List (picker) — active tags only ────────────────────────────────────────
 
 export async function listTags(): Promise<ActionResult<Tag[]>> {
   try {
@@ -56,7 +62,8 @@ export async function listTags(): Promise<ActionResult<Tag[]>> {
       .from("tags")
       .select("*")
       .eq("company_id", company_id)
-      .order("source", { ascending: false }) // 'department' before 'custom'
+      .is("archived_at", null)
+      .order("source", { ascending: false })
       .order("name_en", { ascending: true });
 
     if (error) return fail("INTERNAL", error.message);
@@ -68,12 +75,54 @@ export async function listTags(): Promise<ActionResult<Tag[]>> {
   }
 }
 
+// ── List with usage counts (settings page) — all tags incl. archived ────────
+
+export async function listTagsWithUsage(): Promise<ActionResult<TagWithUsage[]>> {
+  try {
+    const { supabase, company_id } = await getCompanyContext("admin");
+
+    const { data: tags, error } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("company_id", company_id)
+      .order("source", { ascending: false })
+      .order("name_en", { ascending: true });
+
+    if (error) return fail("INTERNAL", error.message);
+    if (!tags || tags.length === 0) return { ok: true, data: [] };
+
+    const tagIds = tags.map((t) => t.id);
+
+    const [{ data: sopLinks }, { data: termLinks }] = await Promise.all([
+      supabase.from("sop_tags").select("tag_id").in("tag_id", tagIds),
+      supabase.from("glossary_term_tags").select("tag_id").in("tag_id", tagIds),
+    ]);
+
+    const sopCounts = new Map<string, number>();
+    const termCounts = new Map<string, number>();
+    for (const r of sopLinks ?? []) sopCounts.set(r.tag_id, (sopCounts.get(r.tag_id) ?? 0) + 1);
+    for (const r of termLinks ?? []) termCounts.set(r.tag_id, (termCounts.get(r.tag_id) ?? 0) + 1);
+
+    const result: TagWithUsage[] = (tags as Tag[]).map((t) => ({
+      ...t,
+      sop_count: sopCounts.get(t.id) ?? 0,
+      term_count: termCounts.get(t.id) ?? 0,
+    }));
+
+    return { ok: true, data: result };
+  } catch (e) {
+    const handled = handleAuthError<TagWithUsage[]>(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
 // ── Create ────────────────────────────────────────────────────────────────────
 
 export async function createTag(raw: unknown): Promise<ActionResult<Tag>> {
   try {
-    const { supabase, company_id } = await getCompanyContext("manager");
-    const parsed = CreateTagInput.parse(raw);
+    const { supabase, company_id, userId } = await getCompanyContext("manager");
+    const parsed = TagNameInput.parse(raw);
 
     const { data, error } = await supabase
       .from("tags")
@@ -83,22 +132,19 @@ export async function createTag(raw: unknown): Promise<ActionResult<Tag>> {
         name_es: parsed.name_es,
         color: parsed.color,
         source: "custom",
+        created_by: userId,
       })
       .select()
       .single();
 
     if (error) {
       if (error.code === PG_UNIQUE_VIOLATION) {
-        return fail(
-          "DUPLICATE_TAG",
-          `A tag named "${parsed.name_en}" already exists.`,
-        );
+        return fail("DUPLICATE_TAG", `A label named "${parsed.name_en}" already exists.`);
       }
       return fail("INTERNAL", error.message);
     }
 
-    revalidatePath("/dashboard/glossary");
-    revalidatePath("/dashboard/sops");
+    revalidateTaggedPages();
     return { ok: true, data: data as Tag };
   } catch (e) {
     const handled = handleAuthError<Tag>(e);
@@ -107,14 +153,115 @@ export async function createTag(raw: unknown): Promise<ActionResult<Tag>> {
   }
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
+// ── Update (rename + recolor) — admin only ────────────────────────────────────
+
+const UpdateTagInput = TagNameInput.extend({ id: z.string().uuid() });
+
+export async function updateTag(raw: unknown): Promise<ActionResult<Tag>> {
+  try {
+    const { supabase, company_id } = await getCompanyContext("admin");
+    const parsed = UpdateTagInput.parse(raw);
+
+    const { data: existing } = await supabase
+      .from("tags")
+      .select("source")
+      .eq("id", parsed.id)
+      .eq("company_id", company_id)
+      .maybeSingle();
+
+    if (!existing) return fail("NOT_FOUND", "Label not found.");
+    if (existing.source === "department") return fail("FORBIDDEN", "Department labels cannot be edited.");
+
+    const { data, error } = await supabase
+      .from("tags")
+      .update({ name_en: parsed.name_en, name_es: parsed.name_es, color: parsed.color })
+      .eq("id", parsed.id)
+      .eq("company_id", company_id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === PG_UNIQUE_VIOLATION) {
+        return fail("DUPLICATE_TAG", `A label named "${parsed.name_en}" already exists.`);
+      }
+      return fail("INTERNAL", error.message);
+    }
+
+    revalidateTaggedPages();
+    return { ok: true, data: data as Tag };
+  } catch (e) {
+    const handled = handleAuthError<Tag>(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── Archive — admin only ──────────────────────────────────────────────────────
+
+export async function archiveTag(raw: unknown): Promise<ActionResult> {
+  try {
+    const { supabase, company_id } = await getCompanyContext("admin");
+    const { id } = IdInput.parse(raw);
+
+    const { data: existing } = await supabase
+      .from("tags")
+      .select("source, archived_at")
+      .eq("id", id)
+      .eq("company_id", company_id)
+      .maybeSingle();
+
+    if (!existing) return fail("NOT_FOUND", "Label not found.");
+    if (existing.source === "department") return fail("FORBIDDEN", "Department labels cannot be archived.");
+    if (existing.archived_at) return { ok: true }; // already archived
+
+    const { error } = await supabase
+      .from("tags")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("company_id", company_id);
+
+    if (error) return fail("INTERNAL", error.message);
+
+    revalidateTaggedPages();
+    return { ok: true };
+  } catch (e) {
+    const handled = handleAuthError(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── Restore — admin only ──────────────────────────────────────────────────────
+
+export async function restoreTag(raw: unknown): Promise<ActionResult> {
+  try {
+    const { supabase, company_id } = await getCompanyContext("admin");
+    const { id } = IdInput.parse(raw);
+
+    const { error } = await supabase
+      .from("tags")
+      .update({ archived_at: null })
+      .eq("id", id)
+      .eq("company_id", company_id);
+
+    if (error) return fail("INTERNAL", error.message);
+
+    revalidateTaggedPages();
+    return { ok: true };
+  } catch (e) {
+    const handled = handleAuthError(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── Delete — admin only, requires usage = 0 ───────────────────────────────────
 
 export async function deleteTag(raw: unknown): Promise<ActionResult> {
   try {
-    const { supabase, company_id } = await getCompanyContext("manager");
-    const { id } = DeleteTagInput.parse(raw);
+    const { supabase, company_id } = await getCompanyContext("admin");
+    const { id } = IdInput.parse(raw);
 
-    // Read source first — department tags cannot be deleted.
     const { data: existing } = await supabase
       .from("tags")
       .select("source")
@@ -122,9 +269,21 @@ export async function deleteTag(raw: unknown): Promise<ActionResult> {
       .eq("company_id", company_id)
       .maybeSingle();
 
-    if (!existing) return fail("NOT_FOUND", "Tag not found.");
-    if (existing.source === "department") {
-      return fail("FORBIDDEN", "Department tags cannot be deleted.");
+    if (!existing) return fail("NOT_FOUND", "Label not found.");
+    if (existing.source === "department") return fail("FORBIDDEN", "Department labels cannot be deleted.");
+
+    // Block deletion if the tag is still assigned anywhere.
+    const [{ count: sopCount }, { count: termCount }] = await Promise.all([
+      supabase.from("sop_tags").select("tag_id", { count: "exact", head: true }).eq("tag_id", id),
+      supabase.from("glossary_term_tags").select("tag_id", { count: "exact", head: true }).eq("tag_id", id),
+    ]);
+
+    const totalUsage = (sopCount ?? 0) + (termCount ?? 0);
+    if (totalUsage > 0) {
+      return fail(
+        "IN_USE",
+        `This label is still assigned to ${totalUsage} item${totalUsage === 1 ? "" : "s"}. Archive it first, then remove it from those items before deleting.`,
+      );
     }
 
     const { error } = await supabase
@@ -135,8 +294,7 @@ export async function deleteTag(raw: unknown): Promise<ActionResult> {
 
     if (error) return fail("INTERNAL", error.message);
 
-    revalidatePath("/dashboard/glossary");
-    revalidatePath("/dashboard/sops");
+    revalidateTaggedPages();
     return { ok: true };
   } catch (e) {
     const handled = handleAuthError(e);
@@ -152,7 +310,6 @@ export async function setGlossaryTermTags(raw: unknown): Promise<ActionResult> {
     const { supabase, company_id } = await getCompanyContext("manager");
     const { termId, tagIds } = SetTermTagsInput.parse(raw);
 
-    // Confirm the term belongs to this company.
     const { data: term } = await supabase
       .from("glossary_terms")
       .select("id")
@@ -163,7 +320,6 @@ export async function setGlossaryTermTags(raw: unknown): Promise<ActionResult> {
 
     if (!term) return fail("NOT_FOUND", "Term not found.");
 
-    // Delete existing assignments, then insert the new set.
     const { error: delErr } = await supabase
       .from("glossary_term_tags")
       .delete()
@@ -193,7 +349,6 @@ export async function setSopTags(raw: unknown): Promise<ActionResult> {
     const { supabase, company_id } = await getCompanyContext("manager");
     const { sopId, tagIds } = SetSopTagsInput.parse(raw);
 
-    // Confirm the SOP belongs to this company.
     const { data: sop } = await supabase
       .from("sops")
       .select("id")

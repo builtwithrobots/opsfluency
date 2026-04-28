@@ -16,7 +16,14 @@ export interface Tag {
   color: string;
   source: "department" | "custom";
   department_id: string | null;
+  created_by: string | null;
+  archived_at: string | null;
   created_at: string;
+}
+
+export interface TagWithUsage extends Tag {
+  sop_count: number;
+  term_count: number;
 }
 
 export const TAG_NAME_MAX = 60;

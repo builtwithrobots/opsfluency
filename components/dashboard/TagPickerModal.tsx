@@ -56,7 +56,7 @@ export function TagPickerModal({
 }: Props) {
   const router = useRouter();
 
-  const [tagPool, setTagPool] = useState<Tag[]>(initialTags);
+  const [tagPool, setTagPool] = useState<Tag[]>(() => initialTags.filter((t) => !t.archived_at));
   const [selected, setSelected] = useState<Set<string>>(new Set(currentTagIds));
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -70,7 +70,7 @@ export function TagPickerModal({
   // Sync state when the modal opens with new props.
   useEffect(() => {
     if (open) {
-      setTagPool(initialTags);
+      setTagPool(initialTags.filter((t) => !t.archived_at));
       setSelected(new Set(currentTagIds));
       setQuery("");
       setShowCreate(false);
