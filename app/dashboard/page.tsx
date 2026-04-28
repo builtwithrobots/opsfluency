@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Bell, FileText, ScanLine, Users } from "lucide-react";
+import { ArrowUpRight, Bell, FileText, QrCode, ScanLine, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Heading, Subheading } from "@/components/ui/heading";
@@ -37,11 +37,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? await supabase.from("companies").select("name").eq("id", company_id).single()
     : { data: null };
 
-  // Only company_members is live in the schema right now. Other counts will
-  // light up as their tables land — see supabase/migrations/.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ count: memberCount }, { count: scanCount7d }] = await Promise.all([
+  const [
+    { count: memberCount },
+    { count: scanCount7d },
+    { count: publishedSopCount },
+    { count: liveQrCount },
+  ] = await Promise.all([
     supabase
       .from("company_members")
       .select("id", { count: "exact", head: true })
@@ -51,6 +54,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .select("id", { count: "exact", head: true })
       .eq("company_id", company_id)
       .gte("scanned_at", sevenDaysAgo),
+    supabase
+      .from("sops")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", company_id)
+      .eq("status", "published"),
+    supabase
+      .from("qr_codes")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", company_id)
+      .is("archived_at", null),
   ]);
 
   return (
@@ -83,34 +96,41 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         )}
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <DashboardStatCard
           label="Published SOPs"
-          value="—"
+          value={publishedSopCount ?? 0}
           icon={<FileText className="size-5" strokeWidth={2} />}
           accent="brand"
           delay={0}
+        />
+        <DashboardStatCard
+          label="Live QR codes"
+          value={liveQrCount ?? 0}
+          icon={<QrCode className="size-5" strokeWidth={2} />}
+          accent="signal-ok"
+          delay={0.05}
         />
         <DashboardStatCard
           label="Team members"
           value={memberCount ?? 0}
           icon={<Users className="size-5" strokeWidth={2} />}
           accent="signal-info"
-          delay={0.05}
+          delay={0.1}
         />
         <DashboardStatCard
           label="QR scans (7d)"
           value={scanCount7d ?? 0}
           icon={<ScanLine className="size-5" strokeWidth={2} />}
           accent="signal-live"
-          delay={0.1}
+          delay={0.15}
         />
         <DashboardStatCard
           label="Pending approvals"
           value="—"
           icon={<Bell className="size-5" strokeWidth={2} />}
           accent="signal-warn"
-          delay={0.15}
+          delay={0.2}
         />
       </section>
 
