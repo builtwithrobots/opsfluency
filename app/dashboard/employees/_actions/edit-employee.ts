@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCompanyContext } from "@/lib/auth/company-context";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { normalizePhone } from "@/lib/employees/phone";
 
 // ─── Update invite ────────────────────────────────────────────────────────────
@@ -94,7 +95,10 @@ export async function updateEmployee(
   formData: FormData,
 ): Promise<UpdateEmployeeResult> {
   try {
+    // Auth check via RLS client; writes use admin client because
+    // company_members has no UPDATE policy for the authenticated role.
     const { supabase, company_id } = await getCompanyContext("manager");
+    const admin = getAdminClient();
 
     const parsed = UpdateEmployeeInput.parse({
       member_id: formData.get("member_id"),
@@ -105,7 +109,7 @@ export async function updateEmployee(
       department_ids: (formData.getAll("department_ids") as string[]).filter(Boolean),
     });
 
-    // Verify member belongs to this company before mutating
+    // Verify member belongs to this company before mutating.
     const { data: member } = await supabase
       .from("company_members")
       .select("id")
@@ -124,14 +128,14 @@ export async function updateEmployee(
       lastName: parsed.last_name || undefined,
     });
 
-    // Update role
-    await supabase
+    // Update role (admin client required — no UPDATE policy on company_members)
+    await admin
       .from("company_members")
       .update({ role: parsed.role })
       .eq("id", parsed.member_id)
       .eq("company_id", company_id);
 
-    // Replace department assignments atomically
+    // Replace department assignments atomically (employee_departments has FOR ALL)
     await supabase
       .from("employee_departments")
       .delete()
@@ -146,6 +150,62 @@ export async function updateEmployee(
           member_id: parsed.member_id,
         })),
       );
+    }
+
+    revalidatePath("/dashboard/employees");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return { ok: false, error: { code: "INVALID_INPUT", message: e.issues[0]?.message } };
+    }
+    throw e;
+  }
+}
+
+// ─── Remove active employee ───────────────────────────────────────────────────
+
+export type RemoveEmployeeResult =
+  | { ok: true }
+  | { ok: false; error: { code: string; message?: string } };
+
+const RemoveEmployeeInput = z.object({
+  member_id: z.string().uuid(),
+});
+
+export async function removeEmployee(
+  _prev: RemoveEmployeeResult | null,
+  formData: FormData,
+): Promise<RemoveEmployeeResult> {
+  try {
+    // Auth check via RLS client; delete uses admin client because
+    // company_members has no DELETE policy for the authenticated role.
+    const { supabase, company_id } = await getCompanyContext("manager");
+    const admin = getAdminClient();
+
+    const { member_id } = RemoveEmployeeInput.parse({
+      member_id: formData.get("member_id"),
+    });
+
+    // Verify member belongs to this company before bypassing RLS.
+    const { data: target } = await supabase
+      .from("company_members")
+      .select("id, role")
+      .eq("id", member_id)
+      .eq("company_id", company_id)
+      .single();
+
+    if (!target) {
+      return { ok: false, error: { code: "NOT_FOUND" } };
+    }
+
+    const { error } = await admin
+      .from("company_members")
+      .delete()
+      .eq("id", member_id)
+      .eq("company_id", company_id);
+
+    if (error) {
+      return { ok: false, error: { code: "INTERNAL", message: error.message } };
     }
 
     revalidatePath("/dashboard/employees");
