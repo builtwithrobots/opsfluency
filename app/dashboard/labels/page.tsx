@@ -28,7 +28,7 @@ export default async function LabelsPage() {
         <Heading>Labels</Heading>
         <Text className="mt-1.5 max-w-2xl">
           Bilingual labels attach to SOPs and glossary terms. Department labels
-          are system-managed. Custom labels can be created, edited, and archived.
+          are system-managed. Edit color in the Departments settings. Custom labels can be created, edited, and archived.
         </Text>
       </header>
 
