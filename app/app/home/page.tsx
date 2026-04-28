@@ -181,7 +181,6 @@ export default async function WorkerHomePage({ searchParams }: Props) {
             urgent: t.announcementsUrgent,
             pinned: t.announcementsPinned,
             justNow: t.announcementsJustNow,
-            unreadCount: t.announcementsUnreadCount,
           }}
         />
       </div>
