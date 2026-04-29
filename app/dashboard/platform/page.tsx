@@ -6,6 +6,7 @@ import { AdminsTab } from "./_tabs/admins-tab";
 import { AiUsageTab } from "./_tabs/ai-usage-tab";
 import { HealthTab } from "./_tabs/health-tab";
 import { ImpersonationTab } from "./_tabs/impersonation-tab";
+import { SandboxTab } from "./_tabs/sandbox-tab";
 import { SeedTab } from "./_tabs/seed-tab";
 import { TenantsTab } from "./_tabs/tenants-tab";
 
@@ -21,6 +22,7 @@ type TabId =
   | "tenants"
   | "impersonation"
   | "seed"
+  | "sandbox"
   | "admins";
 
 const VALID_TABS: readonly TabId[] = [
@@ -29,6 +31,7 @@ const VALID_TABS: readonly TabId[] = [
   "tenants",
   "impersonation",
   "seed",
+  "sandbox",
   "admins",
 ] as const;
 
@@ -51,6 +54,7 @@ export default async function PlatformPage({ searchParams }: PageProps) {
     { id: "tenants",       label: "Tenants",         href: "/dashboard/platform?tab=tenants" },
     { id: "impersonation", label: "Impersonation",   href: "/dashboard/platform?tab=impersonation" },
     { id: "seed",          label: "Seed / demo",     href: "/dashboard/platform?tab=seed" },
+    { id: "sandbox",       label: "Sandbox",         href: "/dashboard/platform?tab=sandbox" },
     { id: "admins",        label: "Super admins",    href: "/dashboard/platform?tab=admins" },
   ];
 
@@ -69,6 +73,7 @@ export default async function PlatformPage({ searchParams }: PageProps) {
 
       {tab === "tenants" && <TenantsTab expandedId={expand} />}
       {tab === "seed" && <SeedTab />}
+      {tab === "sandbox" && <SandboxTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "impersonation" && <ImpersonationTab />}
       {tab === "ai" && <AiUsageTab days={days} />}
