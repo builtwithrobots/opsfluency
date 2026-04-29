@@ -19,7 +19,7 @@ create table data_export_events (
   company_id    uuid        not null references companies(id) on delete cascade,
   exported_by   text        not null,   -- clerk_user_id of the triggering admin
   format        text        not null
-                            check (format in ('json', 'csv_sops', 'csv_glossary', 'csv_team')),
+                            check (format in ('xlsx', 'json', 'csv_sops', 'csv_glossary', 'csv_team')),
   entity_scope  text        not null,   -- 'full' | 'sops' | 'glossary' | 'team'
   row_count     integer,               -- total rows in the export; null on assembly error
   ip_hash       text,                  -- SHA-256 of x-forwarded-for, may be null in dev

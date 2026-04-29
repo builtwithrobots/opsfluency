@@ -4,7 +4,7 @@ import { z } from "zod";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { writeExportAuditRow } from "@/lib/export/audit";
 import { assembleOrgBundle } from "@/lib/export/bundle";
-import { buildGlossaryCsv, buildSopsCsv, buildTeamCsv } from "@/lib/export/csv";
+import { buildGlossaryCsv, buildSopsCsv, buildTeamCsv, buildXlsx } from "@/lib/export/csv";
 import { checkExportRateLimit } from "@/lib/export/rate-limit";
 import {
   EXPORT_FORMATS,
@@ -51,13 +51,23 @@ export async function GET(
 
     // 4. Assemble payload. The supabase client from getCompanyContext carries the
     //    Clerk JWT — RLS enforces company_id at the DB layer for every query.
-    let body: string;
+    let body: string | Buffer;
     let contentType: string;
     let filename: string;
     let rowCount: number;
     const dateStr = new Date().toISOString().slice(0, 10);
 
-    if (format === "json") {
+    if (format === "xlsx") {
+      const bundle = await assembleOrgBundle(supabase, company_id);
+      rowCount =
+        bundle.sops.length +
+        bundle.glossary_terms.length +
+        bundle.team_members.length +
+        bundle.announcements.length;
+      body = buildXlsx(bundle);
+      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      filename = `opsfluency-export-${dateStr}.xlsx`;
+    } else if (format === "json") {
       const bundle = await assembleOrgBundle(supabase, company_id);
       rowCount =
         bundle.sops.length +
@@ -144,7 +154,7 @@ export async function GET(
     // 5. Write audit row after successful assembly — we only log completed exports,
     //    not attempts that failed mid-query.
     const entityScope =
-      format === "json"
+      format === "json" || format === "xlsx"
         ? "full"
         : format === "csv_sops"
           ? "sops"
@@ -164,10 +174,11 @@ export async function GET(
     // 6. Stream directly to the browser. Content-Disposition forces a file download.
     //    No copy is written to Supabase Storage or the filesystem — bytes travel
     //    DB → process memory → TLS → browser only.
+    const isBinary = Buffer.isBuffer(body);
     return new Response(body, {
       status: 200,
       headers: {
-        "Content-Type": `${contentType}; charset=utf-8`,
+        "Content-Type": isBinary ? contentType : `${contentType}; charset=utf-8`,
         "Content-Disposition": `attachment; filename="${filename}"`,
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "no-store, no-cache, must-revalidate",
@@ -183,7 +194,7 @@ export async function GET(
           error: {
             code: "INVALID_FORMAT",
             message:
-              "Supported formats: json, csv_sops, csv_glossary, csv_team",
+              "Supported formats: xlsx, json, csv_sops, csv_glossary, csv_team",
           },
         },
         { status: 400 },

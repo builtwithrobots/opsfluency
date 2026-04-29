@@ -3,6 +3,7 @@ export const EXPORT_FORMATS = [
   "csv_sops",
   "csv_glossary",
   "csv_team",
+  "xlsx",
 ] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 

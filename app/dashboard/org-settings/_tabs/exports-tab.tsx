@@ -1,4 +1,4 @@
-import { Download, FileJson, FileSpreadsheet, Lock, Shield, ShieldCheck } from "lucide-react";
+import { Download, FileJson, FileSpreadsheet, Lock, Sheet, Shield, ShieldCheck } from "lucide-react";
 
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
@@ -6,6 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { getCompanyContext } from "@/lib/auth/company-context";
 
 const FORMAT_LABELS: Record<string, string> = {
+  xlsx: "Full org workbook (Excel)",
   json: "Full org bundle (JSON)",
   csv_sops: "SOPs (CSV)",
   csv_glossary: "Glossary (CSV)",
@@ -72,20 +73,31 @@ export async function ExportsTab() {
           Full org export
         </Heading>
         <Text className="mt-1 max-w-2xl text-sm">
-          Downloads a single JSON file containing all your company data: SOPs
-          and their content (English + Spanish), glossary, departments, tags,
-          announcements, QR codes, and team members.
+          Export everything — SOPs and their content (English + Spanish),
+          glossary, departments, tags, announcements, QR codes, and team
+          members. Choose Excel for spreadsheets or JSON for developer use.
         </Text>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-3">
           <a
-            href="/api/exports/json"
+            href="/api/exports/xlsx"
             download
             className="inline-flex items-center gap-2 rounded-md border border-(--color-brand)/30 bg-(--color-brand)/10 px-4 py-2 text-sm font-medium text-(--color-brand) hover:bg-(--color-brand)/20"
           >
+            <Sheet className="size-4" strokeWidth={2} />
+            Download Excel workbook (.xlsx)
+          </a>
+          <a
+            href="/api/exports/json"
+            download
+            className="inline-flex items-center gap-2 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-4 py-2 text-sm font-medium text-dc-text hover:bg-dc-overlay"
+          >
             <FileJson className="size-4" strokeWidth={2} />
-            Download full org bundle (.json)
+            Download JSON bundle (.json)
           </a>
         </div>
+        <p className="mt-2 text-xs text-dc-text-3">
+          Excel workbook includes separate sheets for SOPs, Glossary, Team, Departments, Announcements, and QR Codes.
+        </p>
       </div>
 
       {/* Individual CSV exports */}
