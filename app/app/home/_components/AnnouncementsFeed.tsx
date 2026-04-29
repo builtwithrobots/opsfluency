@@ -70,19 +70,8 @@ function getEmbedSrc(url: string): string | null {
   }
 }
 
-function getLinkLabel(url: string, lang: WorkerLanguage): string {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("drive.google.com"))
-      return lang === "es" ? "Abrir en Google Drive" : "Open in Google Drive";
-    if (u.hostname.includes("sharepoint.com") || u.hostname.includes("onedrive"))
-      return lang === "es" ? "Abrir en OneDrive" : "Open in OneDrive";
-    if (u.hostname.includes("microsoftstream.com"))
-      return lang === "es" ? "Ver video" : "Watch video";
-    return lang === "es" ? "Abrir enlace" : "Open link";
-  } catch {
-    return lang === "es" ? "Abrir enlace" : "Open link";
-  }
+function getLinkLabel(lang: WorkerLanguage): string {
+  return lang === "es" ? "Ver recurso adjunto" : "View attached resource";
 }
 
 export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
@@ -255,7 +244,7 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
                         className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-(--color-brand)/30 bg-(--color-brand)/10 px-4 py-2.5 text-sm font-medium text-(--color-brand) hover:bg-(--color-brand)/20 active:bg-(--color-brand)/30"
                       >
                         <ExternalLink className="size-4 shrink-0" aria-hidden />
-                        {getLinkLabel(ann.link_url, lang)}
+                        {getLinkLabel(lang)}
                       </a>
                     )}
                   </div>
