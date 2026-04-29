@@ -188,7 +188,7 @@ export default async function WorkerHomePage({ searchParams }: Props) {
       <section aria-labelledby="departments-heading" className="mb-8">
         <h2
           id="departments-heading"
-          className="mb-3 text-sm font-semibold tracking-wide text-dc-text-2 uppercase"
+          className="mb-3 text-base font-bold tracking-tight text-dc-text"
         >
           {t.departmentsHeading}
         </h2>
@@ -201,7 +201,7 @@ export default async function WorkerHomePage({ searchParams }: Props) {
       <section aria-labelledby="actions-heading">
         <h2
           id="actions-heading"
-          className="mb-3 text-sm font-semibold tracking-wide text-dc-text-2 uppercase"
+          className="mb-3 text-base font-bold tracking-tight text-dc-text"
         >
           {t.quickActionsHeading}
         </h2>

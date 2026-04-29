@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { Bell, Building2, ExternalLink, Globe, Pin } from "lucide-react";
 
 import {
@@ -45,7 +45,6 @@ function unreadCountLabel(n: number, lang: WorkerLanguage): string {
 function getEmbedSrc(url: string): string | null {
   try {
     const u = new URL(url);
-    // YouTube: youtube.com/watch?v=ID or youtu.be/ID
     if (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") {
       const v = u.searchParams.get("v");
       if (v) return `https://www.youtube-nocookie.com/embed/${v}`;
@@ -54,12 +53,10 @@ function getEmbedSrc(url: string): string | null {
       const v = u.pathname.slice(1);
       if (v) return `https://www.youtube-nocookie.com/embed/${v}`;
     }
-    // Loom: loom.com/share/ID
     if (u.hostname === "www.loom.com" || u.hostname === "loom.com") {
       const m = u.pathname.match(/\/share\/([a-f0-9]+)/i);
       if (m) return `https://www.loom.com/embed/${m[1]}`;
     }
-    // Vimeo: vimeo.com/ID
     if (u.hostname === "vimeo.com" || u.hostname === "www.vimeo.com") {
       const m = u.pathname.match(/\/(\d+)/);
       if (m) return `https://player.vimeo.com/video/${m[1]}`;
@@ -73,6 +70,175 @@ function getEmbedSrc(url: string): string | null {
 function getLinkLabel(lang: WorkerLanguage): string {
   return lang === "es" ? "Ver recurso adjunto" : "View attached resource";
 }
+
+// ── Per-card component ────────────────────────────────────────────────────────
+
+interface CardProps {
+  ann: AnnouncementWithRead;
+  lang: WorkerLanguage;
+  strings: Props["strings"];
+  onRead: (id: string) => void;
+}
+
+function AnnouncementCard({ ann, lang, strings, onRead }: CardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<HTMLLIElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const title = lang === "es" ? ann.title_es : ann.title_en;
+  const body = lang === "es" ? ann.body_es : ann.body_en;
+  const isUrgent = ann.priority === "urgent";
+  const isUnread = !ann.is_read;
+  const embedSrc = ann.link_url ? getEmbedSrc(ann.link_url) : null;
+  const bodyTruncatable = body.length > 160;
+
+  // Auto-mark as read once the card has been visible (≥70%) for 1.5 s.
+  // Avoids requiring a deliberate tap — workers scan down the list and
+  // visibility alone signals they've seen the item.
+  useEffect(() => {
+    if (!isUnread) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timerRef.current = setTimeout(() => onRead(ann.id), 1500);
+        } else {
+          if (timerRef.current) clearTimeout(timerRef.current);
+        }
+      },
+      { threshold: 0.7 },
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [ann.id, isUnread, onRead]);
+
+  return (
+    <li
+      ref={cardRef}
+      lang={lang}
+      className={[
+        "overflow-hidden rounded-2xl border bg-dc-surface",
+        "transition-[border-color,box-shadow] duration-300",
+        isUrgent
+          ? "border-red-500 shadow-[inset_4px_0_0_theme(colors.red.500)]"
+          : isUnread
+            ? "border-(--color-brand) shadow-[inset_4px_0_0_var(--color-brand)]"
+            : "border-dc-edge",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="p-4">
+        {/* Badge row — urgent / pinned chips sit above the title */}
+        {(isUrgent || ann.pinned) && (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {isUrgent && (
+              <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-500">
+                {strings.urgent}
+              </span>
+            )}
+            {ann.pinned && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-dc-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-dc-text-2">
+                <Pin className="size-3" aria-hidden />
+                {strings.pinned}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Title row — unread dot leads the title */}
+        <div className="flex items-start gap-2">
+          {isUnread && (
+            <span
+              className="mt-[5px] size-2 shrink-0 rounded-full bg-(--color-brand)"
+              aria-hidden
+            />
+          )}
+          <p
+            className={`text-base leading-snug ${
+              isUnread ? "font-semibold text-dc-text" : "font-medium text-dc-text-2"
+            }`}
+          >
+            {title}
+          </p>
+        </div>
+
+        {/* Body with 3-line clamp and expand affordance */}
+        <p
+          className={`mt-1.5 text-sm leading-relaxed text-dc-text-2 whitespace-pre-line ${
+            expanded ? "" : "line-clamp-3"
+          }`}
+        >
+          {body}
+        </p>
+        {bodyTruncatable && !expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="mt-0.5 flex min-h-[44px] items-center text-xs font-medium text-(--color-brand) active:opacity-60"
+          >
+            {lang === "es" ? "Leer más" : "Read more"}
+          </button>
+        )}
+
+        {/* Metadata footer — department + timestamp */}
+        <div className="mt-3 flex items-center gap-2 text-xs text-dc-text-3">
+          {ann.department_id === null ? (
+            <span className="flex items-center gap-1">
+              <Globe className="size-3.5" aria-hidden />
+              {strings.allTeams}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <Building2 className="size-3.5" aria-hidden />
+              {ann.department_name}
+            </span>
+          )}
+          <span className="ml-auto">{timeAgo(ann.created_at, lang)}</span>
+        </div>
+      </div>
+
+      {/* Link / embed — outside the main content area to keep layout clean */}
+      {ann.link_url && (
+        <div className="border-t border-dc-edge px-4 pb-4 pt-3">
+          {embedSrc ? (
+            <div
+              className="relative w-full overflow-hidden rounded-xl"
+              style={{ paddingBottom: "56.25%" }}
+            >
+              <iframe
+                src={embedSrc}
+                className="absolute inset-0 h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={title}
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <a
+              href={ann.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-(--color-brand)/30 bg-(--color-brand)/10 px-4 py-2.5 text-sm font-medium text-(--color-brand) transition-colors hover:bg-(--color-brand)/20 active:scale-[0.98] active:bg-(--color-brand)/30"
+            >
+              <ExternalLink className="size-4 shrink-0" aria-hidden />
+              {getLinkLabel(lang)}
+            </a>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ── Feed ──────────────────────────────────────────────────────────────────────
 
 export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
   const [, startTransition] = useTransition();
@@ -91,12 +257,16 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
 
   const unreadCount = optimisticAnn.filter((a) => !a.is_read).length;
 
-  function handleMarkRead(announcementId: string) {
-    startTransition(async () => {
-      markRead(announcementId);
-      await markAnnouncementRead({ announcement_id: announcementId });
-    });
-  }
+  const handleMarkRead = useCallback(
+    (announcementId: string) => {
+      startTransition(async () => {
+        markRead(announcementId);
+        await markAnnouncementRead({ announcement_id: announcementId });
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [markRead],
+  );
 
   function handleMarkAllRead() {
     startTransition(async () => {
@@ -107,11 +277,12 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
 
   return (
     <section aria-labelledby="announcements-heading">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      {/* Section header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
           <h2
             id="announcements-heading"
-            className="text-sm font-semibold tracking-wide text-dc-text-2 uppercase"
+            className="text-base font-bold tracking-tight text-dc-text"
           >
             {strings.heading}
           </h2>
@@ -125,11 +296,12 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
           )}
         </div>
 
+        {/* Negative margin extends the tap area to the card edge */}
         {unreadCount > 0 && (
           <button
             type="button"
             onClick={handleMarkAllRead}
-            className="text-xs font-medium text-(--color-brand) hover:underline"
+            className="-mr-3 flex min-h-[44px] items-center px-3 text-xs font-medium text-(--color-brand) active:opacity-60"
           >
             {strings.markAllRead}
           </button>
@@ -137,121 +309,26 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
       </div>
 
       {optimisticAnn.length === 0 ? (
-        <div className="rounded-xl border border-dc-edge bg-dc-surface p-5 text-center">
-          <Bell className="mx-auto size-6 text-dc-text-3" strokeWidth={2} aria-hidden />
-          <p className="mt-2 text-sm text-dc-text-2">{strings.empty}</p>
+        <div className="rounded-2xl border border-dashed border-dc-edge bg-dc-surface px-6 py-10 text-center">
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-(--color-brand)/10">
+            <Bell className="size-6 text-(--color-brand)" strokeWidth={1.5} aria-hidden />
+          </div>
+          <p className="text-sm font-semibold text-dc-text">{strings.empty}</p>
+          <p className="mt-1 text-xs text-dc-text-3">
+            {lang === "es" ? "Todo está tranquilo por ahora." : "All quiet for now."}
+          </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2" role="list">
-          {optimisticAnn.map((ann) => {
-            const title = lang === "es" ? ann.title_es : ann.title_en;
-            const body = lang === "es" ? ann.body_es : ann.body_en;
-            const isUrgent = ann.priority === "urgent";
-            const isUnread = !ann.is_read;
-            const embedSrc = ann.link_url ? getEmbedSrc(ann.link_url) : null;
-
-            return (
-              <li
-                key={ann.id}
-                lang={lang}
-                className={[
-                  "overflow-hidden rounded-xl border bg-dc-surface transition-colors",
-                  isUrgent
-                    ? "border-red-500 shadow-[inset_4px_0_0_theme(colors.red.500)]"
-                    : isUnread
-                      ? "border-(--color-brand) shadow-[inset_4px_0_0_var(--color-brand)]"
-                      : "border-dc-edge",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                {/* Mark-as-read interactive area — wraps text only, never a link */}
-                <button
-                  type="button"
-                  onClick={() => !ann.is_read && handleMarkRead(ann.id)}
-                  className={[
-                    "w-full p-4 text-left min-h-[80px]",
-                    isUnread ? "hover:bg-dc-raised/50 active:bg-dc-raised" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-pressed={ann.is_read}
-                  aria-label={`${title}${isUnread ? (lang === "es" ? " — tocar para marcar como leído" : " — tap to mark as read") : ""}`}
-                >
-                  {/* Header row */}
-                  <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {ann.pinned && (
-                      <Pin
-                        className="size-3 text-(--color-brand)"
-                        aria-label={strings.pinned}
-                      />
-                    )}
-                    {isUrgent && (
-                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-500">
-                        {strings.urgent}
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1 text-xs text-dc-text-3">
-                      {ann.department_id === null ? (
-                        <>
-                          <Globe className="size-3" aria-hidden />
-                          {strings.allTeams}
-                        </>
-                      ) : (
-                        <>
-                          <Building2 className="size-3" aria-hidden />
-                          {ann.department_name}
-                        </>
-                      )}
-                    </span>
-                    <span className="ml-auto text-xs text-dc-text-3">
-                      {timeAgo(ann.created_at, lang)}
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <p
-                    className={`text-base leading-snug ${
-                      isUnread ? "font-semibold text-dc-text" : "font-medium text-dc-text-2"
-                    }`}
-                  >
-                    {title}
-                  </p>
-
-                  {/* Body */}
-                  <p className="mt-1 text-sm text-dc-text-2 whitespace-pre-line">{body}</p>
-                </button>
-
-                {/* Link / embed — rendered outside the button to keep valid HTML */}
-                {ann.link_url && (
-                  <div className="border-t border-dc-edge px-4 pb-4 pt-3">
-                    {embedSrc ? (
-                      <div className="relative w-full overflow-hidden rounded-lg" style={{ paddingBottom: "56.25%" }}>
-                        <iframe
-                          src={embedSrc}
-                          className="absolute inset-0 h-full w-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title={title}
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : (
-                      <a
-                        href={ann.link_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-(--color-brand)/30 bg-(--color-brand)/10 px-4 py-2.5 text-sm font-medium text-(--color-brand) hover:bg-(--color-brand)/20 active:bg-(--color-brand)/30"
-                      >
-                        <ExternalLink className="size-4 shrink-0" aria-hidden />
-                        {getLinkLabel(lang)}
-                      </a>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+        <ul className="flex flex-col gap-4" role="list">
+          {optimisticAnn.map((ann) => (
+            <AnnouncementCard
+              key={ann.id}
+              ann={ann}
+              lang={lang}
+              strings={strings}
+              onRead={handleMarkRead}
+            />
+          ))}
         </ul>
       )}
     </section>
