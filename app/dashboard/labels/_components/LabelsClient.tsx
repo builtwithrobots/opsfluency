@@ -502,7 +502,7 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
             {query ? "No active labels match your search." : "No custom labels yet. Create one above."}
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             {active.map((tag) => (
               <LabelCard
                 key={tag.id}
@@ -547,7 +547,7 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
             />
           </button>
           {showArchived && (
-            <div className="grid grid-cols-2 gap-3 opacity-75">
+            <div className="grid grid-cols-2 gap-3 opacity-75 lg:grid-cols-3">
               {archived.map((tag) => (
                 <LabelCard
                   key={tag.id}
