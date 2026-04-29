@@ -1,5 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server";
-import { Crown, Info, ShieldCheck, UserRound, Users } from "lucide-react";
+import { AlertTriangle, Crown, Info, ShieldCheck, UserRound, Users } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -10,6 +10,7 @@ import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { getCompanyContext } from "@/lib/auth/company-context";
 
+import { AssignDepartmentsModal } from "../_components/AssignDepartmentsModal";
 import { PendingTeamInvitesList } from "../_components/PendingTeamInvitesList";
 import { TeamBulkUploadClient } from "../_components/TeamBulkUploadClient";
 import { TeamInviteFormClient } from "../_components/TeamInviteFormClient";
@@ -51,6 +52,7 @@ async function loadTeam(
   members: EnrichedMember[];
   pendingInvites: PendingInvite[];
   departments: Dept[];
+  memberDepts: Record<string, string[]>;
   currentUserId: string;
 }> {
   const [{ data: rows, error }, { data: invites }, { data: depts }] =
@@ -80,6 +82,22 @@ async function loadTeam(
     is_owner: Boolean(r.is_owner),
   }));
 
+  // Fetch department assignments for all active members in one query
+  const memberIds = memberRows.map((m) => m.id);
+  const { data: deptAssignments } = memberIds.length > 0
+    ? await supabase
+        .from("employee_departments")
+        .select("member_id, department_id")
+        .eq("company_id", company_id)
+        .in("member_id", memberIds)
+    : { data: [] };
+
+  const memberDepts: Record<string, string[]> = {};
+  for (const row of deptAssignments ?? []) {
+    if (!memberDepts[row.member_id]) memberDepts[row.member_id] = [];
+    memberDepts[row.member_id].push(row.department_id);
+  }
+
   const clerk = await clerkClient();
   const enriched = await Promise.all(
     memberRows.map(async (m) => {
@@ -100,13 +118,14 @@ async function loadTeam(
     members: enriched,
     pendingInvites: (invites ?? []) as PendingInvite[],
     departments: (depts ?? []) as Dept[],
+    memberDepts,
     currentUserId,
   };
 }
 
 export async function TeamTab() {
   const { supabase, company_id, userId } = await getCompanyContext("admin");
-  const { members, pendingInvites, departments, currentUserId } =
+  const { members, pendingInvites, departments, memberDepts, currentUserId } =
     await loadTeam(supabase, company_id, userId);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
@@ -172,6 +191,12 @@ export async function TeamTab() {
                   ? `Invited ${new Date(m.invited_at).toLocaleDateString()}`
                   : "Unknown";
 
+              const assignedDeptIds = memberDepts[m.id] ?? [];
+              const assignedDepts = departments.filter((d) =>
+                assignedDeptIds.includes(d.id),
+              );
+              const noDepts = !isAdmin && assignedDepts.length === 0;
+
               return (
                 <li
                   key={m.id}
@@ -215,16 +240,47 @@ export async function TeamTab() {
                           {isAdmin ? "Admin" : "Manager"}
                         </span>
                       </div>
+
                       <p className="mt-0.5 text-xs text-dc-text-3">
                         {m.displayName ? `${m.email} · ` : ""}
                         {joinedDate}
                       </p>
+
+                      {/* Department chips (managers only) */}
+                      {!isAdmin && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {noDepts ? (
+                            <span className="flex items-center gap-1 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                              <AlertTriangle className="size-2.5" strokeWidth={2} />
+                              No dept assigned
+                            </span>
+                          ) : (
+                            assignedDepts.map((d) => (
+                              <span
+                                key={d.id}
+                                className="rounded border border-[color:var(--dc-edge)] bg-dc-raised px-1.5 py-0.5 text-[10px] text-dc-text-3"
+                              >
+                                {d.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions — locked for self and org owner */}
                   {!isSelf && !m.is_owner ? (
                     <div className="flex shrink-0 items-center gap-2">
+                      {/* Department assignment for managers */}
+                      {!isAdmin && (
+                        <AssignDepartmentsModal
+                          memberId={m.id}
+                          memberName={m.displayName ?? m.email}
+                          currentDepartmentIds={assignedDeptIds}
+                          allDepartments={departments}
+                        />
+                      )}
                       <form action={changeMemberRole}>
                         <input type="hidden" name="member_id" value={m.id} />
                         <input type="hidden" name="new_role" value={nextRole} />

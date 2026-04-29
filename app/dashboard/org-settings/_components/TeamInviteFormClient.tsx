@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Check, Copy, UserRoundPlus, X } from "lucide-react";
+import { useEffect } from "react";
 
 import {
   Dialog,
@@ -32,6 +33,8 @@ const APP_URL =
 export function TeamInviteFormClient({ departments }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [role, setRole] = useState<"manager" | "admin">("manager");
+  const [selectedDepts, setSelectedDepts] = useState<Set<string>>(new Set());
 
   const [state, action, isPending] = useActionState(
     async (_prev: TeamInviteResult | null, formData: FormData) => {
@@ -39,6 +42,14 @@ export function TeamInviteFormClient({ departments }: Props) {
     },
     INITIAL,
   );
+
+  // Clear dept selection when switching to admin (admins don't need depts)
+  useEffect(() => {
+    if (role === "admin") setSelectedDepts(new Set());
+  }, [role]);
+
+  const deptRequired = role === "manager";
+  const submitDisabled = isPending || (deptRequired && selectedDepts.size === 0);
 
   const inviteUrl = state?.ok ? `${APP_URL}/join/team/${state.token}` : null;
 
@@ -167,7 +178,8 @@ export function TeamInviteFormClient({ departments }: Props) {
                         type="radio"
                         name="role"
                         value={r}
-                        defaultChecked={r === "manager"}
+                        checked={role === r}
+                        onChange={() => setRole(r)}
                         className="accent-(--color-brand)"
                       />
                       <span className="text-sm font-medium text-dc-text capitalize">
@@ -187,9 +199,11 @@ export function TeamInviteFormClient({ departments }: Props) {
                 <fieldset className="flex flex-col gap-2">
                   <legend className="text-xs font-semibold tracking-[0.1em] text-dc-text-3 uppercase">
                     Departments{" "}
-                    <span className="font-normal text-dc-text-3">
-                      (optional)
-                    </span>
+                    {deptRequired ? (
+                      <span className="text-(--color-signal-urgent)">*</span>
+                    ) : (
+                      <span className="font-normal text-dc-text-3">(optional)</span>
+                    )}
                   </legend>
                   <div className="flex flex-wrap gap-x-4 gap-y-2">
                     {departments.map((d) => (
@@ -201,12 +215,25 @@ export function TeamInviteFormClient({ departments }: Props) {
                           type="checkbox"
                           name="department_ids"
                           value={d.id}
+                          checked={selectedDepts.has(d.id)}
+                          onChange={() =>
+                            setSelectedDepts((prev) => {
+                              const next = new Set(prev);
+                              next.has(d.id) ? next.delete(d.id) : next.add(d.id);
+                              return next;
+                            })
+                          }
                           className="rounded border-[color:var(--dc-edge)] accent-(--color-brand)"
                         />
                         <span className="text-sm text-dc-text">{d.name}</span>
                       </label>
                     ))}
                   </div>
+                  {deptRequired && selectedDepts.size === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Managers must be assigned to at least one department.
+                    </p>
+                  )}
                 </fieldset>
               )}
 
@@ -240,7 +267,7 @@ export function TeamInviteFormClient({ departments }: Props) {
               <button
                 type="submit"
                 form="team-invite-form"
-                disabled={isPending}
+                disabled={submitDisabled}
                 className="flex items-center gap-2 rounded-lg bg-(--color-brand) px-4 py-2 text-sm font-semibold text-white hover:bg-(--color-brand-hover) disabled:opacity-50"
               >
                 {isPending ? "Creating…" : "Create invite"}

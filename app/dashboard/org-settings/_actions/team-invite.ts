@@ -5,6 +5,64 @@ import { z } from "zod";
 
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 
+const AssignDeptsInput = z.object({
+  memberId: z.string().uuid(),
+  departmentIds: z.array(z.string().uuid()),
+});
+
+export type AssignDeptsResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function assignMemberDepartments(
+  memberId: string,
+  departmentIds: string[],
+): Promise<AssignDeptsResult> {
+  try {
+    const { supabase, company_id } = await getCompanyContext("admin");
+    const parsed = AssignDeptsInput.parse({ memberId, departmentIds });
+
+    // Verify the member belongs to this company
+    const { data: member } = await supabase
+      .from("company_members")
+      .select("id")
+      .eq("id", parsed.memberId)
+      .eq("company_id", company_id)
+      .single();
+
+    if (!member) return { ok: false, error: "Member not found" };
+
+    // Replace all department assignments atomically
+    const { error: deleteErr } = await supabase
+      .from("employee_departments")
+      .delete()
+      .eq("member_id", parsed.memberId)
+      .eq("company_id", company_id);
+
+    if (deleteErr) throw deleteErr;
+
+    if (parsed.departmentIds.length > 0) {
+      const { error: insertErr } = await supabase
+        .from("employee_departments")
+        .insert(
+          parsed.departmentIds.map((department_id) => ({
+            company_id,
+            department_id,
+            member_id: parsed.memberId,
+          })),
+        );
+      if (insertErr) throw insertErr;
+    }
+
+    revalidatePath("/dashboard/org-settings");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof z.ZodError) return { ok: false, error: "Invalid input" };
+    if (e instanceof AuthError) return { ok: false, error: e.code };
+    throw e;
+  }
+}
+
 const CreateInput = z.object({
   email: z.string().email("Enter a valid email address."),
   name: z.string().trim().max(200).optional(),

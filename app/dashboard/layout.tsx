@@ -26,6 +26,27 @@ async function resolveViewer(): Promise<ResolveResult> {
     // out mid-session — impersonation always forces role='admin' anyway.
     if (ctx.role === "employee" && !ctx.impersonating) redirect("/app/home");
 
+    // Managers must have at least one department assigned before they can
+    // use the dashboard. Admins are unrestricted; impersonation bypasses.
+    if (ctx.role === "manager" && !ctx.impersonating) {
+      const { data: memberRow } = await ctx.supabase
+        .from("company_members")
+        .select("id")
+        .eq("company_id", ctx.company_id)
+        .eq("clerk_user_id", ctx.userId)
+        .single();
+
+      if (memberRow) {
+        const { count } = await ctx.supabase
+          .from("employee_departments")
+          .select("*", { count: "exact", head: true })
+          .eq("member_id", memberRow.id)
+          .eq("company_id", ctx.company_id);
+
+        if ((count ?? 0) === 0) redirect("/pending-setup");
+      }
+    }
+
     // Independent super-admin probe. A user can be both a company
     // member AND a super admin (the dev-account case); we want the
     // full member sidebar AND the Platform section for them.
