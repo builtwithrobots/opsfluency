@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { DashboardTabs, type TabDef } from '@/components/dashboard/dashboard-tabs';
 import QRPrintEditor from '@/components/qr/QRPrintEditor';
 import { QrCardActions } from '@/components/qr/QrCardActions';
+import QRDownloadButton from '@/components/qr/QRDownloadButton';
 import { canModifyQr } from '@/lib/qr/audience';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import { qrStatus } from '@/lib/qr/schedule';
@@ -583,6 +584,11 @@ function QrCard({ qr, appUrl, index, canManage, counts }: QrCardProps) {
             qr_label={qr.label}
             archived={archived}
             canManage={canManage}
+          />
+          <QRDownloadButton
+            qrCodeId={qr.id}
+            label={qr.label}
+            variant="icon"
           />
           {!archived && (
             <Button href={`/dashboard/qr/${qr.id}`} plain className="text-sm">

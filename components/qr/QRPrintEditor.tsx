@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import DotSlider from './DotSlider';
 import PrintButton from './PrintButton';
+import QRDownloadButton from './QRDownloadButton';
 import QRPrintPreview from './QRPrintPreview';
 
 interface Props {
@@ -62,6 +63,7 @@ export default function QRPrintEditor({
   qrCodeId,
   targetType,
   initialConfig,
+  initialLabel,
   companyName,
   logoUrl,
   companyPhone,
@@ -539,8 +541,17 @@ export default function QRPrintEditor({
         ))}
 
         {showPrintButton && (
-          <div className="pt-2">
-            <PrintButton />
+          <div className="flex gap-2 pt-2">
+            <div className="flex-1">
+              <PrintButton />
+            </div>
+            {qrCodeId && (
+              <QRDownloadButton
+                qrCodeId={qrCodeId}
+                label={initialLabel ?? ''}
+                variant="button"
+              />
+            )}
           </div>
         )}
 
