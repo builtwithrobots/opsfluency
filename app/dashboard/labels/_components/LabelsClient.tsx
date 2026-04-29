@@ -274,8 +274,8 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
       sourceFilter === "all" || t.source === sourceFilter;
     return matchesQuery && matchesSource;
   });
-  const active = filtered.filter((t) => !t.archived_at);
-  const archived = filtered.filter((t) => t.archived_at);
+  const active   = filtered.filter((t) => !t.archived_at).sort((a, b) => a.name_en.localeCompare(b.name_en));
+  const archived = filtered.filter((t) =>  t.archived_at).sort((a, b) => a.name_en.localeCompare(b.name_en));
 
   function setErr(id: string, msg: string) {
     setErrors((p) => ({ ...p, [id]: msg }));

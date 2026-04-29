@@ -55,8 +55,8 @@ export function LabelsClient({ tags }: { tags: TagWithUsage[] }) {
       t.name_en.toLowerCase().includes(lowerQ) ||
       t.name_es.toLowerCase().includes(lowerQ),
   );
-  const active = filtered.filter((t) => !t.archived_at);
-  const archived = filtered.filter((t) => t.archived_at);
+  const active   = filtered.filter((t) => !t.archived_at).sort((a, b) => a.name_en.localeCompare(b.name_en));
+  const archived = filtered.filter((t) =>  t.archived_at).sort((a, b) => a.name_en.localeCompare(b.name_en));
 
   function startEdit(tag: TagWithUsage) {
     setEditingId(tag.id);
