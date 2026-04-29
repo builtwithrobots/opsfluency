@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Languages, Save } from 'lucide-react';
 import {
   defaultPrintConfig,
   FONT_FAMILY_LABELS,
@@ -77,6 +77,7 @@ export default function QRPrintEditor({
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [translating, setTranslating] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRenderRef = useRef(true);
 
@@ -84,16 +85,55 @@ export default function QRPrintEditor({
     setConfig(prev => ({ ...prev, ...updates }));
   }, []);
 
-  const switchLang = useCallback((lang: 'en' | 'es') => {
-    setConfig(prev => ({
-      ...prev,
-      lang,
-      // Auto-seed Spanish tagline from the template default on first switch.
-      tagline_es: lang === 'es' && !prev.tagline_es
-        ? TEMPLATE_TAGLINES_ES[prev.template]
-        : prev.tagline_es,
-    }));
+  // Translates all non-empty EN fields and patches the *_es counterparts.
+  const translateLabels = useCallback(async (current: PrintConfig) => {
+    const body: Record<string, string> = {};
+    if (current.header)     body.header     = current.header;
+    if (current.sub_header) body.sub_header = current.sub_header;
+    if (current.footer)     body.footer     = current.footer;
+    if (current.footer2)    body.footer2    = current.footer2;
+    if (current.tagline)    body.tagline    = current.tagline;
+    if (Object.keys(body).length === 0) return;
+
+    setTranslating(true);
+    try {
+      const res = await fetch('/api/qr/translate-labels', {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify(body),
+      });
+      if (res.ok) {
+        const { data } = await res.json() as { data: Partial<PrintConfig> };
+        setConfig(prev => ({ ...prev, ...data }));
+      }
+    } finally {
+      setTranslating(false);
+    }
   }, []);
+
+  const switchLang = useCallback((lang: 'en' | 'es') => {
+    setConfig(prev => {
+      const next = {
+        ...prev,
+        lang,
+        // Auto-seed Spanish tagline from the template default on first switch.
+        tagline_es: lang === 'es' && !prev.tagline_es
+          ? TEMPLATE_TAGLINES_ES[prev.template]
+          : prev.tagline_es,
+      };
+
+      // Auto-translate on first switch to ES when no Spanish content exists yet.
+      if (lang === 'es') {
+        const hasEsContent = !!(prev.header_es || prev.sub_header_es || prev.footer_es || prev.footer2_es);
+        const hasEnContent = !!(prev.header || prev.sub_header || prev.footer || prev.footer2 || prev.tagline);
+        if (!hasEsContent && hasEnContent) {
+          void translateLabels(next);
+        }
+      }
+
+      return next;
+    });
+  }, [translateLabels]);
 
   const endpoint = saveEndpoint ?? (qrCodeId ? `/api/qr/${qrCodeId}` : null);
 
@@ -154,28 +194,51 @@ export default function QRPrintEditor({
         </div>
 
         {/* Language toggle — switches the preview and text inputs between EN and ES */}
-        <div
-          className="flex overflow-hidden rounded-lg border border-[color:var(--dc-edge)]"
-          role="group"
-          aria-label="Print language"
-        >
-          {(['en', 'es'] as const).map(l => (
+        <div className="flex items-center gap-2">
+          <div
+            className="flex flex-1 overflow-hidden rounded-lg border border-[color:var(--dc-edge)]"
+            role="group"
+            aria-label="Print language"
+          >
+            {(['en', 'es'] as const).map(l => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => switchLang(l)}
+                disabled={translating}
+                className={[
+                  'flex-1 min-h-[36px] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-60',
+                  config.lang === l
+                    ? 'bg-(--color-brand) text-white'
+                    : 'bg-dc-raised text-dc-text-2 hover:bg-dc-surface',
+                ].join(' ')}
+                aria-pressed={config.lang === l}
+              >
+                {l === 'en' ? 'EN' : 'ES'}
+              </button>
+            ))}
+          </div>
+
+          {/* Re-translate button — visible in ES mode; lets managers refresh after editing EN fields */}
+          {isEs && (
             <button
-              key={l}
               type="button"
-              onClick={() => switchLang(l)}
-              className={[
-                'flex-1 min-h-[36px] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors',
-                config.lang === l
-                  ? 'bg-(--color-brand) text-white'
-                  : 'bg-dc-raised text-dc-text-2 hover:bg-dc-surface',
-              ].join(' ')}
-              aria-pressed={config.lang === l}
+              onClick={() => void translateLabels(config)}
+              disabled={translating}
+              title="Re-translate all fields from English"
+              className="flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 text-xs text-dc-text-2 transition-colors hover:bg-dc-surface disabled:opacity-60"
             >
-              {l === 'en' ? 'EN' : 'ES'}
+              <Languages className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {translating ? 'Translating…' : 'Re-translate'}
             </button>
-          ))}
+          )}
         </div>
+
+        {translating && (
+          <p className="text-xs text-dc-text-3" role="status">
+            Translating from English…
+          </p>
+        )}
 
         {SECTIONS.map(({ key, title }) => (
           <div key={key} className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface">
