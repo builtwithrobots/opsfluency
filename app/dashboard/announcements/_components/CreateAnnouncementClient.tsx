@@ -194,13 +194,13 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
                   !isOrgWide && selected.includes(dept.id)
                     ? "border-(--color-brand) bg-(--color-brand)/8 text-dc-text"
                     : "border-[color:var(--dc-edge)] text-dc-text-2 hover:bg-dc-raised"
-                } ${isOrgWide ? "opacity-40 pointer-events-none" : ""}`}
+                } ${isPending ? "opacity-40 pointer-events-none" : ""}`}
               >
                 <input
                   type="checkbox"
                   checked={!isOrgWide && selected.includes(dept.id)}
                   onChange={() => toggleOption(dept.id)}
-                  disabled={isPending || isOrgWide}
+                  disabled={isPending}
                   className="size-4 accent-(--color-brand) shrink-0"
                 />
                 {dept.name}
