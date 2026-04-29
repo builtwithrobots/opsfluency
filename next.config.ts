@@ -14,10 +14,12 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Send origin only on cross-origin requests; no path/query leakage
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Disable browser features not used by OpsFluency
+  // camera=(self) allows the worker PWA QR scanner to access the camera.
+  // Restricting to (self) means embedded iframes cannot request camera access.
+  // microphone and geolocation remain blocked — OpsFluency has no use for them.
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
+    value: "camera=(self), microphone=(), geolocation=()",
   },
   {
     key: "Content-Security-Policy",
@@ -31,18 +33,22 @@ const securityHeaders = [
     // Both must be in script-src and connect-src or Clerk silently fails to load.
     //
     // frame-src notes:
-    //   - 'self' is required for the emulator page (/dashboard/emulator) which
-    //     renders the worker PWA in a same-origin iframe.
-    //   - YouTube origins are required for external-URL QR codes that embed video.
-    //     youtube-nocookie.com is the privacy-preserving embed origin.
+    //   - 'self' — emulator page renders worker PWA in a same-origin iframe
+    //   - YouTube — external URL QR codes; youtube-nocookie.com is privacy-preserving
+    //   - Loom — screen-recording walkthroughs common in SOP content
+    //   - Vimeo — professional training video hosting
+    //   - Google Drive — PDF/slide/video embeds from Drive
+    //   - *.sharepoint.com — covers OneDrive for Business AND Microsoft Stream
+    //     (Stream is now SharePoint-embedded); onedrive.live.com covers personal OneDrive
+    //   - web.microsoftstream.com — legacy Stream URLs still in circulation
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.supabase.co https://img.clerk.com https://i.ytimg.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://img.clerk.com https://i.ytimg.com https://vumbnail.com https://*.loom.com",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://api.anthropic.com",
-      "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+      "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com https://drive.google.com https://*.sharepoint.com https://onedrive.live.com https://web.microsoftstream.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
