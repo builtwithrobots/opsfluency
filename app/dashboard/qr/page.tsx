@@ -578,7 +578,7 @@ function QrCard({ qr, appUrl, index, canManage, counts }: QrCardProps) {
       </div>
 
       {/* Footer: actions */}
-      <div className="flex items-center justify-end gap-2 border-t border-[color:var(--dc-edge)] pt-3">
+      <div className="flex items-stretch justify-end gap-2 border-t border-[color:var(--dc-edge)] pt-3">
         <QrCardActions
           qr_id={qr.id}
           qr_label={qr.label}
