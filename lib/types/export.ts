@@ -112,6 +112,7 @@ export interface AnnouncementExport {
   priority: string;
   pinned: boolean;
   expires_at: string | null;
+  link_url: string | null;
   created_at: string;
 }
 

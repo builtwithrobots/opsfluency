@@ -40,6 +40,7 @@ const CreateAnnouncementSchema = z.object({
   priority: z.enum(ANNOUNCEMENT_PRIORITIES),
   pinned: z.boolean().default(false),
   expires_at: z.string().datetime().nullable().optional(),
+  link_url: z.string().url().max(2048).nullable().optional(),
 });
 
 export async function createAnnouncement(
@@ -111,6 +112,7 @@ export async function createAnnouncement(
         priority: input.priority,
         pinned: input.pinned,
         expires_at: input.expires_at ?? null,
+        link_url: input.link_url ?? null,
       })
       .select("id")
       .single();

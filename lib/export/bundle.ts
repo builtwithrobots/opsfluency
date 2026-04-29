@@ -96,7 +96,7 @@ export async function assembleOrgBundle(
     supabase
       .from("announcements")
       .select(
-        "id, department_id, created_by, title_en, title_es, body_en, body_es, priority, pinned, expires_at, created_at",
+        "id, department_id, created_by, title_en, title_es, body_en, body_es, priority, pinned, expires_at, link_url, created_at",
       )
       .eq("company_id", company_id)
       .order("created_at"),
