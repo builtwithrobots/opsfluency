@@ -186,8 +186,8 @@ export function buildXlsx(bundle: OrgExportBundle): Buffer {
   XLSX.utils.book_append_sheet(
     wb,
     sheetFromRows(
-      ["id", "department_id", "created_by", "title_en", "title_es", "body_en", "body_es", "priority", "pinned", "expires_at", "created_at"],
-      bundle.announcements.map((a) => [a.id, a.department_id, a.created_by, a.title_en, a.title_es, a.body_en, a.body_es, a.priority, a.pinned, a.expires_at, a.created_at]),
+      ["id", "department_id", "created_by", "title_en", "title_es", "body_en", "body_es", "priority", "pinned", "expires_at", "link_url", "created_at"],
+      bundle.announcements.map((a) => [a.id, a.department_id, a.created_by, a.title_en, a.title_es, a.body_en, a.body_es, a.priority, a.pinned, a.expires_at, a.link_url, a.created_at]),
     ),
     "Announcements",
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
-import { Bell, Building2, Globe, Pin } from "lucide-react";
+import { Bell, Building2, ExternalLink, Globe, Pin } from "lucide-react";
 
 import {
   markAllAnnouncementsRead,
@@ -38,6 +38,51 @@ function timeAgo(iso: string, lang: WorkerLanguage): string {
 
 function unreadCountLabel(n: number, lang: WorkerLanguage): string {
   return lang === "es" ? `${n} sin leer` : `${n} unread`;
+}
+
+// Returns an embeddable iframe src for YouTube, Loom, and Vimeo URLs.
+// Returns null for all other URLs (they render as a link button instead).
+function getEmbedSrc(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // YouTube: youtube.com/watch?v=ID or youtu.be/ID
+    if (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") {
+      const v = u.searchParams.get("v");
+      if (v) return `https://www.youtube-nocookie.com/embed/${v}`;
+    }
+    if (u.hostname === "youtu.be") {
+      const v = u.pathname.slice(1);
+      if (v) return `https://www.youtube-nocookie.com/embed/${v}`;
+    }
+    // Loom: loom.com/share/ID
+    if (u.hostname === "www.loom.com" || u.hostname === "loom.com") {
+      const m = u.pathname.match(/\/share\/([a-f0-9]+)/i);
+      if (m) return `https://www.loom.com/embed/${m[1]}`;
+    }
+    // Vimeo: vimeo.com/ID
+    if (u.hostname === "vimeo.com" || u.hostname === "www.vimeo.com") {
+      const m = u.pathname.match(/\/(\d+)/);
+      if (m) return `https://player.vimeo.com/video/${m[1]}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getLinkLabel(url: string, lang: WorkerLanguage): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("drive.google.com"))
+      return lang === "es" ? "Abrir en Google Drive" : "Open in Google Drive";
+    if (u.hostname.includes("sharepoint.com") || u.hostname.includes("onedrive"))
+      return lang === "es" ? "Abrir en OneDrive" : "Open in OneDrive";
+    if (u.hostname.includes("microsoftstream.com"))
+      return lang === "es" ? "Ver video" : "Watch video";
+    return lang === "es" ? "Abrir enlace" : "Open link";
+  } catch {
+    return lang === "es" ? "Abrir enlace" : "Open link";
+  }
 }
 
 export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
@@ -114,35 +159,35 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
             const body = lang === "es" ? ann.body_es : ann.body_en;
             const isUrgent = ann.priority === "urgent";
             const isUnread = !ann.is_read;
+            const embedSrc = ann.link_url ? getEmbedSrc(ann.link_url) : null;
 
             return (
-              <li key={ann.id} lang={lang}>
+              <li
+                key={ann.id}
+                lang={lang}
+                className={[
+                  "overflow-hidden rounded-xl border bg-dc-surface transition-colors",
+                  isUrgent
+                    ? "border-red-500 shadow-[inset_4px_0_0_theme(colors.red.500)]"
+                    : isUnread
+                      ? "border-(--color-brand) shadow-[inset_4px_0_0_var(--color-brand)]"
+                      : "border-dc-edge",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {/* Mark-as-read interactive area — wraps text only, never a link */}
                 <button
                   type="button"
                   onClick={() => !ann.is_read && handleMarkRead(ann.id)}
                   className={[
-                    "w-full rounded-xl border bg-dc-surface p-4 text-left transition-colors",
-                    // Border: urgent = red, unread normal = brand, read = default edge
-                    isUrgent
-                      ? "border-red-500"
-                      : isUnread
-                        ? "border-(--color-brand)"
-                        : "border-dc-edge",
-                    // Left accent bar via box-shadow
-                    isUrgent
-                      ? "shadow-[inset_4px_0_0_theme(colors.red.500)]"
-                      : isUnread
-                        ? "shadow-[inset_4px_0_0_var(--color-brand)]"
-                        : "",
-                    // Hover only if unread
+                    "w-full p-4 text-left min-h-[80px]",
                     isUnread ? "hover:bg-dc-raised/50 active:bg-dc-raised" : "",
-                    // Min height for glove-friendly taps
-                    "min-h-[80px]",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   aria-pressed={ann.is_read}
-                  aria-label={`${title}${isUnread ? " — tap to mark as read" : ""}`}
+                  aria-label={`${title}${isUnread ? (lang === "es" ? " — tocar para marcar como leído" : " — tap to mark as read") : ""}`}
                 >
                   {/* Header row */}
                   <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -187,6 +232,34 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
                   {/* Body */}
                   <p className="mt-1 text-sm text-dc-text-2 whitespace-pre-line">{body}</p>
                 </button>
+
+                {/* Link / embed — rendered outside the button to keep valid HTML */}
+                {ann.link_url && (
+                  <div className="border-t border-dc-edge px-4 pb-4 pt-3">
+                    {embedSrc ? (
+                      <div className="relative w-full overflow-hidden rounded-lg" style={{ paddingBottom: "56.25%" }}>
+                        <iframe
+                          src={embedSrc}
+                          className="absolute inset-0 h-full w-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={title}
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <a
+                        href={ann.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-(--color-brand)/30 bg-(--color-brand)/10 px-4 py-2.5 text-sm font-medium text-(--color-brand) hover:bg-(--color-brand)/20 active:bg-(--color-brand)/30"
+                      >
+                        <ExternalLink className="size-4 shrink-0" aria-hidden />
+                        {getLinkLabel(ann.link_url, lang)}
+                      </a>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}

@@ -16,6 +16,7 @@ export interface Announcement {
   priority: AnnouncementPriority;
   pinned: boolean;
   expires_at: string | null;
+  link_url: string | null;
   created_at: string;
   updated_at: string;
 }

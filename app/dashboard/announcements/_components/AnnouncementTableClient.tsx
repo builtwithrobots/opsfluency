@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bell, Building2, Globe, Pin, Trash2 } from "lucide-react";
+import { Bell, Building2, ExternalLink, Globe, Pin, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { deleteAnnouncement } from "@/app/dashboard/announcements/_actions";
@@ -97,6 +97,12 @@ export function AnnouncementTableClient({ announcements: serverAnnouncements }: 
                       )}
                     </div>
                     <p className="mt-0.5 line-clamp-1 text-xs text-dc-text-3">{ann.body_en}</p>
+                    {ann.link_url && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-(--color-brand)">
+                        <ExternalLink className="size-3" aria-hidden />
+                        Link attached
+                      </p>
+                    )}
                     {/* Mobile: show audience inline */}
                     <div className="mt-1 flex items-center gap-1 sm:hidden">
                       {ann.department_id === null ? (

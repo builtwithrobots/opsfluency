@@ -45,6 +45,7 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
   const [priority, setPriority] = useState<"normal" | "urgent">("normal");
   const [pinned, setPinned] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function reset() {
@@ -54,6 +55,7 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
     setPriority("normal");
     setPinned(false);
     setExpiresAt("");
+    setLinkUrl("");
     setError(null);
   }
 
@@ -99,6 +101,7 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
             priority,
             pinned,
             expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+            link_url: linkUrl.trim() || null,
           }),
         ),
       );
@@ -265,6 +268,25 @@ export function CreateAnnouncementClient({ departments, canPostOrgWide }: Props)
               Pinned
             </label>
           </div>
+        </div>
+
+        {/* Link URL */}
+        <div>
+          <label htmlFor="ann-link" className={labelClass}>
+            Link (optional)
+          </label>
+          <input
+            id="ann-link"
+            type="url"
+            className={inputClass}
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="https://…"
+            disabled={isPending}
+          />
+          <p className="mt-1 text-xs text-dc-text-3">
+            YouTube, Loom, and Vimeo URLs embed automatically. Google Drive, OneDrive, and SharePoint links open in a new tab.
+          </p>
         </div>
 
         {/* Expiry */}
