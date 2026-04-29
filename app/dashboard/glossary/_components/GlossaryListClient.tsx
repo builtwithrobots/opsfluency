@@ -160,7 +160,7 @@ function TermRow({
       {/* Tag pills */}
       {term.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 border-t border-[color:var(--dc-edge)] px-5 py-2.5">
-          {term.tags.map((tag) => (
+          {[...term.tags].sort((a, b) => a.name_en.localeCompare(b.name_en)).map((tag) => (
             <TagPill key={tag.id} tag={tag} />
           ))}
         </div>

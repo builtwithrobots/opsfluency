@@ -113,7 +113,7 @@ function SopRowItem({
         {/* Tag pills */}
         {sop.tags.length > 0 && (
           <div className="hidden items-center gap-1 sm:flex">
-            {sop.tags.slice(0, 3).map((tag) => (
+            {[...sop.tags].sort((a, b) => a.name_en.localeCompare(b.name_en)).slice(0, 3).map((tag) => (
               <span
                 key={tag.id}
                 className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
