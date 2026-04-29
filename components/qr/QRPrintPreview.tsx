@@ -135,13 +135,15 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
     Math.round(basePx * (scalePct / 100));
 
   const isEs      = config.lang === 'es';
-  const header    = isEs ? config.header_es    : config.header;
-  const subHeader = isEs ? config.sub_header_es : config.sub_header;
-  const footer    = isEs ? config.footer_es    : config.footer;
-  const footer2   = isEs ? config.footer2_es   : config.footer2;
-  // Tagline: use the per-QR override first, then the template default.
+  // ES fields fall back to their EN counterparts when no Spanish text has been
+  // set yet (or after a re-edit cleared them), so the two sheets always match.
+  const header    = isEs ? (config.header_es    || config.header)     : config.header;
+  const subHeader = isEs ? (config.sub_header_es || config.sub_header) : config.sub_header;
+  const footer    = isEs ? (config.footer_es    || config.footer)     : config.footer;
+  const footer2   = isEs ? (config.footer2_es   || config.footer2)    : config.footer2;
+  // Tagline: ES override → ES template default → EN override → EN template default.
   const tagline   = isEs
-    ? (config.tagline_es || TEMPLATE_TAGLINES_ES[config.template])
+    ? (config.tagline_es || TEMPLATE_TAGLINES_ES[config.template] || config.tagline || TEMPLATE_TAGLINES[config.template])
     : (config.tagline    || TEMPLATE_TAGLINES[config.template]);
 
   const showLogo        = config.show_logo && !!logoUrl;

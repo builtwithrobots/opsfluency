@@ -354,7 +354,9 @@ export default function QRPrintEditor({
                         <input
                           type="text"
                           value={isEs ? config.header_es : config.header}
-                          onChange={e => patch(isEs ? { header_es: e.target.value } : { header: e.target.value })}
+                          onChange={e => patch(isEs
+                            ? { header_es: e.target.value }
+                            : { header: e.target.value, header_es: '' })}
                           placeholder={isEs
                             ? (isDefaults ? 'ej. Procedimiento operativo estándar' : 'ej. Procedimiento de seguridad de montacargas')
                             : (isDefaults ? 'e.g. Standard Operating Procedure' : 'e.g. Forklift Safety Procedure')}
@@ -382,7 +384,9 @@ export default function QRPrintEditor({
                         <input
                           type="text"
                           value={isEs ? config.sub_header_es : config.sub_header}
-                          onChange={e => patch(isEs ? { sub_header_es: e.target.value } : { sub_header: e.target.value })}
+                          onChange={e => patch(isEs
+                            ? { sub_header_es: e.target.value }
+                            : { sub_header: e.target.value, sub_header_es: '' })}
                           placeholder={isEs ? 'Subtítulo opcional' : 'Optional sub-title'}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
@@ -421,7 +425,9 @@ export default function QRPrintEditor({
                           <input
                             type="text"
                             value={isEs ? config.tagline_es : config.tagline}
-                            onChange={e => patch(isEs ? { tagline_es: e.target.value } : { tagline: e.target.value })}
+                            onChange={e => patch(isEs
+                              ? { tagline_es: e.target.value }
+                              : { tagline: e.target.value, tagline_es: '' })}
                             placeholder={isEs ? 'ej. Escanear para ver el procedimiento' : 'e.g. Scan to view procedure'}
                             className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                           />
@@ -456,7 +462,9 @@ export default function QRPrintEditor({
                         <input
                           type="text"
                           value={isEs ? config.footer_es : config.footer}
-                          onChange={e => patch(isEs ? { footer_es: e.target.value } : { footer: e.target.value })}
+                          onChange={e => patch(isEs
+                            ? { footer_es: e.target.value }
+                            : { footer: e.target.value, footer_es: '' })}
                           placeholder={isEs ? 'Texto de pie de página opcional' : 'Optional footer text'}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
@@ -482,7 +490,9 @@ export default function QRPrintEditor({
                         <input
                           type="text"
                           value={isEs ? config.footer2_es : config.footer2}
-                          onChange={e => patch(isEs ? { footer2_es: e.target.value } : { footer2: e.target.value })}
+                          onChange={e => patch(isEs
+                            ? { footer2_es: e.target.value }
+                            : { footer2: e.target.value, footer2_es: '' })}
                           placeholder={isEs ? 'ej. número de teléfono' : 'e.g. phone number'}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
