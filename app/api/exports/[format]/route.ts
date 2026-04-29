@@ -174,8 +174,12 @@ export async function GET(
     // 6. Stream directly to the browser. Content-Disposition forces a file download.
     //    No copy is written to Supabase Storage or the filesystem — bytes travel
     //    DB → process memory → TLS → browser only.
+    //    Buffer is not a valid Web API BodyInit, so convert it to Uint8Array first.
     const isBinary = Buffer.isBuffer(body);
-    return new Response(body, {
+    const responseBody: BodyInit = isBinary
+      ? new Uint8Array(body as Buffer)
+      : (body as string);
+    return new Response(responseBody, {
       status: 200,
       headers: {
         "Content-Type": isBinary ? contentType : `${contentType}; charset=utf-8`,
