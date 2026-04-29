@@ -196,8 +196,67 @@ See [`.claude/skills/opsfluency-bilingual-content/SKILL.md`](../../.claude/skill
 
 ---
 
+## 9. Security messaging
+
+**Technical backup:** [`docs/security.md`](../security.md) — the full control inventory, known gaps, and customer FAQ. If marketing copy and that doc disagree, the doc wins.
+
+### The one claim that matters
+
+Warehouse operators and their IT contacts ask one security question above all others: *"Can another company see our data?"* Every piece of security copy on the marketing site is an answer to that question.
+
+### Approved copy — three tiers
+
+**One line** (hero sections, pricing cards, feature bullets):
+> "Your data is isolated at the database layer. No other company can see it — ever."
+
+**Two sentences** (features page, FAQ accordion, sales one-pager):
+> "Every company's data is isolated by PostgreSQL Row Level Security — enforced at the database itself, not just the application. Even a software bug cannot return another company's data."
+
+**Trust block** (dedicated `/security` or `/trust` page, footer callout, sales email attachment):
+> **Your data stays yours.**
+>
+> OpsFluency is built for multi-tenant isolation from the ground up. Every company's SOPs, glossary, and employee data are isolated at the database layer using PostgreSQL Row Level Security — not just filtered in code. Only your org admins can export your data, every export is logged, and files stream directly to your browser with no copy stored on our servers. All traffic is HTTPS-only with full security headers. Employees log in via magic link — there are no passwords to phish.
+>
+> Questions? security@opsfluency.com
+
+### Voice rules for security copy
+
+| Do | Don't |
+|---|---|
+| "Enforced at the database itself, not just the application" — this lands with technical buyers | "We take security seriously" — says nothing |
+| Name the actual mechanism (Row Level Security, HTTPS, magic link) | "Enterprise-grade security" — meaningless filler |
+| Be honest about what's in progress ("building toward SOC 2") | Imply you have certifications you don't have |
+| Short sentences. One claim per sentence. | Long paragraphs that bury the key point |
+
+### Where each tier goes
+
+| Surface | Tier |
+|---|---|
+| Pricing page — below plan cards | One line |
+| Features page — as a feature row | Two sentences |
+| Homepage — optional trust strip near social proof | One line |
+| `/security` or `/trust` page | Trust block + link to `docs/security.md` |
+| Footer | Link to `/security` only — no inline copy |
+| Sales email / proposal | Trust block as a standalone attachment |
+| Security questionnaire responses | Full answers from `docs/security.md` → Customer FAQ |
+
+### What we can truthfully claim right now
+
+- ✅ Database-layer tenant isolation (RLS)
+- ✅ HTTPS-only with HSTS and full security headers
+- ✅ Magic link authentication — no passwords
+- ✅ Admin-only data export, logged and rate-limited
+- ✅ Every cross-tenant admin action is audited
+- ⏳ SOC 2 — not yet; say "building toward SOC 2 Type II" if asked directly
+- ⏳ Penetration test — not yet; say "scheduled" when it is
+
+Never claim a certification or audit report that doesn't exist. A single customer who asks for the report and gets nothing loses trust permanently.
+
+---
+
 ## Change log
 
 | Date | Change |
 |---|---|
+| 2026-04-29 | Added §9 Security messaging — approved copy tiers, voice rules, placement guidance. |
 | 2026-04-21 | Initial draft. Sections: positioning, logo, color, type, icons, bilingual, imagery, do/don't. |
