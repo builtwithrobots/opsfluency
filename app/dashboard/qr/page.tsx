@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { DashboardTabs, type TabDef } from '@/components/dashboard/dashboard-tabs';
 import QRPrintEditor from '@/components/qr/QRPrintEditor';
 import { QrCardActions } from '@/components/qr/QrCardActions';
-import QRDownloadButton from '@/components/qr/QRDownloadButton';
 import { canModifyQr } from '@/lib/qr/audience';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import { qrStatus } from '@/lib/qr/schedule';
@@ -565,19 +564,8 @@ function QrCard({ qr, appUrl, index, canManage, counts }: QrCardProps) {
         </a>
       </div>
 
-      {/* Footer row: scan count + actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[color:var(--dc-edge)] pt-3">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5 text-xs text-dc-text-3">
-            <ScanLine className="h-3.5 w-3.5 shrink-0" />
-            <span>{counts.total.toLocaleString()} {counts.total === 1 ? 'scan' : 'scans'}</span>
-          </div>
-          {counts.last7d > 0 && (
-            <p className="pl-5 text-[10px] text-dc-text-3">
-              {counts.last7d.toLocaleString()} this week
-            </p>
-          )}
-        </div>
+      {/* Footer: actions + scan stats flush right */}
+      <div className="flex flex-col items-end gap-1.5 border-t border-[color:var(--dc-edge)] pt-3">
         <div className="flex items-center gap-2">
           <QrCardActions
             qr_id={qr.id}
@@ -585,15 +573,24 @@ function QrCard({ qr, appUrl, index, canManage, counts }: QrCardProps) {
             archived={archived}
             canManage={canManage}
           />
-          <QRDownloadButton
-            qrCodeId={qr.id}
-            label={qr.label}
-            variant="icon"
-          />
           {!archived && (
-            <Button href={`/dashboard/qr/${qr.id}`} plain className="h-9 text-sm">
+            <Link
+              href={`/dashboard/qr/${qr.id}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised h-9 px-2.5 text-sm font-semibold text-dc-text-2 transition-colors hover:text-dc-text"
+            >
               Edit / Print
-            </Button>
+            </Link>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-dc-text-3">
+            <ScanLine className="h-3.5 w-3.5 shrink-0" />
+            <span>{counts.total.toLocaleString()} {counts.total === 1 ? 'scan' : 'scans'}</span>
+          </div>
+          {counts.last7d > 0 && (
+            <p className="text-[10px] text-dc-text-3">
+              {counts.last7d.toLocaleString()} this week
+            </p>
           )}
         </div>
       </div>
