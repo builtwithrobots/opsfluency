@@ -28,10 +28,11 @@ import { ArchiveButton } from './_components/ArchiveButton';
 import { PhoneFrame } from './_components/PhoneFrame';
 import { SuperAdminDangerZone } from './_components/SuperAdminDangerZone';
 import { AudienceClient } from './_components/AudienceClient';
+import { VideoClient } from './_components/VideoClient';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import type { Role } from '@/lib/auth/company-context';
 
-const VALID_TABS = ['original', 'english', 'spanish', 'app', 'audience', 'versions', 'qr'] as const;
+const VALID_TABS = ['original', 'english', 'spanish', 'app', 'audience', 'video', 'versions', 'qr'] as const;
 type Tab = (typeof VALID_TABS)[number];
 
 const STATUS_BADGE: Record<SopStatus, { label: string; color: Parameters<typeof Badge>[0]['color'] }> = {
@@ -176,12 +177,28 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
   // empty state, which is correct but not useful.
   const hasWorkerContent = !!latest?.content_en;
 
+  // video_url lives behind migration 20260429000003. Read defensively so a
+  // missing column never breaks the SOP detail page before migration lands.
+  let sopVideoUrl: string | null = null;
+  try {
+    const { data: videoRow } = await supabase
+      .from('sops')
+      .select('video_url')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    sopVideoUrl = (videoRow as { video_url?: string | null } | null)?.video_url ?? null;
+  } catch (err) {
+    console.warn('[sop detail] video_url read failed', { id, message: err instanceof Error ? err.message : String(err) });
+  }
+
   const tabs: TabDef[] = [
     { id: 'original', label: 'Original',   href: `/dashboard/sops/${id}?tab=original` },
     { id: 'english',  label: 'English',    href: `/dashboard/sops/${id}?tab=english` },
     { id: 'spanish',  label: 'Spanish',    href: `/dashboard/sops/${id}?tab=spanish`, disabled: !latest?.content_es },
     { id: 'app',      label: 'App view',   href: `/dashboard/sops/${id}?tab=app`, disabled: !hasWorkerContent },
     { id: 'audience', label: 'Audience',   href: `/dashboard/sops/${id}?tab=audience` },
+    { id: 'video',    label: 'Video',      href: `/dashboard/sops/${id}?tab=video` },
     { id: 'versions', label: 'Versions',   href: `/dashboard/sops/${id}?tab=versions` },
     { id: 'qr',       label: 'QR',         href: `/dashboard/sops/${id}?tab=qr`, disabled: !qrRow },
   ];
@@ -294,6 +311,10 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
           scope={creatorScope}
           initial={sopAudience}
         />
+      )}
+
+      {tab === 'video' && (
+        <VideoClient sopId={id} initialVideoUrl={sopVideoUrl} />
       )}
 
       {tab === 'versions' && (

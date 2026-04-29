@@ -9,7 +9,7 @@
  * always shows an "Open in browser" fallback button to handle that.
  */
 
-export type EmbedProvider = 'youtube' | 'loom' | 'generic';
+export type EmbedProvider = 'youtube' | 'loom' | 'vimeo' | 'generic';
 
 export interface EmbedInfo {
   provider: EmbedProvider;
@@ -23,16 +23,20 @@ export interface EmbedInfo {
 
 const YOUTUBE_HOSTS = new Set(['youtube.com', 'm.youtube.com', 'music.youtube.com']);
 const LOOM_HOSTS    = new Set(['loom.com']);
+const VIMEO_HOSTS   = new Set(['vimeo.com', 'player.vimeo.com']);
 
 function youTubeEmbed(id: string) {
-  // rel=0 disables related-video carousel; modestbranding=1 hides the
-  // YouTube logo in the player chrome (deprecated officially but still
-  // honored). Keep params short — long params make the iframe URL noisy.
-  return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+  // youtube-nocookie.com is the privacy-enhanced domain — no tracking cookies.
+  // rel=0 disables related-video carousel; modestbranding=1 hides YouTube logo.
+  return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`;
 }
 
 function loomEmbed(id: string) {
   return `https://www.loom.com/embed/${id}`;
+}
+
+function vimeoEmbed(id: string) {
+  return `https://player.vimeo.com/video/${id}`;
 }
 
 export function detectEmbed(rawUrl: string): EmbedInfo {
@@ -70,6 +74,17 @@ export function detectEmbed(rawUrl: string): EmbedInfo {
     if (parsed.pathname.startsWith('/embed/')) {
       return { provider: 'loom', embed_url: rawUrl, original_url: rawUrl, host };
     }
+  }
+
+  // ── Vimeo ──────────────────────────────────────────────────────────────────
+  if (VIMEO_HOSTS.has(host)) {
+    // player.vimeo.com/video/ID — already in embed form
+    if (parsed.pathname.startsWith('/video/')) {
+      return { provider: 'vimeo', embed_url: rawUrl, original_url: rawUrl, host };
+    }
+    // vimeo.com/ID
+    const m = parsed.pathname.match(/^\/(\d+)/);
+    if (m) return { provider: 'vimeo', embed_url: vimeoEmbed(m[1]), original_url: rawUrl, host };
   }
 
   // ── Fall through: generic site, leave URL alone ────────────────────────────

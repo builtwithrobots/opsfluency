@@ -672,7 +672,44 @@ export async function updateSopAudience(raw: unknown): Promise<ActionResult<{ ok
 import type { QrAudience } from '@/lib/qr/audience';
 export type Audience = QrAudience;
 
-// ── 7. Archive ────────────────────────────────────────────────────────────────
+// ── 7. Video URL ──────────────────────────────────────────────────────────────
+
+const UpdateSopVideoUrlSchema = z.object({
+  sop_id: z.string().uuid(),
+  video_url: z.string().url().max(2048).nullable(),
+});
+
+export async function updateSopVideoUrl(raw: unknown): Promise<ActionResult<{ ok: true }>> {
+  try {
+    const { supabase, company_id } = await getCompanyContext('manager');
+    const input = UpdateSopVideoUrlSchema.parse(raw);
+
+    const { data: sop } = await supabase
+      .from('sops')
+      .select('id')
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (!sop) return fail('NOT_FOUND');
+
+    const { error: updErr } = await supabase
+      .from('sops')
+      .update({ video_url: input.video_url })
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id);
+    if (updErr) return fail('INTERNAL', updErr.message);
+
+    revalidatePath(`/dashboard/sops/${input.sop_id}`);
+    revalidatePath(`/app/sop/${input.sop_id}`);
+    return { ok: true, data: { ok: true } };
+  } catch (e) {
+    const handled = handleAuthError<{ ok: true }>(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── 8. Archive ────────────────────────────────────────────────────────────────
 //
 // (The previous `approveSop` action was retired when translation auto-
 // publishes. QR creation + published_at stamping moved into `runTranslation`.

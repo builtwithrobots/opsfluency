@@ -5,6 +5,7 @@ import { passesAudience, type QrAudience } from '@/lib/qr/audience';
 import { renderMarkdown } from '@/lib/sop/markdown';
 import type { WorkerLanguage } from '@/lib/types/sop';
 import { LanguageToggleClient } from './_components/LanguageToggleClient';
+import { VideoButtonClient } from './_components/VideoButtonClient';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -87,6 +88,20 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
     console.warn('[worker sop] audience read threw', { id, message: err instanceof Error ? err.message : String(err) });
   }
 
+  // video_url lives behind migration 20260429000003 — read defensively so a
+  // missing column never blocks workers from loading their SOP.
+  let sopVideoUrl: string | null = null;
+  try {
+    const { data: videoRow } = await supabase
+      .from('sops')
+      .select('video_url')
+      .eq('id', id)
+      .maybeSingle();
+    sopVideoUrl = (videoRow as { video_url?: string | null } | null)?.video_url ?? null;
+  } catch {
+    // migration not yet applied — no video button shown
+  }
+
   const { data: memberRow } = await supabase
     .from('company_members')
     .select('id')
@@ -160,6 +175,12 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
         </h1>
         <LanguageToggleClient sopId={id} current={lang} />
       </header>
+
+      {sopVideoUrl && (
+        <div className="mb-5">
+          <VideoButtonClient videoUrl={sopVideoUrl} sopTitle={sop.title} lang={lang} />
+        </div>
+      )}
 
       <article className="text-[17px] leading-relaxed">
         {renderMarkdown(content)}
