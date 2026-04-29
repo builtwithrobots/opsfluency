@@ -6,7 +6,13 @@ import { writeExportAuditRow } from "@/lib/export/audit";
 import { assembleOrgBundle } from "@/lib/export/bundle";
 import { buildGlossaryCsv, buildSopsCsv, buildTeamCsv } from "@/lib/export/csv";
 import { checkExportRateLimit } from "@/lib/export/rate-limit";
-import { EXPORT_FORMATS, type ExportFormat } from "@/lib/types/export";
+import {
+  EXPORT_FORMATS,
+  type ExportFormat,
+  type GlossaryTermExport,
+  type SopExport,
+  type TeamMemberExport,
+} from "@/lib/types/export";
 
 const FormatSchema = z.enum(EXPORT_FORMATS);
 
@@ -77,10 +83,10 @@ export async function GET(
       for (const r of sopTagRows ?? []) {
         (sopTagMap[r.sop_id] ??= []).push(r.tag_id);
       }
-      const sopsWithTags = (sops ?? []).map((s: { id: string; [key: string]: unknown }) => ({
+      const sopsWithTags = (sops ?? [] as Omit<SopExport, "tags">[]).map((s) => ({
         ...s,
         tags: sopTagMap[s.id] ?? [],
-      }));
+      })) as SopExport[];
       rowCount = sopsWithTags.length;
       body = buildSopsCsv(sopsWithTags);
       contentType = "text/csv";
@@ -100,10 +106,10 @@ export async function GET(
       for (const r of termTagRows ?? []) {
         (glossaryTagMap[r.term_id] ??= []).push(r.tag_id);
       }
-      const termsWithTags = (terms ?? []).map((t: { id: string; [key: string]: unknown }) => ({
+      const termsWithTags = (terms ?? [] as Omit<GlossaryTermExport, "tags">[]).map((t) => ({
         ...t,
         tags: glossaryTagMap[t.id] ?? [],
-      }));
+      })) as GlossaryTermExport[];
       rowCount = termsWithTags.length;
       body = buildGlossaryCsv(termsWithTags);
       contentType = "text/csv";
@@ -125,10 +131,10 @@ export async function GET(
       for (const r of deptRows ?? []) {
         (memberDepts[r.member_id] ??= []).push(r.department_id);
       }
-      const membersWithDepts = (members ?? []).map((m: { id: string; [key: string]: unknown }) => ({
+      const membersWithDepts = (members ?? [] as Omit<TeamMemberExport, "department_ids">[]).map((m) => ({
         ...m,
         department_ids: memberDepts[m.id] ?? [],
-      }));
+      })) as TeamMemberExport[];
       rowCount = membersWithDepts.length;
       body = buildTeamCsv(membersWithDepts);
       contentType = "text/csv";
