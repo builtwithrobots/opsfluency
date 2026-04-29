@@ -34,11 +34,10 @@ export async function OriginalEmbed({ bucket, path }: Props) {
 
   if (isPdf) {
     return (
-      <object
-        data={url}
-        type="application/pdf"
+      <iframe
+        src={url}
+        title={`Original PDF: ${filename}`}
         className="block h-[80vh] w-full rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface"
-        aria-label={`Original PDF: ${filename}`}
       >
         <p className="p-4 text-sm text-dc-text-3">
           PDF preview unavailable —
@@ -48,7 +47,7 @@ export async function OriginalEmbed({ bucket, path }: Props) {
           </a>
           .
         </p>
-      </object>
+      </iframe>
     );
   }
 
