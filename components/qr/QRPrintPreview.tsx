@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   FONT_FAMILY_CSS,
   TEMPLATE_TAGLINES,
+  TEMPLATE_TAGLINES_ES,
   type PrintConfig,
 } from '@/lib/qr/print-config';
 
@@ -129,16 +130,24 @@ interface SheetProps {
 function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps) {
   const scanUrl   = `${appUrl}/s/${qrCodeId}`;
   const qrPx      = Math.round((config.qr_size / 100) * SHEET_W * 0.7);
-  // Custom tagline overrides the per-template default. Empty string hides it.
-  const tagline   = config.tagline ?? TEMPLATE_TAGLINES[config.template];
   const fontStack = FONT_FAMILY_CSS[config.font_family];
   const sized     = (basePx: number, scalePct: number) =>
     Math.round(basePx * (scalePct / 100));
 
+  const isEs      = config.lang === 'es';
+  const header    = isEs ? config.header_es    : config.header;
+  const subHeader = isEs ? config.sub_header_es : config.sub_header;
+  const footer    = isEs ? config.footer_es    : config.footer;
+  const footer2   = isEs ? config.footer2_es   : config.footer2;
+  // Tagline: use the per-QR override first, then the template default.
+  const tagline   = isEs
+    ? (config.tagline_es || TEMPLATE_TAGLINES_ES[config.template])
+    : (config.tagline    || TEMPLATE_TAGLINES[config.template]);
+
   const showLogo        = config.show_logo && !!logoUrl;
   const showCompanyName = config.show_company_name && !!companyName;
   const showTopBand     = showLogo || showCompanyName;
-  const showFooterBand  = !!config.footer || !!config.footer2;
+  const showFooterBand  = !!footer || !!footer2;
   const showTagline     = !!tagline;
   const logoMaxH        = sized(64, config.logo_size);
   const logoMaxW        = sized(220, config.logo_size);
@@ -153,6 +162,7 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
       // @media print rule overrides with `display: flex !important` while
       // printing, so the print path is unaffected.
       id={isPrint ? 'qr-print-sheet' : undefined}
+      lang={isEs ? 'es' : 'en'}
       className={[
         'relative flex flex-col bg-white',
         isPrint
@@ -210,20 +220,20 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
         className="flex flex-1 flex-col items-center justify-center px-6 text-center"
         style={{ gap: config.spacing_middle }}
       >
-        {config.header && (
+        {header && (
           <h2
             className={`text-neutral-900 leading-tight ${config.bold_header ? 'font-bold' : 'font-normal'}`}
             style={{ fontSize: sized(BASE_FONT_PX.header, config.font_size_header) }}
           >
-            {config.header}
+            {header}
           </h2>
         )}
-        {config.sub_header && (
+        {subHeader && (
           <p
             className={`text-neutral-600 ${config.bold_sub_header ? 'font-bold' : 'font-normal'}`}
             style={{ fontSize: sized(BASE_FONT_PX.sub_header, config.font_size_sub_header) }}
           >
-            {config.sub_header}
+            {subHeader}
           </p>
         )}
 
@@ -257,20 +267,20 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
           className="flex flex-col items-center pb-6 text-center"
           style={{ gap: config.spacing_footer }}
         >
-          {config.footer && (
+          {footer && (
             <p
               className={`text-neutral-700 ${config.bold_footer ? 'font-bold' : 'font-normal'}`}
               style={{ fontSize: sized(BASE_FONT_PX.footer, config.font_size_footer) }}
             >
-              {config.footer}
+              {footer}
             </p>
           )}
-          {config.footer2 && (
+          {footer2 && (
             <p
               className={`text-neutral-500 ${config.bold_footer2 ? 'font-bold' : 'font-normal'}`}
               style={{ fontSize: sized(BASE_FONT_PX.footer2, config.font_size_footer2) }}
             >
-              {config.footer2}
+              {footer2}
             </p>
           )}
         </div>

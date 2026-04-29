@@ -9,6 +9,7 @@ import {
   LOGO_SIZE_SLIDER,
   QR_SIZE_SLIDER,
   SPACING_SLIDER,
+  TEMPLATE_TAGLINES_ES,
   type PrintConfig,
   type PrintFontFamily,
   type QrTargetType,
@@ -71,6 +72,7 @@ export default function QRPrintEditor({
   const isDefaults = mode === 'defaults';
   const base    = defaultPrintConfig(targetType, { footer2: companyPhone ?? '', ...initialConfig });
   const [config, setConfig] = useState<PrintConfig>(base);
+  const isEs    = config.lang === 'es';
   const [open, setOpen]     = useState<SectionKey | null>('qr');
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -80,6 +82,17 @@ export default function QRPrintEditor({
 
   const patch = useCallback((updates: Partial<PrintConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const switchLang = useCallback((lang: 'en' | 'es') => {
+    setConfig(prev => ({
+      ...prev,
+      lang,
+      // Auto-seed Spanish tagline from the template default on first switch.
+      tagline_es: lang === 'es' && !prev.tagline_es
+        ? TEMPLATE_TAGLINES_ES[prev.template]
+        : prev.tagline_es,
+    }));
   }, []);
 
   const endpoint = saveEndpoint ?? (qrCodeId ? `/api/qr/${qrCodeId}` : null);
@@ -138,6 +151,30 @@ export default function QRPrintEditor({
               Saved {formatSaved(lastSavedAt)}
             </span>
           )}
+        </div>
+
+        {/* Language toggle — switches the preview and text inputs between EN and ES */}
+        <div
+          className="flex overflow-hidden rounded-lg border border-[color:var(--dc-edge)]"
+          role="group"
+          aria-label="Print language"
+        >
+          {(['en', 'es'] as const).map(l => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => switchLang(l)}
+              className={[
+                'flex-1 min-h-[36px] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors',
+                config.lang === l
+                  ? 'bg-(--color-brand) text-white'
+                  : 'bg-dc-raised text-dc-text-2 hover:bg-dc-surface',
+              ].join(' ')}
+              aria-pressed={config.lang === l}
+            >
+              {l === 'en' ? 'EN' : 'ES'}
+            </button>
+          ))}
         </div>
 
         {SECTIONS.map(({ key, title }) => (
@@ -247,13 +284,17 @@ export default function QRPrintEditor({
                     <div className="flex flex-col gap-3">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-dc-text-2">
-                          Header{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          Header
+                          {isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          {isEs && <span className="ml-2 text-xs font-normal text-dc-text-3">— Spanish</span>}
                         </label>
                         <input
                           type="text"
-                          value={config.header}
-                          onChange={e => patch({ header: e.target.value })}
-                          placeholder={isDefaults ? 'e.g. Standard Operating Procedure' : 'e.g. Forklift Safety Procedure'}
+                          value={isEs ? config.header_es : config.header}
+                          onChange={e => patch(isEs ? { header_es: e.target.value } : { header: e.target.value })}
+                          placeholder={isEs
+                            ? (isDefaults ? 'ej. Procedimiento operativo estándar' : 'ej. Procedimiento de seguridad de montacargas')
+                            : (isDefaults ? 'e.g. Standard Operating Procedure' : 'e.g. Forklift Safety Procedure')}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
@@ -271,13 +312,15 @@ export default function QRPrintEditor({
                     <div className="flex flex-col gap-3">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-dc-text-2">
-                          Sub-header{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          Sub-header
+                          {isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          {isEs && <span className="ml-2 text-xs font-normal text-dc-text-3">— Spanish</span>}
                         </label>
                         <input
                           type="text"
-                          value={config.sub_header}
-                          onChange={e => patch({ sub_header: e.target.value })}
-                          placeholder="Optional sub-title"
+                          value={isEs ? config.sub_header_es : config.sub_header}
+                          onChange={e => patch(isEs ? { sub_header_es: e.target.value } : { sub_header: e.target.value })}
+                          placeholder={isEs ? 'Subtítulo opcional' : 'Optional sub-title'}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
@@ -308,12 +351,15 @@ export default function QRPrintEditor({
                     <div className="flex flex-col gap-3">
                       {!isDefaults && (
                         <div>
-                          <label className="mb-1 block text-sm font-medium text-dc-text-2">Tagline</label>
+                          <label className="mb-1 block text-sm font-medium text-dc-text-2">
+                            Tagline
+                            {isEs && <span className="ml-2 text-xs font-normal text-dc-text-3">— Spanish</span>}
+                          </label>
                           <input
                             type="text"
-                            value={config.tagline}
-                            onChange={e => patch({ tagline: e.target.value })}
-                            placeholder="e.g. Scan to view procedure"
+                            value={isEs ? config.tagline_es : config.tagline}
+                            onChange={e => patch(isEs ? { tagline_es: e.target.value } : { tagline: e.target.value })}
+                            placeholder={isEs ? 'ej. Escanear para ver el procedimiento' : 'e.g. Scan to view procedure'}
                             className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                           />
                           <p className="mt-1 text-xs text-dc-text-3">
@@ -340,13 +386,15 @@ export default function QRPrintEditor({
                     <div className="flex flex-col gap-3">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-dc-text-2">
-                          Footer{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          Footer
+                          {isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          {isEs && <span className="ml-2 text-xs font-normal text-dc-text-3">— Spanish</span>}
                         </label>
                         <input
                           type="text"
-                          value={config.footer}
-                          onChange={e => patch({ footer: e.target.value })}
-                          placeholder="Optional footer text"
+                          value={isEs ? config.footer_es : config.footer}
+                          onChange={e => patch(isEs ? { footer_es: e.target.value } : { footer: e.target.value })}
+                          placeholder={isEs ? 'Texto de pie de página opcional' : 'Optional footer text'}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>
@@ -364,13 +412,15 @@ export default function QRPrintEditor({
                     <div className="flex flex-col gap-3">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-dc-text-2">
-                          Footer 2{isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          Footer 2
+                          {isDefaults && <span className="ml-2 text-xs font-normal text-dc-text-3">(default copy)</span>}
+                          {isEs && <span className="ml-2 text-xs font-normal text-dc-text-3">— Spanish</span>}
                         </label>
                         <input
                           type="text"
-                          value={config.footer2}
-                          onChange={e => patch({ footer2: e.target.value })}
-                          placeholder="e.g. phone number"
+                          value={isEs ? config.footer2_es : config.footer2}
+                          onChange={e => patch(isEs ? { footer2_es: e.target.value } : { footer2: e.target.value })}
+                          placeholder={isEs ? 'ej. número de teléfono' : 'e.g. phone number'}
                           className="w-full rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text placeholder-dc-text-3 focus:border-dc-edge-2 focus:outline-none"
                         />
                       </div>

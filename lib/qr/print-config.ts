@@ -35,6 +35,18 @@ export interface PrintConfig {
    * (TEMPLATE_TAGLINES). Empty string hides the line entirely.
    */
   tagline: string;
+
+  /** Print language. 'en' renders the primary fields; 'es' renders the *_es variants. */
+  lang: 'en' | 'es';
+
+  /** Spanish counterparts for all manager-entered text fields. */
+  header_es: string;
+  sub_header_es: string;
+  footer_es: string;
+  footer2_es: string;
+  /** Auto-seeded from TEMPLATE_TAGLINES_ES on first ES toggle. Empty string hides it. */
+  tagline_es: string;
+
   show_logo: boolean;
   show_company_name: boolean;       // independent of logo - both can be on
   template: PrintTemplate;
@@ -83,13 +95,18 @@ const DEFAULT_TEMPLATE_BY_TYPE: Record<QrTargetType, PrintTemplate> = {
  * the company's `qr_design_defaults` from the Design Settings tab and the
  * footer2 phone number.
  */
-export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline'> = {
+export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline' | 'tagline_es'> = {
   qr_size:                60,
   logo_size:              100,
   header:                 '',
   sub_header:             '',
   footer:                 '',
   footer2:                '',
+  lang:                   'en',
+  header_es:              '',
+  sub_header_es:          '',
+  footer_es:              '',
+  footer2_es:             '',
   show_logo:              true,
   show_company_name:      true,
   font_family:            'sans',
@@ -139,11 +156,16 @@ export const DESIGN_DEFAULT_KEYS = [
   'show_company_name',
   'logo_size',
   'qr_size',
+  'lang',
   // Seed text content that auto-fills every new QR. Per-QR edits override.
   'header',
   'sub_header',
   'footer',
   'footer2',
+  'header_es',
+  'sub_header_es',
+  'footer_es',
+  'footer2_es',
   'font_size_company_name',
   'font_size_header',
   'font_size_sub_header',
@@ -187,7 +209,8 @@ export function defaultPrintConfig(
   return {
     ...BASE_PRINT_CONFIG,
     template,
-    tagline: TEMPLATE_TAGLINES[template],
+    tagline:    TEMPLATE_TAGLINES[template],
+    tagline_es: TEMPLATE_TAGLINES_ES[template],
     ...overrides,
   };
 }
@@ -204,6 +227,13 @@ export const TEMPLATE_TAGLINES: Record<PrintTemplate, string> = {
   'announcement':  'Scan for latest update',
   'questionnaire': 'Scan to complete form',
   'generic':       'Scan to view',
+};
+
+export const TEMPLATE_TAGLINES_ES: Record<PrintTemplate, string> = {
+  'sop-standard':  'Escanear para ver el procedimiento',
+  'announcement':  'Escanear para ver la actualización',
+  'questionnaire': 'Escanear para completar el formulario',
+  'generic':       'Escanear para ver',
 };
 
 export const FONT_FAMILY_LABELS: Record<PrintFontFamily, string> = {
