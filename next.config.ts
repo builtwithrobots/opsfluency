@@ -41,6 +41,9 @@ const securityHeaders = [
     //   - *.sharepoint.com — covers OneDrive for Business AND Microsoft Stream
     //     (Stream is now SharePoint-embedded); onedrive.live.com covers personal OneDrive
     //   - web.microsoftstream.com — legacy Stream URLs still in circulation
+    //   - *.supabase.co — Supabase Storage signed URLs for the SOP original file
+    //     viewer (OriginalEmbed renders PDFs in an iframe, not an <object>, so
+    //     object-src can stay 'none').
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev",
@@ -48,7 +51,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.supabase.co https://img.clerk.com https://i.ytimg.com https://vumbnail.com https://*.loom.com",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://api.anthropic.com",
-      "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com https://drive.google.com https://*.sharepoint.com https://onedrive.live.com https://web.microsoftstream.com",
+      "frame-src 'self' https://*.supabase.co https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com https://drive.google.com https://*.sharepoint.com https://onedrive.live.com https://web.microsoftstream.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
