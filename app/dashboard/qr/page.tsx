@@ -591,7 +591,7 @@ function QrCard({ qr, appUrl, index, canManage, counts }: QrCardProps) {
             variant="icon"
           />
           {!archived && (
-            <Button href={`/dashboard/qr/${qr.id}`} plain className="text-sm">
+            <Button href={`/dashboard/qr/${qr.id}`} plain className="h-9 text-sm">
               Edit / Print
             </Button>
           )}

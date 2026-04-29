@@ -130,8 +130,8 @@ export default function QRDownloadButton({
         title="Download QR code"
         className={
           variant === 'icon'
-            ? 'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface text-dc-text-2 transition-colors hover:bg-dc-raised'
-            : 'flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface px-3 text-sm text-dc-text-2 transition-colors hover:bg-dc-raised'
+            ? 'flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface text-dc-text-2 transition-colors hover:bg-dc-raised'
+            : 'flex self-stretch w-full items-center justify-center gap-1.5 rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface px-3 text-sm text-dc-text-2 transition-colors hover:bg-dc-raised'
         }
       >
         <Download className="h-4 w-4 shrink-0" />

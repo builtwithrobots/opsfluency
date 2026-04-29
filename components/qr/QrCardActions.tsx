@@ -79,7 +79,7 @@ export function QrCardActions({ qr_id, qr_label, archived, canManage }: Props) {
               type="button"
               onClick={restore}
               disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 py-1 text-xs font-semibold text-dc-text-2 transition-colors hover:text-dc-text disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised h-9 px-2.5 text-sm font-semibold text-dc-text-2 transition-colors hover:text-dc-text disabled:opacity-50"
             >
               <RotateCcw className="size-3.5" strokeWidth={2} aria-hidden />
               {busy === 'restore' ? 'Restoring…' : 'Restore'}
@@ -88,7 +88,7 @@ export function QrCardActions({ qr_id, qr_label, archived, canManage }: Props) {
               type="button"
               onClick={() => setConfirmOpen(true)}
               disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-md border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/5 px-2.5 py-1 text-xs font-semibold text-(--color-signal-urgent) transition-colors hover:bg-(--color-signal-urgent)/10 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-md border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/5 h-9 px-2.5 text-sm font-semibold text-(--color-signal-urgent) transition-colors hover:bg-(--color-signal-urgent)/10 disabled:opacity-50"
             >
               <Trash2 className="size-3.5" strokeWidth={2} aria-hidden />
               Delete
@@ -99,7 +99,7 @@ export function QrCardActions({ qr_id, qr_label, archived, canManage }: Props) {
             type="button"
             onClick={archive}
             disabled={busy !== null}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 py-1 text-xs font-semibold text-dc-text-2 transition-colors hover:text-dc-text disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised h-9 px-2.5 text-sm font-semibold text-dc-text-2 transition-colors hover:text-dc-text disabled:opacity-50"
           >
             <Archive className="size-3.5" strokeWidth={2} aria-hidden />
             {busy === 'archive' ? 'Archiving…' : 'Archive'}

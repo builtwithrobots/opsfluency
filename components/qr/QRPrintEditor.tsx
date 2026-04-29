@@ -541,7 +541,7 @@ export default function QRPrintEditor({
         ))}
 
         {showPrintButton && (
-          <div className="flex gap-2 pt-2">
+          <div className="flex items-stretch gap-2 pt-2">
             <div className="flex-1">
               <PrintButton />
             </div>
