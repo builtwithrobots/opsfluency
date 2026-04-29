@@ -207,7 +207,7 @@ export async function TeamTab() {
                       {isAdmin ? (
                         <ShieldCheck className="size-4 text-(--color-brand)" strokeWidth={2} />
                       ) : (
-                        <UserRound className="size-4 text-dc-text-3" strokeWidth={2} />
+                        <UserRound className="size-4 text-violet-500" strokeWidth={2} />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -224,17 +224,11 @@ export async function TeamTab() {
                           </span>
                         )}
 
-                        {isSelf && (
-                          <span className="rounded border border-(--color-brand)/30 bg-(--color-brand)/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-(--color-brand) uppercase">
-                            You
-                          </span>
-                        )}
-
                         <span
                           className={
                             isAdmin
                               ? "rounded border border-(--color-brand)/30 bg-(--color-brand)/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-(--color-brand) uppercase"
-                              : "rounded border border-[color:var(--dc-edge)] bg-dc-raised px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-dc-text-3 uppercase"
+                              : "rounded border border-violet-400/30 bg-violet-400/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-violet-600 dark:text-violet-400 uppercase"
                           }
                         >
                           {isAdmin ? "Admin" : "Manager"}
