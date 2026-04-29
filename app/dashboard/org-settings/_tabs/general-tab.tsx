@@ -32,7 +32,7 @@ export async function GeneralTab({ saved }: Props) {
   const hasLogo = Boolean(company.logo_url);
 
   return (
-    <section className="flex flex-col gap-6 max-w-2xl">
+    <section className="flex flex-col gap-6 max-w-5xl">
       {saved ? (
         <div className="flex items-center gap-2 rounded-lg border border-(--color-signal-ok)/30 bg-(--color-signal-ok)/10 px-4 py-3 text-sm font-medium text-(--color-signal-ok)">
           <CheckCircle2 className="size-4 shrink-0" strokeWidth={2} />
@@ -40,6 +40,7 @@ export async function GeneralTab({ saved }: Props) {
         </div>
       ) : null}
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
       {/* ── Card 1: Company information ─────────────────────────────────── */}
       <div className="overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
         <div className="border-b border-[color:var(--dc-edge)] px-5 py-4">
@@ -238,6 +239,7 @@ export async function GeneralTab({ saved }: Props) {
           </form>
         ) : null}
       </div>
+      </div>{/* end grid */}
     </section>
   );
 }
