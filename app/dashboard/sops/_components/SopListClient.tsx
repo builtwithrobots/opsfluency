@@ -137,13 +137,13 @@ function SopRowItem({
           </div>
         )}
 
-        {/* Manage tags button */}
+        {/* Manage tags button — always visible, tooltip on hover */}
         <button
           type="button"
           onClick={onManageTags}
-          title="Manage labels"
-          aria-label={`Manage labels for ${sop.title}`}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-dc-text-3 opacity-0 transition-opacity hover:bg-dc-overlay hover:text-dc-text group-hover/row:opacity-100"
+          title="Add a label"
+          aria-label={`Add a label to ${sop.title}`}
+          className="flex size-8 shrink-0 items-center justify-center rounded-md text-dc-text-3 transition-colors hover:bg-dc-overlay hover:text-dc-text"
         >
           <TagIcon className="size-4" strokeWidth={1.75} aria-hidden />
         </button>

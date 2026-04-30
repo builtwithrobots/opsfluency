@@ -19,6 +19,11 @@ const CompanyInput = z.object({
     .max(50)
     .optional()
     .transform((v) => (v === "" ? undefined : v)),
+  address_line1: z.string().trim().max(200).optional().transform((v) => (v === "" ? undefined : v)),
+  address_line2: z.string().trim().max(200).optional().transform((v) => (v === "" ? undefined : v)),
+  city: z.string().trim().max(100).optional().transform((v) => (v === "" ? undefined : v)),
+  state: z.string().trim().max(100).optional().transform((v) => (v === "" ? undefined : v)),
+  zip: z.string().trim().max(20).optional().transform((v) => (v === "" ? undefined : v)),
 });
 
 export type CreateCompanyWizardState =
@@ -47,6 +52,11 @@ export async function createCompanyWizardAction(
     const parsed = CompanyInput.safeParse({
       name: formData.get("name"),
       phone: formData.get("phone"),
+      address_line1: formData.get("address_line1"),
+      address_line2: formData.get("address_line2"),
+      city: formData.get("city"),
+      state: formData.get("state"),
+      zip: formData.get("zip"),
     });
     if (!parsed.success) {
       return {
@@ -97,6 +107,22 @@ export async function createCompanyWizardAction(
       if (!readBack) return { status: "error", code: "BRIDGE_UNCONFIGURED" };
     } catch {
       return { status: "error", code: "BRIDGE_UNCONFIGURED" };
+    }
+
+    // Save address if any field was provided. Non-fatal — user can complete in Settings.
+    const { address_line1, address_line2, city, state: addrState, zip } = parsed.data;
+    if (address_line1 || city || addrState || zip) {
+      const admin = getAdminClient();
+      await admin
+        .from("companies")
+        .update({
+          address_line1: address_line1 ?? null,
+          address_line2: address_line2 ?? null,
+          city: city ?? null,
+          state: addrState ?? null,
+          zip: zip ?? null,
+        })
+        .eq("id", company_id);
     }
 
     return { status: "success", company_id };
