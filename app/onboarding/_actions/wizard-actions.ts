@@ -159,6 +159,53 @@ export async function uploadLogoAction(formData: FormData): Promise<UploadLogoRe
   }
 }
 
+// ── Step 1 (optional): save address after company creation ───────────────────
+
+const AddressInput = z.object({
+  address_line1: z.string().trim().max(200).optional().transform((v) => (v === "" ? undefined : v)),
+  address_line2: z.string().trim().max(200).optional().transform((v) => (v === "" ? undefined : v)),
+  city: z.string().trim().max(100).optional().transform((v) => (v === "" ? undefined : v)),
+  state: z.string().trim().max(100).optional().transform((v) => (v === "" ? undefined : v)),
+  zip: z.string().trim().max(20).optional().transform((v) => (v === "" ? undefined : v)),
+});
+
+export type UpdateAddressResult = { ok: true } | { ok: false; error: string };
+
+export async function updateCompanyAddressAction(formData: FormData): Promise<UpdateAddressResult> {
+  try {
+    const parsed = AddressInput.safeParse({
+      address_line1: formData.get("address_line1"),
+      address_line2: formData.get("address_line2"),
+      city: formData.get("city"),
+      state: formData.get("state"),
+      zip: formData.get("zip"),
+    });
+    if (!parsed.success) return { ok: false, error: "Invalid address." };
+
+    // Only save if at least one field has a value.
+    const data = parsed.data;
+    if (!data.address_line1 && !data.city && !data.state && !data.zip) return { ok: true };
+
+    const { company_id } = await getCompanyContext();
+    const admin = getAdminClient();
+    const { error } = await admin
+      .from("companies")
+      .update({
+        address_line1: data.address_line1 ?? null,
+        address_line2: data.address_line2 ?? null,
+        city: data.city ?? null,
+        state: data.state ?? null,
+        zip: data.zip ?? null,
+      })
+      .eq("id", company_id);
+
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to save address." };
+  }
+}
+
 // ── Step 2: fetch departments ─────────────────────────────────────────────────
 
 export interface OnboardingDepartment {
