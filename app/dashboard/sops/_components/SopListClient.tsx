@@ -98,8 +98,9 @@ function SopRowItem({
           href={`/dashboard/sops/${sop.id}`}
           className="min-w-0 flex-1"
         >
-          <p className="truncate font-medium text-dc-text group-hover/row:text-(--color-brand) transition-colors">
-            {sop.title}
+          <p className="flex items-center gap-2 truncate font-medium text-dc-text group-hover/row:text-(--color-brand) transition-colors">
+            <span className="truncate">{sop.title}</span>
+            <Badge color={meta.color} dot>{meta.label}</Badge>
           </p>
           <p className="mt-0.5 text-xs text-dc-text-3">
             {sop.departments?.name ?? "No department"}
@@ -107,8 +108,6 @@ function SopRowItem({
             Updated {new Date(sop.updated_at).toLocaleDateString()}
           </p>
         </Link>
-
-        <Badge color={meta.color} dot>{meta.label}</Badge>
 
         {/* Tag pills */}
         {sop.tags.length > 0 && (
