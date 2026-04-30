@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
+import { AuthError } from "@/lib/auth/company-context";
+import { getCompanyContextOrPlatform } from "@/lib/auth/redirect-helpers";
 
 export default async function DepartmentsLayout({
   children,
@@ -9,7 +10,7 @@ export default async function DepartmentsLayout({
   children: ReactNode;
 }) {
   try {
-    await getCompanyContext("manager");
+    await getCompanyContextOrPlatform("manager");
   } catch (e) {
     if (e instanceof AuthError && e.code === "FORBIDDEN") redirect("/dashboard");
     if (e instanceof AuthError && e.code === "UNAUTHENTICATED") redirect("/sign-in");

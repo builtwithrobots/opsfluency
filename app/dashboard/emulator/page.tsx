@@ -1,6 +1,6 @@
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
-import { getCompanyContext } from "@/lib/auth/company-context";
+import { getCompanyContextOrPlatform } from "@/lib/auth/redirect-helpers";
 import type { WorkerLanguage } from "@/lib/types/sop";
 
 import { EmulatorClient } from "./_components/EmulatorClient";
@@ -23,7 +23,7 @@ export const metadata = {
 export default async function EmulatorPage() {
   // Manager-or-better. Admin always satisfies; impersonating super
   // admins resolve as role='admin'.
-  const { userId, supabase, company_id } = await getCompanyContext("manager");
+  const { userId, supabase, company_id } = await getCompanyContextOrPlatform("manager");
 
   const { data: member } = await supabase
     .from("company_members")
