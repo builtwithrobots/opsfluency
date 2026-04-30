@@ -2,9 +2,14 @@
 
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { NavbarItem } from './navbar'
 import { SidebarCollapsedContext } from './sidebar-collapsed-context'
+
+const SIDEBAR_DEFAULT_W = 240
+const SIDEBAR_MIN_W     = 180
+const SIDEBAR_MAX_W     = 360
+const SIDEBAR_COLLAPSED_W = 72
 
 function OpenMenuIcon() {
   return (
@@ -53,36 +58,77 @@ export function SidebarLayout({
 }: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
   const [showSidebar, setShowSidebar] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_W)
+  const [isResizing, setIsResizing] = useState(false)
 
-  // Sync collapsed state from localStorage after mount (avoids SSR mismatch)
+  // Sync persisted state after mount (avoids SSR mismatch)
   useEffect(() => {
-    if (localStorage.getItem('sidebar-collapsed') === 'true') {
-      setCollapsed(true)
-    }
+    if (localStorage.getItem('sidebar-collapsed') === 'true') setCollapsed(true)
+    const saved = Number(localStorage.getItem('sidebar-width'))
+    if (saved >= SIDEBAR_MIN_W && saved <= SIDEBAR_MAX_W) setSidebarWidth(saved)
   }, [])
 
   const toggle = () => {
-    setCollapsed((c) => {
+    setCollapsed((c: boolean) => {
       const next = !c
       localStorage.setItem('sidebar-collapsed', String(next))
       return next
     })
   }
 
-  const sidebarW = collapsed ? 'w-[72px]' : 'w-56'
-  const mainPl  = collapsed ? 'lg:pl-[72px]' : 'lg:pl-56'
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = sidebarWidth
+    let currentW = startW
+
+    setIsResizing(true)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMove = (me: MouseEvent) => {
+      currentW = Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, startW + me.clientX - startX))
+      setSidebarWidth(currentW)
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setIsResizing(false)
+      localStorage.setItem('sidebar-width', String(currentW))
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [sidebarWidth])
+
+  const expandedW = sidebarWidth
+  const currentW  = collapsed ? SIDEBAR_COLLAPSED_W : expandedW
 
   return (
     <SidebarCollapsedContext.Provider value={{ collapsed, toggle }}>
       <div className="relative isolate flex min-h-svh w-full bg-dc-surface max-lg:flex-col lg:bg-dc-bg">
         {/* Desktop sidebar */}
         <div
+          style={{ width: currentW }}
           className={clsx(
-            'fixed inset-y-0 left-0 max-lg:hidden overflow-hidden transition-[width] duration-200 ease-in-out',
-            sidebarW,
+            'fixed inset-y-0 left-0 max-lg:hidden overflow-hidden',
+            !isResizing && 'transition-[width] duration-200 ease-in-out',
           )}
         >
           {sidebar}
+
+          {/* Drag handle — only shown when expanded */}
+          {!collapsed && (
+            <div
+              onMouseDown={handleResizeStart}
+              className="absolute inset-y-0 right-0 w-1 cursor-col-resize group"
+              aria-hidden
+            >
+              <div className="h-full w-px bg-transparent transition-colors group-hover:bg-[color:var(--color-brand)]/40" />
+            </div>
+          )}
         </div>
 
         {/* Mobile sidebar */}
@@ -102,10 +148,10 @@ export function SidebarLayout({
 
         {/* Main content */}
         <main
+          style={{ paddingLeft: currentW }}
           className={clsx(
             'flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2',
-            'transition-[padding-left] duration-200 ease-in-out',
-            mainPl,
+            !isResizing && 'transition-[padding-left] duration-200 ease-in-out',
           )}
         >
           <div className="grow p-6 lg:rounded-lg lg:bg-dc-surface lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-[color:var(--dc-edge)]">
