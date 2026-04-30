@@ -1,6 +1,6 @@
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
-import { getCompanyContext } from "@/lib/auth/company-context";
+import { getCompanyContextOrPlatform } from "@/lib/auth/redirect-helpers";
 import { getCreatorScope } from "@/lib/qr/creator-scope";
 import type { AnnouncementWithMeta } from "@/lib/types/announcements";
 
@@ -12,7 +12,7 @@ export const metadata = {
 
 export default async function AnnouncementsPage() {
   const { userId, supabase, company_id, role, impersonating } =
-    await getCompanyContext("manager");
+    await getCompanyContextOrPlatform("manager");
 
   const scope = await getCreatorScope({
     supabase,

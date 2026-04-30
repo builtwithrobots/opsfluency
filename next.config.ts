@@ -46,11 +46,15 @@ const securityHeaders = [
     //     object-src can stay 'none').
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev blob:",
+      // Clerk creates service workers from blob: URLs. worker-src must be
+      // explicit because it falls back to script-src when absent, and
+      // script-src alone doesn't grant blob: worker execution.
+      "worker-src blob: 'self'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https://img.clerk.com https://i.ytimg.com https://vumbnail.com https://*.loom.com",
       "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://api.anthropic.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://api.clerk.com https://api.anthropic.com",
       "frame-src 'self' https://*.supabase.co https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com https://drive.google.com https://*.sharepoint.com https://onedrive.live.com https://web.microsoftstream.com",
       "object-src 'none'",
       "base-uri 'self'",

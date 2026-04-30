@@ -4,7 +4,7 @@ import { UserRound } from "lucide-react";
 
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
-import { getCompanyContext } from "@/lib/auth/company-context";
+import { getCompanyContextOrPlatform } from "@/lib/auth/redirect-helpers";
 import { formatPhoneDisplay } from "@/lib/employees/phone";
 import { InviteFormClient } from "./_components/InviteFormClient";
 import { JoinQrClient } from "./_components/JoinQrClient";
@@ -20,7 +20,7 @@ interface EmployeeProfile {
 }
 
 export default async function EmployeesPage() {
-  const { supabase, company_id } = await getCompanyContext("manager");
+  const { supabase, company_id } = await getCompanyContextOrPlatform("manager");
 
   const [
     companyResult,

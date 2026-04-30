@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
-import { getCompanyContext } from '@/lib/auth/company-context';
+import { getCompanyContextOrPlatform } from '@/lib/auth/redirect-helpers';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ interface Props {
 
 export default async function QrDetailPage({ params }: Props) {
   const { id } = await params;
-  const { supabase, company_id } = await getCompanyContext('manager');
+  const { supabase, company_id } = await getCompanyContextOrPlatform('manager');
 
   const [{ data: qr }, { data: company }] = await Promise.all([
     supabase

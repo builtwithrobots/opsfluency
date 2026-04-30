@@ -3,7 +3,8 @@ import { BookOpenText, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
-import { getCompanyContext } from "@/lib/auth/company-context";
+import type { CompanyContext } from "@/lib/auth/company-context";
+import { getCompanyContextOrPlatform } from "@/lib/auth/redirect-helpers";
 import type { GlossaryTermWithTags } from "@/lib/types/glossary";
 import type { Tag } from "@/lib/types/tags";
 
@@ -24,7 +25,7 @@ function resolveView(raw: string | undefined): View {
 }
 
 async function loadTermsWithTags(
-  supabase: Awaited<ReturnType<typeof getCompanyContext>>["supabase"],
+  supabase: CompanyContext["supabase"],
   company_id: string,
   view: View,
   q: string,
@@ -84,7 +85,7 @@ async function loadTermsWithTags(
 }
 
 async function loadCompanyTags(
-  supabase: Awaited<ReturnType<typeof getCompanyContext>>["supabase"],
+  supabase: CompanyContext["supabase"],
   company_id: string,
 ): Promise<Tag[]> {
   const { data } = await supabase
@@ -97,7 +98,7 @@ async function loadCompanyTags(
 }
 
 async function countByView(
-  supabase: Awaited<ReturnType<typeof getCompanyContext>>["supabase"],
+  supabase: CompanyContext["supabase"],
   company_id: string,
 ): Promise<{ active: number; archived: number }> {
   const [{ count: active }, { count: archived }] = await Promise.all([
@@ -121,7 +122,7 @@ export default async function GlossaryPage({ searchParams }: PageProps) {
   const q = (rawQ ?? "").trim();
   const tagId = rawTag ?? null;
 
-  const { supabase, company_id } = await getCompanyContext("manager");
+  const { supabase, company_id } = await getCompanyContextOrPlatform("manager");
   const [terms, allTags, counts] = await Promise.all([
     loadTermsWithTags(supabase, company_id, view, q, tagId),
     loadCompanyTags(supabase, company_id),

@@ -1,12 +1,12 @@
 import { listTagsWithUsage } from "@/app/dashboard/tags/_actions/tags";
-import { getCompanyContext } from "@/lib/auth/company-context";
+import { getCompanyContextOrPlatform } from "@/lib/auth/redirect-helpers";
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 
 import { LabelsClient } from "./_components/LabelsClient";
 
 export default async function LabelsPage() {
-  await getCompanyContext("admin");
+  await getCompanyContextOrPlatform("admin");
   const result = await listTagsWithUsage();
 
   if (!result.ok) {
