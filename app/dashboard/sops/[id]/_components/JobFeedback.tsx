@@ -107,7 +107,7 @@ const FRIENDLY_HINTS: Record<string, string> = {
   AI_PARSE_FAILURE:
     'Sonnet returned text that did not match the expected JSON shape. The raw response is captured below — share it with engineering.',
   AI_TRUNCATED:
-    'Sonnet hit its output token cap before finishing — the document is unusually long. Try splitting it into smaller sections, or ask engineering to raise maxTokens.',
+    'This document is too large to convert in one pass. Upload each procedure as a separate SOP — one procedure per file works best.',
   AI_INTERNAL: 'Anthropic returned an unexpected error. Retry first; if it persists, capture the details below.',
   TRANSLATION_TIMEOUT: 'Google Translate did not respond in time. Retry once.',
   TRANSLATION_RATE_LIMITED:

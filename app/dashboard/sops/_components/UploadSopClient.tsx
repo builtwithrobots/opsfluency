@@ -193,7 +193,7 @@ export function UploadSopClient({ departments, scope }: Props) {
             </button>
           </div>
           <DialogDescription>
-            PDF, TXT, JPG, PNG, or HEIC up to 10 MB. Claude reads it and pulls the SOP into structured Markdown.
+            PDF, TXT, JPG, PNG, or HEIC up to 10 MB. One procedure per file works best — keep it under 10 pages for fastest results.
           </DialogDescription>
 
           <DialogBody className="flex flex-col gap-4">
@@ -229,7 +229,7 @@ export function UploadSopClient({ departments, scope }: Props) {
                 <>
                   <Upload className="size-7 text-dc-text-3" strokeWidth={1.5} aria-hidden />
                   <p className="text-sm font-medium text-dc-text">Drop a file or click to browse</p>
-                  <p className="text-xs text-dc-text-3">PDF · TXT · JPG · PNG · HEIC · max 10 MB</p>
+                  <p className="text-xs text-dc-text-3">PDF · TXT · JPG · PNG · HEIC · max 10 MB · one procedure per file</p>
                 </>
               )}
             </label>
