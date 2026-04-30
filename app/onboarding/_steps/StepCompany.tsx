@@ -7,7 +7,6 @@ import { useFormStatus } from "react-dom";
 import {
   createCompanyWizardAction,
   type CreateCompanyWizardState,
-  updateCompanyAddressAction,
   uploadLogoAction,
 } from "@/app/onboarding/_actions/wizard-actions";
 import { Button } from "@/components/ui/button";
@@ -59,30 +58,15 @@ export function StepCompany({ onSuccess }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  // After company creation succeeds, upload logo + save address (both non-fatal) then advance.
+  // After company creation succeeds, upload logo (non-fatal) then advance.
   async function handleSuccess(companyId: string) {
     startUploadTransition(async () => {
-      const addressFd = new FormData();
-      if (formRef.current) {
-        for (const field of ["address_line1", "address_line2", "city", "state", "zip"]) {
-          const el = formRef.current.elements.namedItem(field) as HTMLInputElement | null;
-          if (el?.value) addressFd.append(field, el.value);
-        }
-      }
-
-      const tasks: Promise<unknown>[] = [updateCompanyAddressAction(addressFd)];
-
       if (logoFile) {
         const fd = new FormData();
         fd.append("file", logoFile);
-        tasks.push(
-          uploadLogoAction(fd).then((r) => {
-            if (!r.ok) setLogoWarning("Logo couldn't be saved — you can upload it in Settings later.");
-          }),
-        );
+        const r = await uploadLogoAction(fd);
+        if (!r.ok) setLogoWarning("Logo couldn't be saved — you can upload it in Settings later.");
       }
-
-      await Promise.all(tasks);
       onSuccess(companyId);
     });
   }
