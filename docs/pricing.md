@@ -1,9 +1,9 @@
 # OpsFluency — pricing & unit economics
 
-> Last updated: April 2026 — revised after real upload measurements on live `ai_call_log` data.
-> Two five-page PDF SOPs (Cold Storage Pro) through the full pipeline produced the ground-truth
-> numbers used throughout this doc. Architecture updated to reflect the Haiku+Sonnet two-call
-> split and prompt caching shipped in PR #135.
+> Last updated: April 2026 — revised to correct Haiku+Sonnet label (architecture is Sonnet+Sonnet;
+> Haiku was evaluated and rejected on quality grounds). Cache pricing split into write ($3.75/M)
+> and read ($0.30/M) to match `ai_call_log` tracking added in PR #220. Annual cost range
+> tightened to $10–40/tenant based on simulation against real org size profiles.
 >
 > **⚠ Pricing tier conflict:** this doc previously used $149 Starter / $349 Pro. PRD.md currently
 > shows $79 / $119 / $199 / $249. Reconcile these before any external pricing page is published —
@@ -23,8 +23,8 @@
   | Scale | 151–500 | $199 | $249 |
   | Enterprise | 500+ | Custom | Custom |
 
-- **Why flat:** AI cost is small enough to absorb (~$25–50/tenant/year for typical usage), and metering creates more friction than savings at MVP scale. Customers buy *outcomes* (worker safety, training velocity), not tokens.
-- **Rule of thumb: $0.04/page** (full pipeline: Haiku conversion + Sonnet flagging + Google translation, after PR #135). Previously $0.05/page on the single-Sonnet architecture.
+- **Why flat:** AI cost is small enough to absorb (~$10–40/tenant/year depending on org size and activity), and metering creates more friction than savings at MVP scale. Customers buy *outcomes* (worker safety, training velocity), not tokens.
+- **Rule of thumb: $0.05/page** (full pipeline: Sonnet conversion + Sonnet flagging + Google translation). Both calls use Sonnet — Haiku was evaluated for Call 1 and rejected on quality grounds.
 
 ---
 
@@ -45,11 +45,11 @@ Call 2's input is the compact Markdown (not the raw document), so the split is s
 
 ### Pricing used
 
-| Provider | Model | Input | Output | Cached input |
-|---|---|---|---|---|
-| Anthropic | claude-haiku-4-5-20251001 | $1.00 / M tokens | $5 / M tokens | $0.10 / M tokens |
-| Anthropic | claude-sonnet-4-6 | $3.00 / M tokens | $15 / M tokens | $0.30 / M tokens |
-| Google | Cloud Translation v2 | $20 / M **source characters** | $0 (source only) | — |
+| Provider | Model | Input | Output | Cache write | Cache read |
+|---|---|---|---|---|---|
+| Anthropic | claude-haiku-4-5-20251001 | $1.00 / M tokens | $5 / M tokens | $1.25 / M tokens | $0.10 / M tokens |
+| Anthropic | claude-sonnet-4-6 | $3.00 / M tokens | $15 / M tokens | $3.75 / M tokens | $0.30 / M tokens |
+| Google | Cloud Translation v2 | $20 / M **source characters** | $0 (source only) | — | — |
 
 ### Measured cost — 2 × five-page PDFs (Cold Storage Pro, live data)
 
@@ -59,12 +59,12 @@ Call 2's input is the compact Markdown (not the raw document), so the split is s
 | Google Translation | $0.3352 | **$0.168** |
 | **Total (old architecture)** | **$0.5523** | **$0.276** |
 
-Restated for the new two-call architecture (Haiku + Sonnet):
+Restated for the current two-call architecture (Sonnet + Sonnet):
 
 | Component | Estimated cost | Per SOP |
 |---|---|---|
-| Sonnet — Markdown conversion | ~$0.058 | $0.058 |
-| Sonnet — term flagging (Markdown input only) | ~$0.019 | $0.019 |
+| Sonnet — Markdown conversion (Call 1) | ~$0.058 | $0.058 |
+| Sonnet — term flagging, Markdown input only (Call 2) | ~$0.019 | $0.019 |
 | Google Translation | ~$0.168 | $0.168 |
 | **Total (current architecture)** | **~$0.245** | **~$0.245** |
 
@@ -75,7 +75,7 @@ Short SOPs (1–2 pages) run slightly higher per page because the system prompt 
 
 The critical finding: **Google Translation is 61% of total cost**, not Anthropic.
 
-- The Haiku+Sonnet split reduces the Anthropic component by ~69%.
+- The two-call split (raw doc → Markdown, then Markdown → flagged terms) reduces the Anthropic component vs a single combined call, because Call 2 takes compact Markdown as input rather than the full raw document.
 - It reduces *total* cost by ~27% — the remainder is Google, which is fixed per character and cannot be reduced without degrading translation quality.
 - Translation cost scales with SOP length, not SOP count. A 10-page SOP costs ~2× a 5-page SOP to translate.
 
@@ -92,7 +92,7 @@ The critical finding: **Google Translation is 61% of total cost**, not Anthropic
 
 ## Tenant cost projections
 
-Based on measured $0.04/page (new architecture) across a typical SOP library:
+Based on measured $0.05/page (Sonnet+Sonnet architecture) across a typical SOP library:
 
 | Stage | Volume | AI cost |
 |---|---|---|
@@ -213,7 +213,7 @@ Every SOP retains the original PDF + every `sop_versions` row. At 5MB average ×
 
 ### 5. Vercel function-seconds
 
-SOP conversions hold a serverless function open for up to 180s (the Haiku + Sonnet timeout). At 1,000 conversions/mo × 90s avg = 90,000 function-seconds, well inside Vercel Pro's included quota.
+SOP conversions hold a serverless function open for up to 180s (the hard timeout per call). Measured avg is ~70s on Sonnet. At 1,000 conversions/mo × 70s avg = 70,000 function-seconds, well inside Vercel Pro's included quota.
 
 ---
 
@@ -221,8 +221,8 @@ SOP conversions hold a serverless function open for up to 180s (the Haiku + Sonn
 
 | Lever | Savings | Quality risk | Status |
 |---|---|---|---|
-| **Haiku for Markdown conversion** (Call 1 of 2) | ~27% total cost reduction | Real — complex tables, implied warnings, scanned PDFs. Managers would need to proof conversion output. Not worth it for safety-critical documents. | ❌ **Evaluated and rejected** — quality floor > cost savings |
-| **Prompt caching** on system prompts | 10–20% on input tokens; up to 90% on repeat calls within a session | None | ✅ **Shipped** (PR #135) |
+| **Haiku for Markdown conversion** (Call 1 of 2) | ~27% total cost reduction | Real — complex tables, implied warnings, scanned PDFs. Managers would need to proof conversion output. Not worth it for safety-critical documents. | ❌ **Evaluated and rejected** — Sonnet used for both calls; quality floor > cost savings |
+| **Prompt caching** on system prompts | Cache reads at $0.30/M vs $3.00/M regular input (10× cheaper); meaningful savings when a manager uploads multiple SOPs in one session | None | ✅ **Shipped** (PR #135) — cache write/read tokens now tracked separately in `ai_call_log` |
 | **Pre-extract text from digital PDFs** — skip vision when PDF has a text layer | 5–10× cheaper Haiku input on text-layer PDFs (most Word→PDF exports) | Modest — loses some table/diagram fidelity. A/B on real SOPs first | Not started |
 | **Google Translation v3 + registered glossary** | Eliminates placeholder-substitution workaround; potentially better term consistency | Low | Not started — worth revisiting when glossary size grows |
 
