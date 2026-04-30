@@ -132,7 +132,8 @@ export function TermsGateClient({ sopId, flaggedTerms, existingGlossary }: Props
           </p>
           <p className="mt-1 text-xs text-dc-text-2">
             Translation is paused until each flagged term is resolved. New terms get saved to your
-            company glossary so future SOPs translate consistently.
+            company glossary so future SOPs translate consistently.{' '}
+            <strong className="text-dc-text">Spanish translations can be auto-translated later in the glossary.</strong>
             {conflictCount > 0 && (
               <>
                 {' '}
