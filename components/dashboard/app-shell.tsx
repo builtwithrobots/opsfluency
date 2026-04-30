@@ -2,7 +2,7 @@
 
 import { UserButton, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, CircleHelp, Eye, GripVertical, Smartphone } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronRight as ArrowRight, CircleHelp, Eye, GripVertical, Smartphone, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -32,6 +32,7 @@ import {
   navFooterSection,
   visibleSections,
   type NavItem,
+  type SetupPrompt,
   type Viewer,
 } from "./nav-config";
 
@@ -315,6 +316,47 @@ function StaticNavList({
   );
 }
 
+// ── Setup prompt pill ────────────────────────────────────────────────────────
+
+function SetupPromptPill({ prompt }: { prompt: SetupPrompt }) {
+  const { collapsed } = useSidebarCollapsed();
+
+  if (collapsed) {
+    return (
+      <div className="relative flex justify-center pb-1">
+        <Link
+          href={prompt.nextHref}
+          title={`${prompt.remaining} setup task${prompt.remaining === 1 ? "" : "s"} remaining — ${prompt.nextLabel}`}
+          className="relative flex size-9 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand) hover:bg-(--color-brand)/20 transition-colors"
+        >
+          <Zap className="size-4" strokeWidth={2} />
+          <span
+            aria-hidden
+            className="absolute right-1 top-1 size-2 rounded-full bg-(--color-brand)"
+          />
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-1">
+      <Link
+        href={prompt.nextHref}
+        className="flex items-center gap-2.5 rounded-lg border border-(--color-brand)/20 bg-(--color-brand)/8 px-3 py-2.5 text-(--color-brand) hover:bg-(--color-brand)/14 transition-colors group"
+      >
+        <Zap className="size-4 shrink-0" strokeWidth={2} />
+        <span className="flex-1 min-w-0 text-xs font-semibold leading-tight">
+          {prompt.remaining === 1
+            ? prompt.nextLabel
+            : `${prompt.remaining} setup tasks left`}
+        </span>
+        <ArrowRight className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+      </Link>
+    </div>
+  );
+}
+
 // ── Sidebar contents (needs to be a component to use context hooks) ──────────
 
 function SidebarContents({ viewer }: { viewer: Viewer }) {
@@ -342,6 +384,11 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
       </SidebarHeader>
 
       <SidebarBody>
+        {/* ── Setup prompt pill (above nav, hidden once all tasks done) ── */}
+        {viewer.kind === "member" && viewer.setupPrompt ? (
+          <SetupPromptPill prompt={viewer.setupPrompt} />
+        ) : null}
+
         {sections.map((section, sectionIndex) => (
           <SidebarSection key={section.heading ?? `section-${sectionIndex}`}>
             {section.heading && !collapsed ? (

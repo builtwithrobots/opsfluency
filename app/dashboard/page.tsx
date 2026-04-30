@@ -12,6 +12,7 @@ import { getRequestClient } from "@/lib/supabase/server";
 import { DashboardStatCard } from "@/components/dashboard/stat-card";
 import { StatGridSkeleton } from "@/components/dashboard/stat-grid-skeleton";
 import { EmptyActivityCard } from "@/components/dashboard/empty-activity-card";
+import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
 import { WelcomeBanner } from "@/components/dashboard/welcome-banner";
 
 interface DashboardPageProps {
@@ -156,6 +157,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </Suspense>
 
       <div className="border-t border-[color:var(--dc-edge)]" />
+
+      <OnboardingChecklist company_id={company_id} role={role} />
 
       <section className="flex flex-col gap-4">
         <div className="flex items-end justify-between">

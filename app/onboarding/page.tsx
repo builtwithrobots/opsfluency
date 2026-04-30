@@ -4,12 +4,11 @@ import { redirect } from "next/navigation";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
-import { OnboardingForm } from "./OnboardingForm";
+import { OnboardingWizard } from "./OnboardingWizard";
 
 export default async function OnboardingPage() {
   // Super admins don't belong in any company — bootstrapping one for
-  // them would create a shell tenant. Send them to the Platform surface
-  // inside the dashboard shell.
+  // them would create a shell tenant. Send them to the Platform surface.
   if (await isCurrentUserSuperAdmin()) redirect("/dashboard/platform");
 
   try {
@@ -36,23 +35,19 @@ export default async function OnboardingPage() {
         <UserButton />
       </header>
 
-      <main id="main" className="flex flex-1 items-center justify-center px-6 py-16">
-        <div className="flex w-full max-w-md flex-col gap-8">
-          <div className="flex flex-col gap-3 text-center">
-            <p className="text-xs font-medium tracking-[0.15em] text-(--color-brand) uppercase">
-              Step 1 of 1
-            </p>
+      <main id="main" className="flex flex-1 items-center justify-center px-6 py-12">
+        <div className="flex w-full max-w-lg flex-col gap-6">
+          <div className="flex flex-col gap-2 text-center">
             <h1 className="font-display text-3xl font-bold tracking-tight text-dc-text md:text-4xl">
-              Create your company
+              Set up your workspace
             </h1>
             <p className="text-dc-text-2">
-              This sets up your admin account, seeds the four default departments
-              (Safety, Equipment, Process, HR), and opens the manager dashboard.
+              Takes about 2 minutes. We&apos;ll create your company, configure
+              your departments, and help you invite your first teammate.
             </p>
           </div>
-          <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6 shadow-xs">
-            <OnboardingForm />
-          </div>
+
+          <OnboardingWizard />
         </div>
       </main>
     </div>
