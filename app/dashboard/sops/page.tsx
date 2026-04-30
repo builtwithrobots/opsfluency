@@ -266,23 +266,23 @@ function EmptyState({ filtered }: { filtered: boolean }) {
           </p>
           <div className="flex flex-wrap gap-3">
             <a
-              href="/examples/example-sop.docx"
+              href="/examples/example-sop-forklift.md"
               download
               className="flex items-center gap-2 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
             >
               <FileText className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-              <span>Example SOP</span>
-              <span className="rounded bg-dc-overlay px-1.5 py-0.5 text-xs font-medium text-dc-text-3">DOCX</span>
+              <span>Forklift Pre-Shift Inspection</span>
+              <span className="rounded bg-dc-overlay px-1.5 py-0.5 text-xs font-medium text-dc-text-3">MD</span>
               <Download className="size-3.5 shrink-0 text-dc-text-3" strokeWidth={2} aria-hidden />
             </a>
             <a
-              href="/examples/example-sop.pdf"
+              href="/examples/example-sop-chemical-handling.md"
               download
               className="flex items-center gap-2 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
             >
               <FileText className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-              <span>Example SOP</span>
-              <span className="rounded bg-dc-overlay px-1.5 py-0.5 text-xs font-medium text-dc-text-3">PDF</span>
+              <span>Chemical Handling and Storage</span>
+              <span className="rounded bg-dc-overlay px-1.5 py-0.5 text-xs font-medium text-dc-text-3">MD</span>
               <Download className="size-3.5 shrink-0 text-dc-text-3" strokeWidth={2} aria-hidden />
             </a>
           </div>
