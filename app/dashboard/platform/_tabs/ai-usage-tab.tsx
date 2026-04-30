@@ -3,8 +3,16 @@ import { Cpu, DollarSign, Languages, Timer } from "lucide-react";
 import { Heading } from "@/components/ui/heading";
 import { Text } from "@/components/ui/text";
 import { getAdminClient } from "@/lib/supabase/admin";
+import {
+  type PlanTier,
+  TIER_CONFIG,
+  TIER_BADGE_CLASSES,
+  aiCostThreshold,
+  impliedMargin,
+} from "@/lib/types/billing";
 
 import { TenantDeleteButton } from "./tenant-delete-button";
+import { TenantPlanSelect } from "./tenant-plan-select";
 
 type UnitKind = "token" | "character";
 
@@ -61,6 +69,7 @@ interface ModelRollup {
 interface TenantRollup {
   company_id: string;
   company_name: string | null;
+  plan_tier: PlanTier;
   calls: number;
   anthropic_cost: number;
   google_cost: number;
@@ -69,6 +78,9 @@ interface TenantRollup {
   output_tokens: number;
   input_chars: number;
   output_chars: number;
+  projected_monthly: number; // total_cost extrapolated to 30 days
+  prior_total_cost: number;  // spend in the equivalent prior window
+  trend_pct: number | null;  // (current - prior) / prior; null if no prior data
 }
 
 interface UsageData {
@@ -103,12 +115,31 @@ async function loadUsage(days: number): Promise<UsageData> {
   // ai_call_log is REVOKE'd from anon + authenticated. Service-role only.
   const admin = getAdminClient();
 
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const { data: calls, error } = await admin
-    .from("ai_call_log")
-    .select("model, input_units, output_units, cache_write_tokens, cache_read_tokens, unit_kind, duration_ms, company_id, created_at")
-    .gte("created_at", since);
+  const now = Date.now();
+  const since = new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
+  const priorSince = new Date(now - 2 * days * 24 * 60 * 60 * 1000).toISOString();
+
+  // Fetch current period and prior period in parallel.
+  const [{ data: calls, error }, { data: priorCalls }] = await Promise.all([
+    admin
+      .from("ai_call_log")
+      .select("model, input_units, output_units, cache_write_tokens, cache_read_tokens, unit_kind, duration_ms, company_id, created_at")
+      .gte("created_at", since),
+    admin
+      .from("ai_call_log")
+      .select("model, input_units, output_units, cache_write_tokens, cache_read_tokens, unit_kind, company_id")
+      .gte("created_at", priorSince)
+      .lt("created_at", since),
+  ]);
   if (error) throw error;
+
+  // Build prior-period cost per tenant for trend calculation.
+  const priorCostByCompany = new Map<string, number>();
+  for (const r of priorCalls ?? []) {
+    if (!r.company_id) continue;
+    const cost = estimateCost(r as AiCallRow);
+    priorCostByCompany.set(r.company_id, (priorCostByCompany.get(r.company_id) ?? 0) + cost);
+  }
 
   const rows: AiCallRow[] = calls ?? [];
 
@@ -157,6 +188,7 @@ async function loadUsage(days: number): Promise<UsageData> {
       const t = tenantMap.get(r.company_id) ?? {
         company_id: r.company_id,
         company_name: null,
+        plan_tier: "starter" as PlanTier, // replaced after company lookup
         calls: 0,
         anthropic_cost: 0,
         google_cost: 0,
@@ -165,6 +197,9 @@ async function loadUsage(days: number): Promise<UsageData> {
         output_tokens: 0,
         input_chars: 0,
         output_chars: 0,
+        projected_monthly: 0,
+        prior_total_cost: 0,
+        trend_pct: null,
       };
       t.calls += 1;
       if (r.unit_kind === "token") {
@@ -196,11 +231,24 @@ async function loadUsage(days: number): Promise<UsageData> {
   if (topTenantRollups.length) {
     const { data: companies } = await admin
       .from("companies")
-      .select("id, name")
+      .select("id, name, plan_tier")
       .in("id", topTenantRollups.map((t) => t.company_id));
     const nameById = new Map<string, string>();
-    for (const c of companies ?? []) nameById.set(c.id, c.name);
-    for (const t of topTenantRollups) t.company_name = nameById.get(t.company_id) ?? null;
+    const tierById = new Map<string, PlanTier>();
+    for (const c of companies ?? []) {
+      nameById.set(c.id, c.name);
+      // plan_tier may be absent on older DB snapshots before migration is applied.
+      tierById.set(c.id, ((c as { plan_tier?: string }).plan_tier as PlanTier | undefined) ?? "starter");
+    }
+    for (const t of topTenantRollups) {
+      t.company_name    = nameById.get(t.company_id) ?? null;
+      t.plan_tier       = tierById.get(t.company_id) ?? "starter";
+      t.prior_total_cost = priorCostByCompany.get(t.company_id) ?? 0;
+      t.projected_monthly = (t.total_cost / days) * 30;
+      t.trend_pct = t.prior_total_cost > 0
+        ? (t.total_cost - t.prior_total_cost) / t.prior_total_cost
+        : null;
+    }
   }
 
   return {
@@ -397,69 +445,174 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
         {!data.topTenants.length ? (
           <EmptyRow>No tenant-attributed calls recorded.</EmptyRow>
         ) : (
-          <div className="mt-2 overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
-            <table className="w-full text-sm">
-              <thead className="border-b border-[color:var(--dc-edge)] bg-dc-raised/50 text-left text-xs font-medium tracking-[0.08em] text-dc-text-3 uppercase">
-                <tr>
-                  <th className="px-4 py-2.5">Tenant</th>
-                  <th className="px-4 py-2.5 text-right">Calls</th>
-                  <th className="px-4 py-2.5 text-right">Anthropic</th>
-                  <th className="px-4 py-2.5 text-right">Google</th>
-                  <th className="px-4 py-2.5 text-right">Total</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[color:var(--dc-edge)]">
-                {data.topTenants.map((t) => (
-                  <tr key={t.company_id}>
-                    <td className="px-4 py-2.5">
-                      {t.company_name ? (
-                        <span className="text-dc-text">{t.company_name}</span>
-                      ) : (
-                        <span className="italic text-dc-text-3">deleted tenant</span>
-                      )}
-                      <span className="ml-2 font-mono text-xs text-dc-text-3">
-                        {t.company_id.slice(0, 8)}…
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      {t.calls.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      {t.anthropic_cost > 0 ? (
-                        <div>
-                          <div className="font-medium text-dc-text-2">{fmtUsd(t.anthropic_cost)}</div>
-                          <div className="mt-0.5 text-[10px] text-dc-text-3 tabular-nums">
-                            {fmtUnits(t.input_tokens)} in · {fmtUnits(t.output_tokens)} out
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-dc-text-3">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      {t.google_cost > 0 ? (
-                        <div>
-                          <div className="font-medium text-dc-text-2">{fmtUsd(t.google_cost)}</div>
-                          <div className="mt-0.5 text-[10px] text-dc-text-3 tabular-nums">
-                            {fmtUnits(t.input_chars)} in · {fmtUnits(t.output_chars)} out
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-dc-text-3">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">
-                      {fmtUsd(t.total_cost)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <TenantDeleteButton companyId={t.company_id} />
-                    </td>
+          <>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
+              <table className="w-full text-sm">
+                <thead className="border-b border-[color:var(--dc-edge)] bg-dc-raised/50 text-left text-xs font-medium tracking-[0.08em] text-dc-text-3 uppercase">
+                  <tr>
+                    <th className="px-4 py-2.5">Tenant</th>
+                    <th className="px-4 py-2.5 text-right">Calls</th>
+                    <th className="px-4 py-2.5 text-right">Anthropic</th>
+                    <th className="px-4 py-2.5 text-right">Google</th>
+                    <th className="px-4 py-2.5 text-right">Proj.&nbsp;/&nbsp;Month</th>
+                    <th className="px-4 py-2.5">vs Cap</th>
+                    <th className="px-4 py-2.5 text-right">Margin</th>
+                    <th className="px-4 py-2.5 text-right">Plan</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[color:var(--dc-edge)]">
+                  {data.topTenants.map((t) => {
+                    const threshold = aiCostThreshold(t.plan_tier);
+                    const capPct = threshold !== null ? Math.min(t.projected_monthly / threshold, 1) : null;
+                    const margin = impliedMargin(t.plan_tier, t.projected_monthly);
+                    const marginPct = margin !== null ? Math.round(margin * 100) : null;
+                    const capBarColor =
+                      capPct === null ? ""
+                      : capPct >= 0.8 ? "bg-red-500"
+                      : capPct >= 0.5 ? "bg-amber-500"
+                      : "bg-emerald-500";
+                    const marginColor =
+                      marginPct === null ? "text-dc-text-3"
+                      : marginPct >= 90 ? "text-emerald-400"
+                      : marginPct >= 80 ? "text-amber-400"
+                      : "text-red-400";
+
+                    return (
+                      <tr key={t.company_id}>
+                        {/* Tenant */}
+                        <td className="px-4 py-3">
+                          <div>
+                            {t.company_name ? (
+                              <span className="font-medium text-dc-text">{t.company_name}</span>
+                            ) : (
+                              <span className="italic text-dc-text-3">deleted tenant</span>
+                            )}
+                            <span className="ml-2 font-mono text-xs text-dc-text-3">
+                              {t.company_id.slice(0, 8)}…
+                            </span>
+                          </div>
+                          <span
+                            className={[
+                              "mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium",
+                              TIER_BADGE_CLASSES[t.plan_tier],
+                            ].join(" ")}
+                          >
+                            {TIER_CONFIG[t.plan_tier].label}
+                          </span>
+                        </td>
+
+                        {/* Calls */}
+                        <td className="px-4 py-3 text-right tabular-nums text-dc-text-2">
+                          {t.calls.toLocaleString()}
+                        </td>
+
+                        {/* Anthropic */}
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {t.anthropic_cost > 0 ? (
+                            <div>
+                              <div className="font-medium text-dc-text-2">{fmtUsd(t.anthropic_cost)}</div>
+                              <div className="mt-0.5 text-[10px] text-dc-text-3">
+                                {fmtUnits(t.input_tokens)} in · {fmtUnits(t.output_tokens)} out
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-dc-text-3">—</span>
+                          )}
+                        </td>
+
+                        {/* Google */}
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {t.google_cost > 0 ? (
+                            <div>
+                              <div className="font-medium text-dc-text-2">{fmtUsd(t.google_cost)}</div>
+                              <div className="mt-0.5 text-[10px] text-dc-text-3">
+                                {fmtUnits(t.input_chars)} in · {fmtUnits(t.output_chars)} out
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-dc-text-3">—</span>
+                          )}
+                        </td>
+
+                        {/* Proj. / Month */}
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          <div className="font-semibold text-dc-text">{fmtUsd(t.projected_monthly)}</div>
+                          <div className="mt-0.5 text-[10px] text-dc-text-3">
+                            {days}d actual: {fmtUsd(t.total_cost)}
+                          </div>
+                          {t.trend_pct !== null && (
+                            <div
+                              className={[
+                                "mt-0.5 text-[10px] tabular-nums",
+                                t.trend_pct > 0.05 ? "text-red-400"
+                                : t.trend_pct < -0.05 ? "text-emerald-400"
+                                : "text-dc-text-3",
+                              ].join(" ")}
+                            >
+                              {t.trend_pct > 0 ? "▲" : "▼"}{" "}
+                              {Math.abs(Math.round(t.trend_pct * 100))}% vs prior {days}d
+                            </div>
+                          )}
+                        </td>
+
+                        {/* vs Cap */}
+                        <td className="px-4 py-3 min-w-[140px]">
+                          {capPct !== null && threshold !== null ? (
+                            <div>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-dc-overlay">
+                                <div
+                                  className={["h-full rounded-full transition-all", capBarColor].join(" ")}
+                                  style={{ width: `${capPct * 100}%` }}
+                                />
+                              </div>
+                              <div className="mt-1 text-[10px] tabular-nums text-dc-text-3">
+                                {fmtUsd(t.projected_monthly)} of {fmtUsd(threshold)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-dc-text-3">—</span>
+                          )}
+                        </td>
+
+                        {/* Margin */}
+                        <td className="px-4 py-3 text-right">
+                          {marginPct !== null ? (
+                            <span className={["font-semibold tabular-nums", marginColor].join(" ")}>
+                              {marginPct}%
+                            </span>
+                          ) : (
+                            <span className="text-xs text-dc-text-3">—</span>
+                          )}
+                        </td>
+
+                        {/* Plan selector */}
+                        <td className="px-4 py-3 text-right">
+                          <TenantPlanSelect
+                            companyId={t.company_id}
+                            currentTier={t.plan_tier}
+                          />
+                        </td>
+
+                        {/* Delete */}
+                        <td className="px-4 py-3 text-right">
+                          <TenantDeleteButton companyId={t.company_id} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Legend */}
+            <p className="mt-2 text-[11px] text-dc-text-3">
+              <strong className="text-dc-text-2">Cap</strong> = AI spend concern threshold (20% of monthly plan price).{" "}
+              <strong className="text-dc-text-2">Margin</strong> = est. gross margin after AI + Stripe 3% + Vercel + Supabase fixed COGS.{" "}
+              <strong className="text-dc-text-2">Proj.&nbsp;/&nbsp;Month</strong> = {days}d spend extrapolated to 30 days.
+              Trend compares to the prior {days}-day window.
+            </p>
+          </>
         )}
       </div>
     </section>
