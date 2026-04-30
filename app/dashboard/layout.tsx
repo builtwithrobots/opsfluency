@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { AuthBridgeError } from "@/components/dashboard/auth-bridge-error";
 import { ImpersonationBanner } from "@/components/dashboard/impersonation-banner";
-import type { Viewer } from "@/components/dashboard/nav-config";
+import type { SetupPrompt, Viewer } from "@/components/dashboard/nav-config";
 import { AuthError, getCompanyContext } from "@/lib/auth/company-context";
 import { isCurrentUserSuperAdmin } from "@/lib/auth/super-admin-context";
 
@@ -52,13 +52,38 @@ async function resolveViewer(): Promise<ResolveResult> {
     // full member sidebar AND the Platform section for them.
     const isSuperAdmin = await isCurrentUserSuperAdmin();
 
-    const { data: company } = await ctx.supabase
-      .from("companies")
-      .select("name")
-      .eq("id", ctx.company_id)
-      .single();
+    const [{ data: company }, sopResult, memberResult] = await Promise.all([
+      ctx.supabase.from("companies").select("name").eq("id", ctx.company_id).single(),
+      // For setup prompt: has the company published at least one SOP?
+      ctx.supabase
+        .from("sops")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", ctx.company_id),
+      // For setup prompt: has anyone else joined (more than just the owner)?
+      ctx.supabase
+        .from("company_members")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", ctx.company_id),
+    ]);
 
     const companyName = company?.name ?? "Workspace";
+    const sopCount = sopResult.count ?? 0;
+    const memberCount = memberResult.count ?? 0;
+
+    // Compute setup prompt for admin/manager roles — employees skip it.
+    let setupPrompt: SetupPrompt | undefined;
+    if (ctx.role !== "employee") {
+      const hasSop = sopCount > 0;
+      const hasTeammate = memberCount > 1;
+      const remaining = (hasSop ? 0 : 1) + (hasTeammate ? 0 : 1);
+
+      if (remaining > 0) {
+        // The "next" task is the first incomplete one in priority order.
+        const nextLabel = !hasSop ? "Import your first SOP" : "Invite a teammate";
+        const nextHref = !hasSop ? "/dashboard/sops" : "/dashboard/org-settings?tab=team";
+        setupPrompt = { remaining, nextLabel, nextHref };
+      }
+    }
 
     return {
       kind: "viewer",
@@ -68,6 +93,7 @@ async function resolveViewer(): Promise<ResolveResult> {
           role: ctx.role,
           companyName,
           isSuperAdmin: isSuperAdmin || undefined,
+          setupPrompt,
         },
         impersonatingCompanyName: ctx.impersonating ? companyName : undefined,
       },

@@ -26,8 +26,17 @@ import type { Role } from "@/lib/auth/company-context";
  * viewer with `isSuperAdmin: true`, which unlocks Platform items on
  * top of their normal role-based nav.
  */
+export interface SetupPrompt {
+  /** Remaining incomplete setup tasks count. */
+  remaining: number;
+  /** Label for the next actionable task. */
+  nextLabel: string;
+  /** URL to navigate to for the next task. */
+  nextHref: string;
+}
+
 export type Viewer =
-  | { kind: "member"; role: Role; companyName: string; isSuperAdmin?: boolean }
+  | { kind: "member"; role: Role; companyName: string; isSuperAdmin?: boolean; setupPrompt?: SetupPrompt }
   | { kind: "superAdmin" };
 
 export interface NavItem {
