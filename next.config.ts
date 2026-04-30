@@ -46,7 +46,12 @@ const securityHeaders = [
     //     object-src can stay 'none').
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev blob:",
+      // unsafe-inline + unsafe-eval required by Clerk's hosted auth components.
+      // challenges.cloudflare.com is required for Clerk's Cloudflare Turnstile CAPTCHA.
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com blob:",
+      // script-src-elem must be set explicitly; without it some Chromium versions
+      // refuse to load inline/external scripts even when script-src allows them.
+      "script-src-elem 'self' 'unsafe-inline' https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com blob:",
       // Clerk creates service workers from blob: URLs. worker-src must be
       // explicit because it falls back to script-src when absent, and
       // script-src alone doesn't grant blob: worker execution.
@@ -54,8 +59,11 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.supabase.co https://img.clerk.com https://i.ytimg.com https://vumbnail.com https://*.loom.com",
       "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://api.clerk.com https://api.anthropic.com",
-      "frame-src 'self' https://*.supabase.co https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com https://drive.google.com https://*.sharepoint.com https://onedrive.live.com https://web.microsoftstream.com",
+      // challenges.cloudflare.com: Turnstile CAPTCHA makes XHR calls back to Cloudflare.
+      // clerk-telemetry.com: Clerk SDK telemetry endpoint.
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.opsfluency.com https://clerk.accounts.dev https://*.clerk.accounts.dev https://api.clerk.com https://api.anthropic.com https://challenges.cloudflare.com https://clerk-telemetry.com",
+      // challenges.cloudflare.com: Turnstile renders the CAPTCHA widget inside a sandboxed iframe.
+      "frame-src 'self' https://challenges.cloudflare.com https://*.supabase.co https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://player.vimeo.com https://drive.google.com https://*.sharepoint.com https://onedrive.live.com https://web.microsoftstream.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
