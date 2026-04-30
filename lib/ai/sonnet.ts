@@ -174,6 +174,8 @@ export async function callSonnet<T>(
           model: modelToUse,
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
+          cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+          cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
           durationMs: Date.now() - start,
         });
         return {
@@ -199,6 +201,8 @@ export async function callSonnet<T>(
           model: modelToUse,
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
+          cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+          cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
           durationMs: Date.now() - start,
         });
         return {
@@ -219,6 +223,8 @@ export async function callSonnet<T>(
         model: modelToUse,
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
         durationMs: Date.now() - start,
       });
 
@@ -234,6 +240,17 @@ export async function callSonnet<T>(
       lastError = err;
 
       if (controller.signal.aborted && !input.signal?.aborted) {
+        // No response.usage available — log zeros so the call count in the
+        // console stays accurate even though the cost will be understated.
+        await logCall({
+          ctx,
+          model: modelToUse,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheWriteTokens: 0,
+          cacheReadTokens: 0,
+          durationMs: Date.now() - start,
+        });
         return {
           ok: false,
           error: {
@@ -332,6 +349,8 @@ interface LogCallInput {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
   durationMs: number;
 }
 
@@ -346,6 +365,8 @@ async function logCall({
   model,
   inputTokens,
   outputTokens,
+  cacheWriteTokens,
+  cacheReadTokens,
   durationMs,
 }: LogCallInput): Promise<void> {
   try {
@@ -354,6 +375,8 @@ async function logCall({
       model,
       input_units: inputTokens,
       output_units: outputTokens,
+      cache_write_tokens: cacheWriteTokens,
+      cache_read_tokens: cacheReadTokens,
       unit_kind: "token",
       sop_id: ctx.sopId,
       company_id: ctx.companyId,
