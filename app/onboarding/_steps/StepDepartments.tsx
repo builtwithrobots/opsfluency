@@ -108,8 +108,9 @@ export function StepDepartments({ onContinue }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <p className="text-sm text-dc-text-2">
-        These departments were created automatically. Rename them or change their
-        colors to match your facility. You can add more in Settings later.
+        We&apos;ve created five default departments for your facility. Rename
+        them or change their colors to match your org. You can add more in
+        Settings later.
       </p>
 
       <ul className="flex flex-col gap-3">

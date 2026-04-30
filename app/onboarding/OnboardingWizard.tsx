@@ -10,7 +10,7 @@ import { StepInvite } from "./_steps/StepInvite";
 
 const STEPS = [
   { label: "Company",     description: "Name, phone & logo" },
-  { label: "Departments", description: "Customize your 4 defaults" },
+  { label: "Departments", description: "Customize your 5 defaults" },
   { label: "Invite",      description: "Add your first teammate" },
 ] as const;
 

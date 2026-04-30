@@ -440,16 +440,17 @@ All templates: minimum 16px body text, high contrast, WCAG 2.1 AA compliant.
 
 ## Departments (Default on Account Creation)
 
-When a new org is created, seed these four departments automatically:
+When a new org is created, seed these five departments automatically (alphabetical order):
 
-- Safety
-- Equipment
-- Process
 - HR
+- Manufacturing
+- Quality Control
+- Safety
+- Warehouse
 
 HR department has additional features beyond standard departments (contacts, chat). All other departments are view-only for employees.
 
-**How seeding runs.** In the Server Action that creates a new `companies` row (fired on first sign-up of an admin). **Not** a Postgres trigger — the Server Action is visible in code, testable, and runs inside the same transaction as the `company_members` insert. The four departments are inserted with `company_id` set to the new company's id, and the seed is idempotent (safe to re-run against an existing company via `ON CONFLICT DO NOTHING`).
+**How seeding runs.** In the Server Action that creates a new `companies` row (fired on first sign-up of an admin). **Not** a Postgres trigger — the Server Action is visible in code, testable, and runs inside the same transaction as the `company_members` insert. The five departments are inserted with `company_id` set to the new company's id, and the seed is idempotent (safe to re-run against an existing company via `ON CONFLICT DO NOTHING`).
 
 ---
 

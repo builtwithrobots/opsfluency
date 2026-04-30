@@ -54,8 +54,8 @@ export function WelcomeBanner({ companyName }: WelcomeBannerProps) {
                 {companyName} is ready.
               </h2>
               <p className="mt-0.5 text-sm text-dc-text-2">
-                Your admin account is live and four default departments (Safety, Equipment, Process, HR)
-                are configured. Import your first SOP to go live.
+                Your admin account is live and five default departments (HR, Manufacturing, Quality
+                Control, Safety, Warehouse) are configured. Import your first SOP to go live.
               </p>
             </div>
             <button
