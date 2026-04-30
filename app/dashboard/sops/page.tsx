@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, Download, FileText, Search, Upload } from 'lucide-react';
+import { AlertCircle, ChevronDown, Download, Search, Upload } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
@@ -143,6 +143,25 @@ export default async function SopsPage({ searchParams }: PageProps) {
             Upload, review, translate, and publish bilingual procedures. Each published SOP gets a
             permanent QR code your workers can scan.
           </Text>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-dc-text-3">Sample SOPs:</span>
+            <a
+              href="/examples/example-sop-forklift.md"
+              download
+              className="flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 py-1 text-xs text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
+            >
+              <Download className="size-3 shrink-0" strokeWidth={2} aria-hidden />
+              Forklift Pre-Shift Inspection
+            </a>
+            <a
+              href="/examples/example-sop-chemical-handling.md"
+              download
+              className="flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 py-1 text-xs text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
+            >
+              <Download className="size-3 shrink-0" strokeWidth={2} aria-hidden />
+              Chemical Handling and Storage
+            </a>
+          </div>
         </div>
         <UploadSopClient
           departments={(departments ?? []) as { id: string; name: string }[]}
@@ -242,50 +261,19 @@ function EmptyState({ filtered }: { filtered: boolean }) {
         aria-hidden
         className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-(--color-brand) opacity-10 blur-3xl"
       />
-      <div className="relative flex flex-col gap-6">
-        <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-          <span
-            aria-hidden
-            className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-(--color-brand)/10 text-(--color-brand)"
-          >
-            <Upload className="size-7" strokeWidth={1.5} />
-          </span>
-          <div>
-            <h3 className="text-xl font-semibold text-dc-text">Upload your first SOP</h3>
-            <p className="mt-1 max-w-md text-dc-text-2">
-              Drop a PDF, photo, or text file. Claude reads it, builds clean Markdown, flags
-              site-specific terms, and translates to Spanish — all in one pass.
-            </p>
-          </div>
-        </div>
-
-        {/* Example SOP downloads */}
-        <div className="flex flex-col gap-2 border-t border-[color:var(--dc-edge)] pt-5">
-          <p className="text-xs font-medium uppercase tracking-wide text-dc-text-3">
-            Not sure where to start? Download an example SOP
+      <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+        <span
+          aria-hidden
+          className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-(--color-brand)/10 text-(--color-brand)"
+        >
+          <Upload className="size-7" strokeWidth={1.5} />
+        </span>
+        <div>
+          <h3 className="text-xl font-semibold text-dc-text">Upload your first SOP</h3>
+          <p className="mt-1 max-w-md text-dc-text-2">
+            Drop a PDF, photo, or text file. Claude reads it, builds clean Markdown, flags
+            site-specific terms, and translates to Spanish — all in one pass.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="/examples/example-sop-forklift.md"
-              download
-              className="flex items-center gap-2 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
-            >
-              <FileText className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-              <span>Forklift Pre-Shift Inspection</span>
-              <span className="rounded bg-dc-overlay px-1.5 py-0.5 text-xs font-medium text-dc-text-3">MD</span>
-              <Download className="size-3.5 shrink-0 text-dc-text-3" strokeWidth={2} aria-hidden />
-            </a>
-            <a
-              href="/examples/example-sop-chemical-handling.md"
-              download
-              className="flex items-center gap-2 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
-            >
-              <FileText className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-              <span>Chemical Handling and Storage</span>
-              <span className="rounded bg-dc-overlay px-1.5 py-0.5 text-xs font-medium text-dc-text-3">MD</span>
-              <Download className="size-3.5 shrink-0 text-dc-text-3" strokeWidth={2} aria-hidden />
-            </a>
-          </div>
         </div>
       </div>
     </div>
