@@ -22,7 +22,7 @@ export async function OnboardingChecklist({ company_id, role }: Props) {
 
   const supabase = await getRequestClient();
 
-  const [sopResult, memberResult] = await Promise.all([
+  const [sopResult, memberResult, companyResult] = await Promise.all([
     supabase
       .from("sops")
       .select("id", { count: "exact", head: true })
@@ -31,18 +31,25 @@ export async function OnboardingChecklist({ company_id, role }: Props) {
       .from("company_members")
       .select("id", { count: "exact", head: true })
       .eq("company_id", company_id),
+    supabase
+      .from("companies")
+      .select("logo_url, address_line1")
+      .eq("id", company_id)
+      .single(),
   ]);
 
   const hasSop = (sopResult.count ?? 0) > 0;
   const hasTeammate = (memberResult.count ?? 0) > 1;
+  const company = companyResult.data;
+  const isCompanyComplete = Boolean(company?.logo_url && company?.address_line1);
 
   const items: ChecklistItem[] = [
     {
       id: "company",
-      label: "Set up your company",
-      done: true,
-      href: "/dashboard/org-settings",
-      actionLabel: "View settings",
+      label: "Complete your company profile",
+      done: isCompanyComplete,
+      href: "/dashboard/org-settings?tab=general",
+      actionLabel: "Complete profile",
     },
     {
       id: "sop",

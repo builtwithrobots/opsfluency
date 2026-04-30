@@ -7,6 +7,7 @@ import { useFormStatus } from "react-dom";
 import {
   createCompanyWizardAction,
   type CreateCompanyWizardState,
+  updateCompanyAddressAction,
   uploadLogoAction,
 } from "@/app/onboarding/_actions/wizard-actions";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ export function StepCompany({ onSuccess }: Props) {
   const [logoWarning, setLogoWarning] = useState<string | null>(null);
   const [isUploading, startUploadTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const nameError = state.status === "error" ? state.fieldErrors?.name?.[0] : undefined;
   const phoneError = state.status === "error" ? state.fieldErrors?.phone?.[0] : undefined;
@@ -57,30 +59,40 @@ export function StepCompany({ onSuccess }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  // After the create action succeeds, upload logo (non-fatal) then advance.
+  // After company creation succeeds, upload logo + save address (both non-fatal) then advance.
   async function handleSuccess(companyId: string) {
-    if (logoFile) {
-      startUploadTransition(async () => {
+    startUploadTransition(async () => {
+      const addressFd = new FormData();
+      if (formRef.current) {
+        for (const field of ["address_line1", "address_line2", "city", "state", "zip"]) {
+          const el = formRef.current.elements.namedItem(field) as HTMLInputElement | null;
+          if (el?.value) addressFd.append(field, el.value);
+        }
+      }
+
+      const tasks: Promise<unknown>[] = [updateCompanyAddressAction(addressFd)];
+
+      if (logoFile) {
         const fd = new FormData();
         fd.append("file", logoFile);
-        const result = await uploadLogoAction(fd);
-        if (!result.ok) {
-          setLogoWarning("Logo couldn't be saved — you can upload it in Settings later.");
-        }
-        onSuccess(companyId);
-      });
-    } else {
+        tasks.push(
+          uploadLogoAction(fd).then((r) => {
+            if (!r.ok) setLogoWarning("Logo couldn't be saved — you can upload it in Settings later.");
+          }),
+        );
+      }
+
+      await Promise.all(tasks);
       onSuccess(companyId);
-    }
+    });
   }
 
-  // Wire action result back to our handler
   if (state.status === "success") {
     void handleSuccess(state.company_id);
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form ref={formRef} action={formAction} className="flex flex-col gap-6" noValidate>
       {topError ? (
         <div
           role="alert"
@@ -129,6 +141,76 @@ export function StepCompany({ onSuccess }: Props) {
           <Description>Shown in QR print headers. Change anytime in Settings.</Description>
         )}
       </Field>
+
+      {/* ── Address (optional) ── */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-dc-text">
+            Company address <span className="font-normal text-dc-text-3">(optional)</span>
+          </span>
+          <span className="text-xs text-dc-text-3">Complete in Settings later</span>
+        </div>
+
+        <Field>
+          <Label htmlFor="address_line1" className="sr-only">Street address</Label>
+          <Input
+            id="address_line1"
+            name="address_line1"
+            type="text"
+            maxLength={200}
+            autoComplete="address-line1"
+            placeholder="Street address"
+          />
+        </Field>
+
+        <Field>
+          <Label htmlFor="address_line2" className="sr-only">Suite / unit (optional)</Label>
+          <Input
+            id="address_line2"
+            name="address_line2"
+            type="text"
+            maxLength={200}
+            autoComplete="address-line2"
+            placeholder="Suite / unit (optional)"
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Field className="col-span-2 sm:col-span-1">
+            <Label htmlFor="city" className="sr-only">City</Label>
+            <Input
+              id="city"
+              name="city"
+              type="text"
+              maxLength={100}
+              autoComplete="address-level2"
+              placeholder="City"
+            />
+          </Field>
+          <Field>
+            <Label htmlFor="state" className="sr-only">State</Label>
+            <Input
+              id="state"
+              name="state"
+              type="text"
+              maxLength={100}
+              autoComplete="address-level1"
+              placeholder="State"
+            />
+          </Field>
+          <Field>
+            <Label htmlFor="zip" className="sr-only">ZIP code</Label>
+            <Input
+              id="zip"
+              name="zip"
+              type="text"
+              maxLength={20}
+              autoComplete="postal-code"
+              placeholder="ZIP"
+            />
+          </Field>
+        </div>
+      </div>
 
       {/* ── Logo upload ── */}
       <div className="flex flex-col gap-2">

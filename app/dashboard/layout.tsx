@@ -53,8 +53,12 @@ async function resolveViewer(): Promise<ResolveResult> {
     const isSuperAdmin = await isCurrentUserSuperAdmin();
 
     const [{ data: company }, sopResult, memberResult] = await Promise.all([
-      ctx.supabase.from("companies").select("name").eq("id", ctx.company_id).single(),
-      // For setup prompt: has the company published at least one SOP?
+      ctx.supabase
+        .from("companies")
+        .select("name, logo_url, address_line1")
+        .eq("id", ctx.company_id)
+        .single(),
+      // For setup prompt: has the company imported at least one SOP?
       ctx.supabase
         .from("sops")
         .select("id", { count: "exact", head: true })
@@ -73,14 +77,27 @@ async function resolveViewer(): Promise<ResolveResult> {
     // Compute setup prompt for admin/manager roles — employees skip it.
     let setupPrompt: SetupPrompt | undefined;
     if (ctx.role !== "employee") {
+      const isProfileComplete = Boolean(company?.logo_url && company?.address_line1);
       const hasSop = sopCount > 0;
       const hasTeammate = memberCount > 1;
-      const remaining = (hasSop ? 0 : 1) + (hasTeammate ? 0 : 1);
+      const remaining =
+        (isProfileComplete ? 0 : 1) + (hasSop ? 0 : 1) + (hasTeammate ? 0 : 1);
 
       if (remaining > 0) {
-        // The "next" task is the first incomplete one in priority order.
-        const nextLabel = !hasSop ? "Import your first SOP" : "Invite a teammate";
-        const nextHref = !hasSop ? "/dashboard/sops" : "/dashboard/org-settings?tab=team";
+        // The "next" task is the first incomplete one in priority order:
+        // 1. Complete company profile, 2. Import first SOP, 3. Invite a teammate.
+        let nextLabel: string;
+        let nextHref: string;
+        if (!isProfileComplete) {
+          nextLabel = "Complete company profile";
+          nextHref = "/dashboard/org-settings?tab=general";
+        } else if (!hasSop) {
+          nextLabel = "Import your first SOP";
+          nextHref = "/dashboard/sops";
+        } else {
+          nextLabel = "Invite a teammate";
+          nextHref = "/dashboard/org-settings?tab=team";
+        }
         setupPrompt = { remaining, nextLabel, nextHref };
       }
     }
