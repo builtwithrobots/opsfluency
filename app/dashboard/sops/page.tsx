@@ -146,20 +146,20 @@ export default async function SopsPage({ searchParams }: PageProps) {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-dc-text-3">Sample SOPs:</span>
             <a
-              href="/examples/example-sop-forklift.md"
+              href="/examples/example-sop.docx"
               download
               className="flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 py-1 text-xs text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
             >
               <Download className="size-3 shrink-0" strokeWidth={2} aria-hidden />
-              Forklift Pre-Shift Inspection
+              Example SOP (DOCX)
             </a>
             <a
-              href="/examples/example-sop-chemical-handling.md"
+              href="/examples/example-sop.pdf"
               download
               className="flex items-center gap-1.5 rounded-md border border-[color:var(--dc-edge)] bg-dc-raised px-2.5 py-1 text-xs text-dc-text-2 transition-colors hover:border-(--color-brand)/40 hover:text-(--color-brand)"
             >
               <Download className="size-3 shrink-0" strokeWidth={2} aria-hidden />
-              Chemical Handling and Storage
+              Example SOP (PDF)
             </a>
           </div>
         </div>
