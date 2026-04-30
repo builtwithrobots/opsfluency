@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
-import { ArrowRight, BookOpen, Lock } from 'lucide-react';
+import { ArrowRight, BookOpen, Lock, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { FlaggedTerm } from '@/lib/ai/sop-conversion';
@@ -67,6 +67,7 @@ export function TermsGateClient({ sopId, flaggedTerms, existingGlossary }: Props
   );
 
   const conflictCount = terms.filter((t) => !!t.existing).length;
+  const skippedCount = terms.filter((t) => t.resolution === 'skip').length;
   const hasUnresolvedConflicts = false; // conflicts always have a default resolution; kept for future custom states.
 
   function patch(idx: number, patchObj: Partial<DraftRow>) {
@@ -123,6 +124,11 @@ export function TermsGateClient({ sopId, flaggedTerms, existingGlossary }: Props
         <div className="flex-1">
           <p className="text-sm font-semibold text-dc-text">
             {terms.length} site-specific term{terms.length === 1 ? '' : 's'} to review
+            {skippedCount > 0 && (
+              <span className="ml-2 text-xs font-normal text-dc-text-3">
+                · {skippedCount} will be skipped
+              </span>
+            )}
           </p>
           <p className="mt-1 text-xs text-dc-text-2">
             Translation is paused until each flagged term is resolved. New terms get saved to your
@@ -184,6 +190,8 @@ export function TermsGateClient({ sopId, flaggedTerms, existingGlossary }: Props
               row={row}
               meta={meta}
               onPatch={(p) => patch(i, p)}
+              onDismiss={() => patch(i, { resolution: 'skip' })}
+              onUndo={() => patch(i, { resolution: row.existing ? 'use_existing' : 'use_new' })}
             />
           );
         })}
@@ -211,21 +219,50 @@ interface TermRowProps {
   row: DraftRow;
   meta?: FlaggedTerm;
   onPatch: (p: Partial<DraftRow>) => void;
+  onDismiss: () => void;
+  onUndo: () => void;
 }
 
-function TermRow({ row, meta, onPatch }: TermRowProps) {
+function TermRow({ row, meta, onPatch, onDismiss, onUndo }: TermRowProps) {
   const conflict = !!row.existing;
   const editable = row.resolution === 'use_new';
+  const skipped = row.resolution === 'skip' && !conflict;
+
+  // Compact dismissed state for non-conflict terms the manager doesn't want.
+  if (skipped) {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-[color:var(--dc-edge)] bg-dc-surface px-4 py-2.5 opacity-60">
+        <span className="text-sm text-dc-text-2 line-through">{row.term_en}</span>
+        <button
+          type="button"
+          onClick={onUndo}
+          className="ml-4 shrink-0 text-xs text-(--color-brand) hover:underline"
+        >
+          Undo
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className={
-      'rounded-lg border bg-dc-surface p-4 ' +
+      'relative rounded-lg border bg-dc-surface p-4 ' +
       (conflict
         ? 'border-(--color-signal-info)/40 ring-1 ring-(--color-signal-info)/15'
         : 'border-[color:var(--dc-edge)]')
     }>
+      {/* Dismiss button — skip this term entirely */}
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label={`Skip term: ${row.term_en}`}
+        className="absolute top-3 right-3 rounded p-0.5 text-dc-text-3 hover:text-dc-text hover:bg-dc-raised transition-colors"
+      >
+        <X className="size-4" strokeWidth={2} aria-hidden />
+      </button>
+
       {meta?.reason && (
-        <p className="mb-3 text-xs text-dc-text-3">
+        <p className="mb-3 pr-6 text-xs text-dc-text-3">
           <span className="font-medium text-dc-text-2">Flagged because:</span> {meta.reason}
         </p>
       )}
@@ -278,12 +315,6 @@ function TermRow({ row, meta, onPatch }: TermRowProps) {
             />
           </div>
         </div>
-      )}
-
-      {!conflict && !editable && (
-        // Should never happen for non-conflicts (their default resolution
-        // is use_new). Render-time fallback so the row isn't ghostly empty.
-        <p className="mt-2 text-xs text-dc-text-3">This term will be skipped.</p>
       )}
     </div>
   );
