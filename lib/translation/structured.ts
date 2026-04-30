@@ -42,6 +42,8 @@ import { GOOGLE_TRANSLATE_MODEL } from './google';
 const TRANSLATE_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 1;
+// Google Translate v2 rejects requests with more than 128 segments.
+const SEGMENT_BATCH_SIZE = 128;
 
 export type TranslationErrorCode =
   | 'TRANSLATION_TIMEOUT'
@@ -262,6 +264,94 @@ async function logTranslateCall({
   }
 }
 
+// ── Batching helpers ───────────────────────────────────────────────────────────
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
+
+/**
+ * Translate one chunk of ≤128 segments with the standard retry loop.
+ * Returns the translated strings on success or a `TranslationFailure` on error.
+ */
+async function translateChunkWithRetry(
+  apiKey: string,
+  chunk: string[],
+  source: string,
+  target: string,
+  callerSignal: AbortSignal | undefined,
+  startMs: number,
+): Promise<{ ok: true; results: string[] } | TranslationFailure> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    const signal = callerSignal ? anySignal([callerSignal, controller.signal]) : controller.signal;
+
+    try {
+      const res = await callTranslateBatch(apiKey, chunk, source, target, signal);
+
+      if (res.ok) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(res.text);
+        } catch {
+          return {
+            ok: false,
+            error: {
+              code: 'TRANSLATION_INTERNAL',
+              retry_allowed: false,
+              message: 'Invalid JSON from Google Translate',
+              duration_ms: Date.now() - startMs,
+              attempt: attempt + 1,
+              http_status: res.status,
+              raw: res.text.slice(0, 2048),
+            },
+          };
+        }
+        const got = extractTranslatedTexts(parsed);
+        if (!got || got.length !== chunk.length) {
+          return {
+            ok: false,
+            error: {
+              code: 'TRANSLATION_INTERNAL',
+              retry_allowed: false,
+              message: `Expected ${chunk.length} translations, got ${got?.length ?? 0}`,
+              duration_ms: Date.now() - startMs,
+              attempt: attempt + 1,
+              http_status: res.status,
+              raw: res.text.slice(0, 2048),
+            },
+          };
+        }
+        return { ok: true, results: got };
+      }
+
+      if (res.status === 429) {
+        if (attempt < MAX_RETRIES) { await sleep(500 + Math.floor(Math.random() * 1000)); continue; }
+        return { ok: false, error: { code: 'TRANSLATION_RATE_LIMITED', retry_allowed: true, message: 'Google Translate 429', duration_ms: Date.now() - startMs, attempt: attempt + 1, http_status: 429, raw: res.text.slice(0, 2048) } };
+      }
+      if (res.status >= 500 && attempt < MAX_RETRIES) {
+        await sleep(500 + Math.floor(Math.random() * 1000)); continue;
+      }
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
+        return { ok: false, error: { code: 'TRANSLATION_CONFIG_ERROR', retry_allowed: false, message: `Google Translate ${res.status}`, duration_ms: Date.now() - startMs, attempt: attempt + 1, http_status: res.status, raw: res.text.slice(0, 2048) } };
+      }
+      return { ok: false, error: { code: 'TRANSLATION_INTERNAL', retry_allowed: false, message: `Google Translate ${res.status}`, duration_ms: Date.now() - startMs, attempt: attempt + 1, http_status: res.status, raw: res.text.slice(0, 2048) } };
+    } catch (err) {
+      if (controller.signal.aborted && !callerSignal?.aborted) {
+        return { ok: false, error: { code: 'TRANSLATION_TIMEOUT', retry_allowed: true, message: `Google Translate did not respond within ${DEFAULT_TIMEOUT_MS / 1000}s`, duration_ms: Date.now() - startMs, attempt: attempt + 1 } };
+      }
+      if (attempt < MAX_RETRIES) { await sleep(500 + Math.floor(Math.random() * 1000)); continue; }
+      return { ok: false, error: { code: 'TRANSLATION_INTERNAL', retry_allowed: false, message: err instanceof Error ? err.message : String(err), duration_ms: Date.now() - startMs, attempt: attempt + 1 } };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return { ok: false, error: { code: 'TRANSLATION_INTERNAL', retry_allowed: false, message: 'Exhausted retries', duration_ms: Date.now() - startMs, attempt: MAX_RETRIES + 1 } };
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
 export async function translateMarkdownStructured(
@@ -318,132 +408,16 @@ export async function translateMarkdownStructured(
     pattern ? substituteIn(s.get(), byLower, pattern) : s.get(),
   );
 
-  // 4. Send leaves to Google as a batch (one request, ordered response).
-  let translated: string[] = [];
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-    const signal = input.signal ? anySignal([input.signal, controller.signal]) : controller.signal;
-
-    try {
-      const res = await callTranslateBatch(apiKey, englishLeaves, input.source, input.target, signal);
-
-      if (res.ok) {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(res.text);
-        } catch {
-          return {
-            ok: false,
-            error: {
-              code: 'TRANSLATION_INTERNAL',
-              retry_allowed: false,
-              message: 'Invalid JSON from Google Translate',
-              duration_ms: Date.now() - start,
-              attempt: attempt + 1,
-              http_status: res.status,
-              raw: res.text.slice(0, 2048),
-            },
-          };
-        }
-        const got = extractTranslatedTexts(parsed);
-        if (!got || got.length !== englishLeaves.length) {
-          return {
-            ok: false,
-            error: {
-              code: 'TRANSLATION_INTERNAL',
-              retry_allowed: false,
-              message: `Expected ${englishLeaves.length} translations, got ${got?.length ?? 0}`,
-              duration_ms: Date.now() - start,
-              attempt: attempt + 1,
-              http_status: res.status,
-              raw: res.text.slice(0, 2048),
-            },
-          };
-        }
-        translated = got;
-        break;
-      }
-
-      // Non-2xx
-      if (res.status === 429) {
-        if (attempt < MAX_RETRIES) {
-          await sleep(500 + Math.floor(Math.random() * 1000));
-          continue;
-        }
-        return {
-          ok: false,
-          error: {
-            code: 'TRANSLATION_RATE_LIMITED',
-            retry_allowed: true,
-            message: 'Google Translate 429',
-            duration_ms: Date.now() - start,
-            attempt: attempt + 1,
-            http_status: 429,
-            raw: res.text.slice(0, 2048),
-          },
-        };
-      }
-      if (res.status >= 500 && attempt < MAX_RETRIES) {
-        await sleep(500 + Math.floor(Math.random() * 1000));
-        continue;
-      }
-      if (res.status === 400 || res.status === 401 || res.status === 403) {
-        return {
-          ok: false,
-          error: {
-            code: 'TRANSLATION_CONFIG_ERROR',
-            retry_allowed: false,
-            message: `Google Translate ${res.status}`,
-            duration_ms: Date.now() - start,
-            attempt: attempt + 1,
-            http_status: res.status,
-            raw: res.text.slice(0, 2048),
-          },
-        };
-      }
-      return {
-        ok: false,
-        error: {
-          code: 'TRANSLATION_INTERNAL',
-          retry_allowed: false,
-          message: `Google Translate ${res.status}`,
-          duration_ms: Date.now() - start,
-          attempt: attempt + 1,
-          http_status: res.status,
-          raw: res.text.slice(0, 2048),
-        },
-      };
-    } catch (err) {
-      if (controller.signal.aborted && !input.signal?.aborted) {
-        return {
-          ok: false,
-          error: {
-            code: 'TRANSLATION_TIMEOUT',
-            retry_allowed: true,
-            message: `Google Translate did not respond within ${DEFAULT_TIMEOUT_MS / 1000}s`,
-            duration_ms: Date.now() - start,
-            attempt: attempt + 1,
-          },
-        };
-      }
-      if (attempt < MAX_RETRIES) {
-        await sleep(500 + Math.floor(Math.random() * 1000));
-        continue;
-      }
-      return {
-        ok: false,
-        error: {
-          code: 'TRANSLATION_INTERNAL',
-          retry_allowed: false,
-          message: err instanceof Error ? err.message : String(err),
-          duration_ms: Date.now() - start,
-          attempt: attempt + 1,
-        },
-      };
-    } finally {
-      clearTimeout(timeout);
-    }
+  // 4. Send leaves to Google in batches of ≤128 segments (API hard limit).
+  //    Each batch is retried independently; first failure short-circuits.
+  const chunks = chunkArray(englishLeaves, SEGMENT_BATCH_SIZE);
+  const translated: string[] = [];
+  for (const chunk of chunks) {
+    const result = await translateChunkWithRetry(
+      apiKey, chunk, input.source, input.target, input.signal, start,
+    );
+    if (!result.ok) return result;
+    translated.push(...result.results);
   }
 
   // 5. Restore glossary placeholders + write translations back to the tree.

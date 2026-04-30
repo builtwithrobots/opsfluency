@@ -132,7 +132,8 @@ export function TermsGateClient({ sopId, flaggedTerms, existingGlossary }: Props
           </p>
           <p className="mt-1 text-xs text-dc-text-2">
             Translation is paused until each flagged term is resolved. New terms get saved to your
-            company glossary so future SOPs translate consistently.
+            company glossary so future SOPs translate consistently.{' '}
+            <strong className="text-dc-text">Spanish translations can be auto-translated later in the glossary.</strong>
             {conflictCount > 0 && (
               <>
                 {' '}
@@ -246,23 +247,13 @@ function TermRow({ row, meta, onPatch, onDismiss, onUndo }: TermRowProps) {
 
   return (
     <div className={
-      'relative rounded-lg border bg-dc-surface p-4 ' +
+      'rounded-lg border bg-dc-surface p-4 ' +
       (conflict
         ? 'border-(--color-signal-info)/40 ring-1 ring-(--color-signal-info)/15'
         : 'border-[color:var(--dc-edge)]')
     }>
-      {/* Dismiss button — skip this term entirely */}
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={`Skip term: ${row.term_en}`}
-        className="absolute top-3 right-3 rounded p-0.5 text-dc-text-3 hover:text-dc-text hover:bg-dc-raised transition-colors"
-      >
-        <X className="size-4" strokeWidth={2} aria-hidden />
-      </button>
-
       {meta?.reason && (
-        <p className="mb-3 pr-6 text-xs text-dc-text-3">
+        <p className="mb-3 text-xs text-dc-text-3">
           <span className="font-medium text-dc-text-2">Flagged because:</span> {meta.reason}
         </p>
       )}
@@ -316,6 +307,17 @@ function TermRow({ row, meta, onPatch, onDismiss, onUndo }: TermRowProps) {
           </div>
         </div>
       )}
+
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="inline-flex items-center gap-1.5 rounded-md border border-(--color-signal-urgent)/30 bg-(--color-signal-urgent)/5 px-3 py-1.5 text-xs font-medium text-(--color-signal-urgent) hover:bg-(--color-signal-urgent)/15 transition-colors"
+        >
+          <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+          Remove
+        </button>
+      </div>
     </div>
   );
 }
