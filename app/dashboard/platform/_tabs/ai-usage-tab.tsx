@@ -20,19 +20,28 @@ function isPresetDays(n: number): n is PresetDays {
 //
 // $ per 1M units. Unit is `unit_kind`-dependent: tokens for Anthropic,
 // source characters for Google. Google bills source only (output rate 0).
-const PRICE_PER_M_UNITS: Record<string, { input: number; output: number }> = {
-  "claude-sonnet-4-6":   { input: 3,    output: 15 },
-  "claude-haiku-4-5-20251001": { input: 1.00, output: 5 },
-  "claude-haiku-4-5":    { input: 1.00, output: 5 },
-  "google-translate-v2": { input: 20,   output: 0 },
+interface ModelPrice {
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+}
+
+const PRICE_PER_M_UNITS: Record<string, ModelPrice> = {
+  "claude-sonnet-4-6":        { input: 3,    output: 15,   cacheWrite: 3.75, cacheRead: 0.30 },
+  "claude-haiku-4-5-20251001":{ input: 1.00, output: 5,    cacheWrite: 1.25, cacheRead: 0.10 },
+  "claude-haiku-4-5":         { input: 1.00, output: 5,    cacheWrite: 1.25, cacheRead: 0.10 },
+  "google-translate-v2":      { input: 20,   output: 0,    cacheWrite: 0,    cacheRead: 0    },
   // Conservative upper-bound fallback so unknown models never look cheaper.
-  default:               { input: 3,    output: 15 },
+  default:                    { input: 3,    output: 15,   cacheWrite: 3.75, cacheRead: 0.30 },
 };
 
 interface AiCallRow {
   model: string;
   input_units: number;
   output_units: number;
+  cache_write_tokens: number;
+  cache_read_tokens: number;
   unit_kind: UnitKind;
   duration_ms: number;
   company_id: string | null;
@@ -74,9 +83,20 @@ interface UsageData {
   topTenants: TenantRollup[];
 }
 
-function estimateCost(model: string, inputUnits: number, outputUnits: number): number {
-  const price = PRICE_PER_M_UNITS[model] ?? PRICE_PER_M_UNITS.default;
-  return (inputUnits * price.input + outputUnits * price.output) / 1_000_000;
+function estimateCost(row: AiCallRow): number {
+  const price = PRICE_PER_M_UNITS[row.model] ?? PRICE_PER_M_UNITS.default;
+  // For token-based rows, split input into regular / cache-write / cache-read
+  // buckets because each is billed at a different rate. Cache-read tokens are
+  // 10× cheaper than regular input — ignoring them overstates Sonnet spend.
+  // Character-based rows (Google) have 0 in both cache columns so the formula
+  // degrades correctly to: input_units * price.input.
+  const regularInput = row.input_units - row.cache_write_tokens - row.cache_read_tokens;
+  return (
+    regularInput           * price.input      +
+    row.cache_write_tokens * price.cacheWrite  +
+    row.cache_read_tokens  * price.cacheRead   +
+    row.output_units       * price.output
+  ) / 1_000_000;
 }
 
 async function loadUsage(days: number): Promise<UsageData> {
@@ -86,7 +106,7 @@ async function loadUsage(days: number): Promise<UsageData> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const { data: calls, error } = await admin
     .from("ai_call_log")
-    .select("model, input_units, output_units, unit_kind, duration_ms, company_id, created_at")
+    .select("model, input_units, output_units, cache_write_tokens, cache_read_tokens, unit_kind, duration_ms, company_id, created_at")
     .gte("created_at", since);
   if (error) throw error;
 
@@ -105,7 +125,7 @@ async function loadUsage(days: number): Promise<UsageData> {
 
   for (const r of rows) {
     totalDurationMs += r.duration_ms;
-    const cost = estimateCost(r.model, r.input_units, r.output_units);
+    const cost = estimateCost(r);
     totalEstimatedCost += cost;
 
     if (r.unit_kind === "token") {

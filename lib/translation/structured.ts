@@ -484,7 +484,11 @@ export async function translateMarkdownStructured(
     // would understate (we don't bill for structural scaffolding,
     // but the markdown the manager edited is the right reference).
     inputChars: input.markdown.length,
-    outputChars: out.length,
+    // Google does not charge for output characters. `out` is the
+    // remark-stringified tree which adds extra blank lines and trailing
+    // newlines, inflating the count well above the real translated
+    // content length. Log 0 to avoid the misleading metric.
+    outputChars: 0,
     durationMs: Date.now() - start,
   });
 
