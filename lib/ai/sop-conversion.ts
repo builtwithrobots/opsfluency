@@ -179,7 +179,7 @@ async function runPipeline(
       model: SONNET_MODEL,
       systemPrompt: buildFlaggingSystemPrompt(base.glossary),
       userMessage: `Review the following SOP Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${markdown}\n---END MARKDOWN---`,
-      maxTokens: 4096,
+      maxTokens: 8192,
       parse: parseFlaggingResponse,
       signal: base.signal,
     },
