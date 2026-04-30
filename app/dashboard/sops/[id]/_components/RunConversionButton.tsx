@@ -20,12 +20,13 @@ interface ErrorState {
 }
 
 const CONVERSION_STAGES = [
-  { at_ms: 0,      label: 'Reading the uploaded document…' },
-  { at_ms: 4_000,  label: 'Sending to Claude Sonnet…' },
-  { at_ms: 8_000,  label: 'Analyzing structure — headings, steps, callouts…' },
-  { at_ms: 25_000, label: 'Identifying site-specific terminology…' },
-  { at_ms: 60_000, label: 'Almost there — finalizing the response…' },
-  { at_ms: 120_000, label: 'Still working — large or scanned PDFs can take a while.' },
+  { at_ms: 0,       label: 'Reading the uploaded document…' },
+  { at_ms: 4_000,   label: 'Sending to Claude Sonnet…' },
+  { at_ms: 8_000,   label: 'Analyzing structure — headings, steps, callouts…' },
+  { at_ms: 25_000,  label: 'Identifying site-specific terminology…' },
+  { at_ms: 45_000,  label: 'Document is large — processing in sections…' },
+  { at_ms: 90_000,  label: 'Almost there — finalizing the response…' },
+  { at_ms: 150_000, label: 'Still working — large or scanned PDFs can take a while.' },
 ];
 
 export function RunConversionButton({ sopId, disabled }: Props) {
@@ -50,7 +51,7 @@ export function RunConversionButton({ sopId, disabled }: Props) {
       <div className="flex w-full flex-col gap-3">
         <JobProgress
           headline="Claude is converting your document"
-          expectedMs={45_000}
+          expectedMs={120_000}
           stages={CONVERSION_STAGES}
         />
       </div>

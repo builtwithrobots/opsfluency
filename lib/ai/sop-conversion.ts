@@ -25,6 +25,12 @@ import { SONNET_MODEL, callSonnet, type SonnetResult, type SonnetUserContent } f
  *
  * Per CLAUDE.md → "AI call conventions": 180s timeout, 1 retry on
  * transient errors, prompt caching on system prompts.
+ *
+ * Large-document fallback: if either call returns AI_TRUNCATED, the pipeline
+ * automatically retries using a chunked strategy transparent to all callers.
+ * Call 2 splits by heading boundaries. Call 1 (text path only) splits at
+ * paragraph boundaries. PDF/image paths cannot be chunked without a PDF
+ * extraction library and surface AI_TRUNCATED as-is on Call 1.
  */
 
 export interface FlaggedTerm {
@@ -44,7 +50,7 @@ export interface SopConversionResult {
 }
 
 // ---------------------------------------------------------------------------
-// Call 1 — Haiku: document → Markdown
+// Call 1 — Sonnet: document → Markdown
 // ---------------------------------------------------------------------------
 
 const CONVERSION_SYSTEM_PROMPT = `You are an expert technical writer at OpsFluency, a tool that delivers bilingual SOPs to warehouse and manufacturing workers via QR code. Convert a Standard Operating Procedure document into clean, mobile-friendly Markdown.
@@ -138,7 +144,184 @@ function parseFlaggingResponse(rawText: string): FlaggedTermsOnly {
 }
 
 // ---------------------------------------------------------------------------
-// Shared pipeline runner
+// Chunking helpers
+// ---------------------------------------------------------------------------
+
+// Target sizes chosen so each chunk produces well under the output token cap
+// in the worst-case (dense terminology) scenario.
+const FLAGGING_CHUNK_MAX_CHARS = 8_000;
+const CONVERSION_TEXT_CHUNK_MAX_CHARS = 60_000;
+
+/**
+ * Splits a Markdown string into heading-bounded chunks for per-section term
+ * flagging. Split priority: H1/H2 → H3/H4 → paragraph breaks. Each chunk is
+ * a standalone Markdown fragment with enough context to flag terms correctly.
+ */
+function splitMarkdownForFlagging(markdown: string): string[] {
+  if (markdown.length <= FLAGGING_CHUNK_MAX_CHARS) return [markdown];
+
+  function groupByBoundary(parts: string[], max: number): string[] {
+    const out: string[] = [];
+    let cur = "";
+    for (const part of parts) {
+      if (cur.length + part.length > max && cur.length > 0) {
+        out.push(cur);
+        cur = part;
+      } else {
+        cur += part;
+      }
+    }
+    if (cur.length > 0) out.push(cur);
+    return out;
+  }
+
+  // Pass 1: H1/H2 headings
+  let chunks = groupByBoundary(
+    markdown.split(/(?=^#{1,2} )/m),
+    FLAGGING_CHUNK_MAX_CHARS,
+  );
+
+  // Pass 2: H3/H4 headings for any still-oversized chunks
+  chunks = chunks.flatMap((c) => {
+    if (c.length <= FLAGGING_CHUNK_MAX_CHARS) return [c];
+    return groupByBoundary(c.split(/(?=^#{3,4} )/m), FLAGGING_CHUNK_MAX_CHARS);
+  });
+
+  // Pass 3: paragraph breaks
+  chunks = chunks.flatMap((c) => {
+    if (c.length <= FLAGGING_CHUNK_MAX_CHARS) return [c];
+    const paras = c.split(/\n\n+/);
+    const out: string[] = [];
+    let cur = "";
+    for (const para of paras) {
+      const sep = cur.length > 0 ? "\n\n" : "";
+      if (cur.length + sep.length + para.length > FLAGGING_CHUNK_MAX_CHARS && cur.length > 0) {
+        out.push(cur);
+        cur = para;
+      } else {
+        cur = cur + sep + para;
+      }
+    }
+    if (cur.length > 0) out.push(cur);
+    return out;
+  });
+
+  return chunks.filter((c) => c.trim().length > 0);
+}
+
+/**
+ * Splits plain text at paragraph boundaries for chunked Call 1 conversion.
+ */
+function splitTextForConversion(text: string): string[] {
+  if (text.length <= CONVERSION_TEXT_CHUNK_MAX_CHARS) return [text];
+
+  const paragraphs = text.split(/\n\n+/);
+  const chunks: string[] = [];
+  let cur = "";
+
+  for (const para of paragraphs) {
+    const sep = cur.length > 0 ? "\n\n" : "";
+    if (cur.length + sep.length + para.length > CONVERSION_TEXT_CHUNK_MAX_CHARS && cur.length > 0) {
+      chunks.push(cur);
+      cur = para;
+    } else {
+      cur = cur + sep + para;
+    }
+  }
+  if (cur.length > 0) chunks.push(cur);
+
+  return chunks.filter((c) => c.trim().length > 0);
+}
+
+// ---------------------------------------------------------------------------
+// Call 2 with automatic chunked fallback
+// ---------------------------------------------------------------------------
+
+/**
+ * Flags terms in multiple Markdown chunks sequentially, merging and
+ * deduplicating results by term (case-insensitive). Sequential to avoid
+ * cascading 429s from Anthropic's per-minute token rate limit.
+ */
+async function flagTermsInChunks(
+  chunks: string[],
+  glossary: GlossaryRow[],
+  ctx: { sopId: string; companyId: string },
+  signal?: AbortSignal,
+): Promise<SonnetResult<FlaggedTermsOnly>> {
+  const systemPrompt = buildFlaggingSystemPrompt(glossary);
+  const accumulated: FlaggedTerm[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  for (const chunk of chunks) {
+    const result = await callSonnet<FlaggedTermsOnly>(
+      {
+        model: SONNET_MODEL,
+        systemPrompt,
+        userMessage: `Review the following SOP Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${chunk}\n---END MARKDOWN---`,
+        maxTokens: 8192,
+        parse: parseFlaggingResponse,
+        signal,
+      },
+      ctx,
+    );
+
+    if (!result.ok) return result;
+
+    for (const term of result.data.flagged_terms) {
+      const key = term.term.toLowerCase().trim();
+      if (!accumulated.some((t) => t.term.toLowerCase().trim() === key)) {
+        accumulated.push(term);
+      }
+    }
+
+    inputTokens += result.usage.input_tokens;
+    outputTokens += result.usage.output_tokens;
+  }
+
+  return {
+    ok: true,
+    data: { flagged_terms: accumulated },
+    usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+  };
+}
+
+/**
+ * Runs the flagging call on `markdown`. On AI_TRUNCATED, automatically
+ * retries using heading-bounded chunks if the Markdown can be split.
+ * Transparent to all callers — managers never see AI_TRUNCATED from this step
+ * unless even the individual chunks are too large.
+ */
+async function runFlaggingWithFallback(
+  markdown: string,
+  glossary: GlossaryRow[],
+  ctx: { sopId: string; companyId: string },
+  signal?: AbortSignal,
+): Promise<SonnetResult<FlaggedTermsOnly>> {
+  const result = await callSonnet<FlaggedTermsOnly>(
+    {
+      model: SONNET_MODEL,
+      systemPrompt: buildFlaggingSystemPrompt(glossary),
+      userMessage: `Review the following SOP Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${markdown}\n---END MARKDOWN---`,
+      maxTokens: 8192,
+      parse: parseFlaggingResponse,
+      signal,
+    },
+    ctx,
+  );
+
+  if (!result.ok && result.error.code === "AI_TRUNCATED") {
+    const chunks = splitMarkdownForFlagging(markdown);
+    if (chunks.length > 1) {
+      return flagTermsInChunks(chunks, glossary, ctx, signal);
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Shared pipeline runner (PDF and image paths)
 // ---------------------------------------------------------------------------
 
 interface ConvertSopBaseInput {
@@ -171,19 +354,13 @@ async function runPipeline(
 
   const { markdown } = conversionResult.data;
 
-  // Step 2 — Sonnet flags site-specific terms from the compact Markdown.
-  // Input is the Markdown only (not the raw document), so this call is
-  // significantly cheaper than a single combined call would be.
-  const flaggingResult = await callSonnet<FlaggedTermsOnly>(
-    {
-      model: SONNET_MODEL,
-      systemPrompt: buildFlaggingSystemPrompt(base.glossary),
-      userMessage: `Review the following SOP Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${markdown}\n---END MARKDOWN---`,
-      maxTokens: 8192,
-      parse: parseFlaggingResponse,
-      signal: base.signal,
-    },
+  // Step 2 — Sonnet flags site-specific terms. Automatically chunks and retries
+  // on AI_TRUNCATED so terminology-dense documents don't surface errors to managers.
+  const flaggingResult = await runFlaggingWithFallback(
+    markdown,
+    base.glossary,
     ctx,
+    base.signal,
   );
 
   if (!flaggingResult.ok) return flaggingResult;
@@ -194,12 +371,9 @@ async function runPipeline(
       markdown,
       flagged_terms: flaggingResult.data.flagged_terms,
     },
-    // Report combined token usage (Haiku + Sonnet) so callers can log if needed.
     usage: {
-      input_tokens:
-        conversionResult.usage.input_tokens + flaggingResult.usage.input_tokens,
-      output_tokens:
-        conversionResult.usage.output_tokens + flaggingResult.usage.output_tokens,
+      input_tokens: conversionResult.usage.input_tokens + flaggingResult.usage.input_tokens,
+      output_tokens: conversionResult.usage.output_tokens + flaggingResult.usage.output_tokens,
     },
   };
 }
@@ -213,16 +387,96 @@ export interface ConvertSopFromTextInput extends ConvertSopBaseInput {
 }
 
 /**
- * Converts a plain-text or text-extracted document (PDF/DOCX/TXT) into the
- * SOP Markdown shape. The caller is responsible for extracting text from the
- * source file before calling this — Anthropic does not parse PDFs natively
- * outside of the vision path.
+ * Converts a plain-text or text-extracted document into the SOP Markdown shape.
+ * If the document is too large for a single Call 1 conversion, it is
+ * automatically split at paragraph boundaries and converted in sections.
  */
 export async function convertSopFromText(
   input: ConvertSopFromTextInput,
 ): Promise<SonnetResult<SopConversionResult>> {
-  const userMessage = `Convert the following document. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${input.documentText}\n---END DOCUMENT---`;
-  return runPipeline(input, userMessage);
+  const ctx = { sopId: input.sopId, companyId: input.companyId };
+
+  const conversionResult = await callSonnet<MarkdownOnly>(
+    {
+      model: SONNET_MODEL,
+      systemPrompt: CONVERSION_SYSTEM_PROMPT,
+      userMessage: `Convert the following document. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${input.documentText}\n---END DOCUMENT---`,
+      maxTokens: 16384,
+      parse: parseMarkdownResponse,
+      signal: input.signal,
+    },
+    ctx,
+  );
+
+  if (!conversionResult.ok) {
+    if (conversionResult.error.code === "AI_TRUNCATED") {
+      const chunks = splitTextForConversion(input.documentText);
+      if (chunks.length > 1) {
+        return convertTextInChunks(input, chunks, ctx);
+      }
+    }
+    return conversionResult;
+  }
+
+  const { markdown } = conversionResult.data;
+  const flaggingResult = await runFlaggingWithFallback(markdown, input.glossary, ctx, input.signal);
+  if (!flaggingResult.ok) return flaggingResult;
+
+  return {
+    ok: true,
+    data: { markdown, flagged_terms: flaggingResult.data.flagged_terms },
+    usage: {
+      input_tokens: conversionResult.usage.input_tokens + flaggingResult.usage.input_tokens,
+      output_tokens: conversionResult.usage.output_tokens + flaggingResult.usage.output_tokens,
+    },
+  };
+}
+
+/**
+ * Converts oversized plain-text input in paragraph-bounded chunks, then merges
+ * the resulting Markdown sections and flags terms across the full document.
+ */
+async function convertTextInChunks(
+  base: ConvertSopBaseInput,
+  chunks: string[],
+  ctx: { sopId: string; companyId: string },
+): Promise<SonnetResult<SopConversionResult>> {
+  const parts: string[] = [];
+  let convInputTokens = 0;
+  let convOutputTokens = 0;
+
+  for (const chunk of chunks) {
+    const result = await callSonnet<MarkdownOnly>(
+      {
+        model: SONNET_MODEL,
+        systemPrompt: CONVERSION_SYSTEM_PROMPT,
+        userMessage: `Convert the following document section. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${chunk}\n---END DOCUMENT---`,
+        maxTokens: 16384,
+        parse: parseMarkdownResponse,
+        signal: base.signal,
+      },
+      ctx,
+    );
+
+    if (!result.ok) return result;
+
+    parts.push(result.data.markdown);
+    convInputTokens += result.usage.input_tokens;
+    convOutputTokens += result.usage.output_tokens;
+  }
+
+  const markdown = parts.join("\n\n---\n\n");
+  const flaggingResult = await runFlaggingWithFallback(markdown, base.glossary, ctx, base.signal);
+  if (!flaggingResult.ok) return flaggingResult;
+
+  return {
+    ok: true,
+    data: { markdown, flagged_terms: flaggingResult.data.flagged_terms },
+    usage: {
+      input_tokens: convInputTokens + flaggingResult.usage.input_tokens,
+      output_tokens: convOutputTokens + flaggingResult.usage.output_tokens,
+    },
+  };
 }
 
 export interface ConvertSopFromPdfInput extends ConvertSopBaseInput {
@@ -232,7 +486,7 @@ export interface ConvertSopFromPdfInput extends ConvertSopBaseInput {
 /**
  * Converts a PDF document into the SOP Markdown shape using Anthropic's
  * native document block — no PDF parsing library needed. Handles both
- * digital-text PDFs and scanned (image-only) PDFs in a single Haiku call.
+ * digital-text PDFs and scanned (image-only) PDFs in a single Sonnet call.
  */
 export async function convertSopFromPdf(
   input: ConvertSopFromPdfInput,
