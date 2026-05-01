@@ -103,6 +103,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // next-pwa v5 injects a webpack config; Next.js 16 requires an explicit
+  // turbopack config (even empty) to suppress the "webpack config but no
+  // turbopack config" build error introduced in Next 16.
+  turbopack: {},
   async headers() {
     return [
       {
