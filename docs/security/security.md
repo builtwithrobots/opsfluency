@@ -1,8 +1,8 @@
 # OpsFluency — Security State
 
 > Living document. Update this file whenever a security-relevant change lands.
-> Last updated: 2026-04-29
-> Branch: `claude/org-settings-data-export-VtSJR`
+> Last updated: 2026-05-01
+> Branch: `claude/improve-employee-invitations-Nf7IQ`
 
 ---
 
@@ -36,6 +36,13 @@
 | **Export security** | Exports stream directly to browser — no copy written to Supabase Storage or filesystem | `app/api/exports/[format]/route.ts` | ✅ Added 2026-04-29 |
 | **Export security** | Sensitive fields excluded from export: qr_scans, invite tokens, storage URLs, print configs | `lib/export/bundle.ts` | ✅ Added 2026-04-29 |
 | **Rate limiting** | QR scan logging rate-limited by IP hash per QR code (prevents scan flooding) | `lib/qr/rate-limit.ts` | ✅ Active |
+| **Rate limiting** | Employee claim paths (phone lookup and personal token) rate-limited at 5 attempts per IP per 15 minutes; IP stored as SHA-256 hash, never plaintext | `lib/employees/claim-rate-limit.ts` | ✅ Added 2026-05-01 |
+| **Rate limiting** | Self-serve join requests rate-limited by IP hash before any DB read | `lib/employees/claim-rate-limit.ts` | ✅ Added 2026-05-01 |
+| **Employee onboarding** | Personal invite tokens are 128-bit cryptographically random UUIDs (`crypto.randomUUID()`); single-use (tombstoned on claim); 7-day TTL enforced server-side | `app/dashboard/employees/_actions/employees.ts` | ✅ Added 2026-05-01 |
+| **Employee onboarding** | Token claim path (`/join/claim/[token]`) never reveals whether a token exists, is expired, or is already claimed — only "not valid", "already used", or "expired" messages, no server-state hints | `app/join/claim/[token]/page.tsx` | ✅ Added 2026-05-01 |
+| **Employee onboarding** | Phone-based claim path returns a single generic error for all failure modes (rate limit, not found, expired, already claimed) — prevents phone enumeration via the company QR | `app/join/[company_id]/_actions/claim-invite.ts` | ✅ Added 2026-05-01 |
+| **Employee onboarding** | Self-serve join requests always return success to the caller, including on duplicate phone submissions — never reveals whether a phone is registered | `app/join/[company_id]/request/_actions/create-join-request.ts` | ✅ Added 2026-05-01 |
+| **Employee onboarding** | Manager-generated "access link" tokens are Clerk sign-in tokens (1-hour TTL, single-use); scoped to verified company members only — manager cannot generate a token for a user outside their company | `app/dashboard/employees/_actions/resend-access.ts` | ✅ Added 2026-05-01 |
 
 ---
 
@@ -45,7 +52,7 @@
 |---|---|---|---|
 | No Dependabot / automated dependency scanning | Low | 🔴 Open | Enable in GitHub repo settings → Security. 10-minute fix. |
 | No GitHub Actions secret-scanning workflow | Low | 🔴 Open | Add `trufflesecurity/trufflehog-actions-scan` to CI. |
-| No rate limiting on general API mutations (beyond exports and QR scans) | Low | 🟡 Deferred | Phase 2 hardening. Assess after first 90 days of traffic. |
+| No rate limiting on general API mutations (beyond exports, QR scans, and employee claim paths) | Low | 🟡 Deferred | Phase 2 hardening. Assess after first 90 days of traffic. |
 | CSP uses `unsafe-inline` and `unsafe-eval` | Medium | 🟡 Constrained | Required by Clerk hosted components. Tighten when Clerk provides nonce-based CSP guidance. Track Clerk CSP roadmap. |
 | Team member emails in Clerk, not Supabase | Informational | 🟡 By design | Documented in export `_meta.pii_note`. Not a gap — Clerk owns identity. Note in customer PII responses. |
 | No automated penetration testing schedule | Medium | 🔴 Open | Recommend annual pentest before enterprise sales. |
@@ -69,6 +76,12 @@
 **Q: What about employees — can they access the raw data?**
 > No. Employees can only view SOPs and announcements assigned to their departments. The export feature is restricted to org admins. Employees authenticate via magic link — there are no passwords that could be phished or compromised.
 
+**Q: How do employee invite links work, and can they be guessed or reused?**
+> Each invite generates a 128-bit cryptographically random token (the same entropy as a UUID v4). Brute-forcing the token space would require more attempts than is computationally feasible. Links expire after 7 days and are permanently invalidated the moment they are used — a second tap on the same link is rejected. The claim endpoint is also IP rate-limited to 5 attempts per 15 minutes.
+
+**Q: Can an attacker enumerate which phone numbers are registered?**
+> No. The company join page returns an identical generic error message regardless of whether a phone number exists in the system, is expired, is already claimed, or triggers the rate limit. There is no timing difference between these paths. The self-serve request form also always returns success — submitting a phone that is already registered produces the same response as a new one.
+
 **Q: How is data encrypted in transit?**
 > All traffic is HTTPS-only (TLS 1.2+). Vercel enforces this on every request — there is no HTTP fallback. HTTP Strict Transport Security headers instruct browsers to always use HTTPS even if a link is typed as HTTP.
 
@@ -84,3 +97,4 @@
 | 2026-04-29 | Added HTTP security headers (`next.config.ts`): HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy | `claude/org-settings-data-export-VtSJR` |
 | 2026-04-29 | Added data export feature: `data_export_events` audit table, rate limiting (5/hour), admin-only access, streaming download, no server-side copy | `claude/org-settings-data-export-VtSJR` |
 | 2026-04-29 | This document created | `claude/org-settings-data-export-VtSJR` |
+| 2026-05-01 | Added employee invite security controls: personal invite tokens (128-bit UUID, 7-day TTL, single-use tombstone), IP rate limiting on all claim paths, generic error hardening on phone lookup, self-serve join request always-success pattern, manager access-link scoping | `claude/improve-employee-invitations-Nf7IQ` |
