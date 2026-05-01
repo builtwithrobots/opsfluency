@@ -11,6 +11,7 @@ import { JoinQrClient } from "./_components/JoinQrClient";
 import { PendingInvitesList, type InviteRow } from "./_components/PendingInvitesList";
 import { BulkUploadClient } from "./_components/BulkUploadClient";
 import { EditEmployeeButton } from "./_components/EditEmployeeButton";
+import { SendAccessLinkButton } from "./_components/SendAccessLinkButton";
 import { JoinRequestsList, type JoinRequestRow } from "./_components/JoinRequestsList";
 
 interface EmployeeProfile {
@@ -250,15 +251,21 @@ export default async function EmployeesPage() {
                     )}
                   </div>
 
-                  {/* Edit */}
-                  <EditEmployeeButton
-                    memberId={m.id}
-                    clerkUserId={m.clerk_user_id}
-                    displayName={m.displayName}
-                    currentRole={m.role}
-                    departments={depts}
-                    memberDeptIds={memberDeptIds}
-                  />
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <SendAccessLinkButton
+                      clerkUserId={m.clerk_user_id}
+                      displayName={m.displayName}
+                    />
+                    <EditEmployeeButton
+                      memberId={m.id}
+                      clerkUserId={m.clerk_user_id}
+                      displayName={m.displayName}
+                      currentRole={m.role}
+                      departments={depts}
+                      memberDeptIds={memberDeptIds}
+                    />
+                  </div>
                 </li>
               );
             })}

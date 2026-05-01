@@ -80,7 +80,7 @@ export default async function PersonalInvitePage({ params }: PageProps) {
         </div>
 
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Tap below to set up your account. No passwords needed — you'll be
+          Tap below to set up your account. No passwords needed &mdash; you&apos;ll be
           signed in automatically.
         </p>
 

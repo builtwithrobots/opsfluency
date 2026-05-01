@@ -1,0 +1,25 @@
+{
+  "name": "OpsFluency",
+  "short_name": "OpsFluency",
+  "description": "Frontline knowledge and SOPs for every worker",
+  "start_url": "/app/home",
+  "scope": "/app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/light-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/light-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

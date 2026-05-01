@@ -1,4 +1,35 @@
 import type { NextConfig } from "next";
+import { createRequire } from "module";
+
+// next-pwa v5 is CommonJS — use createRequire to import from an ESM config.
+const require = createRequire(import.meta.url);
+const withPWA = require("next-pwa")({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  // Disable service worker in dev — hot reload and SW caching conflict.
+  disable: process.env.NODE_ENV === "development",
+  // Only cache the employee PWA routes, not the manager dashboard.
+  // The manager dashboard is not designed for offline use.
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/.+\/app\/.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "employee-pwa-pages",
+        expiration: { maxEntries: 30, maxAgeSeconds: 24 * 60 * 60 },
+      },
+    },
+    {
+      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff2?)$/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "static-assets",
+        expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
+      },
+    },
+  ],
+});
 
 const securityHeaders = [
   // Enables browser-side DNS prefetching for performance
@@ -82,4 +113,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);
