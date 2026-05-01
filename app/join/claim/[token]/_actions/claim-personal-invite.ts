@@ -5,66 +5,57 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getAdminClient } from "@/lib/supabase/admin";
-import { normalizePhone } from "@/lib/employees/phone";
 import { isClaimRateLimited, hashIp } from "@/lib/employees/claim-rate-limit";
 
-// Generic terminal error — never reveals whether a phone/token exists or is claimed.
+export type PersonalClaimState = { error: string } | null;
+
+// Generic terminal error — never reveals whether a token exists, is expired, or is claimed.
 const GENERIC_CLAIM_ERROR =
   "Something went wrong. Please try again or ask your manager for help.";
 
-export type ClaimState = { error: string } | null;
-
-export async function claimInvite(
-  _prev: ClaimState,
+export async function claimPersonalInvite(
+  _prev: PersonalClaimState,
   formData: FormData,
-): Promise<ClaimState> {
+): Promise<PersonalClaimState> {
   const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? hdrs.get("x-real-ip")
-    ?? "unknown";
+  const ip =
+    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    hdrs.get("x-real-ip") ??
+    "unknown";
   if (isClaimRateLimited(hashIp(ip))) return { error: GENERIC_CLAIM_ERROR };
 
-  const companyId = (formData.get("company_id") as string | null)?.trim();
-  const rawPhone = (formData.get("phone") as string | null)?.trim() ?? "";
-
-  if (!companyId) return { error: "Invalid claim link. Please scan the QR code again." };
-
-  const phone = normalizePhone(rawPhone);
-  if (!phone) {
-    return { error: "Enter a valid US phone number, e.g. (555) 123-4567." };
-  }
+  const token = (formData.get("token") as string | null)?.trim();
+  if (!token) return { error: GENERIC_CLAIM_ERROR };
 
   const admin = getAdminClient();
 
-  // Look up an unclaimed invite for this company + phone
+  // Admin client justified: no Clerk session exists yet for this user.
+  // Lookup by token — the partial index on unclaimed rows makes this O(1).
   const { data: invite } = await admin
     .from("employee_invites")
-    .select("id, phone, name, email_work, email_personal, department_ids")
-    .eq("company_id", companyId)
-    .eq("phone", phone)
-    .is("claimed_at", null)
+    .select("id, company_id, name, email_work, email_personal, department_ids, claimed_at, personal_invite_token_expires_at")
+    .eq("personal_invite_token", token)
     .maybeSingle();
 
   if (!invite) return { error: GENERIC_CLAIM_ERROR };
+  if (invite.claimed_at) return { error: GENERIC_CLAIM_ERROR };
 
+  const expiresAt = invite.personal_invite_token_expires_at
+    ? new Date(invite.personal_invite_token_expires_at as string)
+    : null;
+  if (expiresAt && expiresAt < new Date()) return { error: GENERIC_CLAIM_ERROR };
+
+  const companyId = invite.company_id as string;
   const clerk = await clerkClient();
 
-  // Personal email takes priority for magic-link re-logins; work email is the
-  // fallback. If neither is set the employee authenticates only via the
-  // initial sign-in token — they can add an email later from their profile.
   const clerkEmail =
     (invite.email_personal as string | null) ??
     (invite.email_work as string | null) ??
     null;
 
-  // NOTE: phoneNumber is intentionally NOT passed to Clerk. Our phone number
-  // is purely a lookup key in employee_invites — Clerk authentication uses
-  // email magic links. Passing phoneNumber here requires "Phone number" to be
-  // enabled as an identifier in Clerk's dashboard, which is not required and
-  // causes a 422 on instances where it is not configured.
   let clerkUserId: string;
   try {
-    const nameParts = (invite.name ?? "").split(" ").filter(Boolean);
+    const nameParts = ((invite.name as string | null) ?? "").split(" ").filter(Boolean);
     const user = await clerk.users.createUser({
       firstName: nameParts[0] ?? undefined,
       lastName: nameParts.slice(1).join(" ") || undefined,
@@ -73,7 +64,6 @@ export async function claimInvite(
     });
     clerkUserId = user.id;
   } catch (err: unknown) {
-    // Extract the most useful message from Clerk's error shape
     let msg = "Failed to create your account.";
     if (err && typeof err === "object") {
       const clerkErr = err as { errors?: { message: string }[]; message?: string };
@@ -86,7 +76,6 @@ export async function claimInvite(
     return { error: msg };
   }
 
-  // Create company_members row (employee, already joined)
   const now = new Date().toISOString();
   const { data: member, error: memberError } = await admin
     .from("company_members")
@@ -105,17 +94,14 @@ export async function claimInvite(
     return { error: "Failed to register your membership. Please try again." };
   }
 
-  // Create employees extended profile — phone stored here, not in Clerk
   await admin.from("employees").insert({
     company_id: companyId,
     clerk_user_id: clerkUserId,
-    phone,
     email_work: (invite.email_work as string | null) ?? null,
     email_personal: (invite.email_personal as string | null) ?? null,
   });
 
-  // Assign departments from invite
-  const deptIds = (invite.department_ids ?? []) as string[];
+  const deptIds = ((invite.department_ids ?? []) as string[]);
   if (deptIds.length > 0) {
     await admin.from("employee_departments").insert(
       deptIds.map((department_id: string) => ({
@@ -129,23 +115,17 @@ export async function claimInvite(
   // Tombstone the invite
   await admin
     .from("employee_invites")
-    .update({
-      claimed_at: now,
-      claimed_by_clerk_user_id: clerkUserId,
-    })
+    .update({ claimed_at: now, claimed_by_clerk_user_id: clerkUserId })
     .eq("id", invite.id);
 
-  // Issue a Clerk sign-in token. Derive the origin from request headers so
-  // the redirect works on preview deployments, not just production.
-  const token = await clerk.signInTokens.createSignInToken({
+  const signInToken = await clerk.signInTokens.createSignInToken({
     userId: clerkUserId,
     expiresInSeconds: 3600,
   });
 
   const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
   const proto = hdrs.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
-  const destination = `${proto}://${host}/sign-in?__clerk_ticket=${token.token}&redirect_url=%2Fapp%2Fhome`;
+  const destination = `${proto}://${host}/sign-in?__clerk_ticket=${signInToken.token}&redirect_url=%2Fapp%2Fhome`;
   redirect(destination);
-  // redirect() throws NEXT_REDIRECT — unreachable, satisfies return type
   return null;
 }

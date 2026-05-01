@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 
 import { getAdminClient } from "@/lib/supabase/admin";
-import { ClaimForm } from "./_components/ClaimForm";
+import { JoinRequestForm } from "./_components/JoinRequestForm";
 
 interface PageProps {
   params: Promise<{ company_id: string }>;
 }
 
-export default async function JoinPage({ params }: PageProps) {
+export default async function JoinRequestPage({ params }: PageProps) {
   const { company_id } = await params;
 
   const admin = getAdminClient();
@@ -50,27 +50,17 @@ export default async function JoinPage({ params }: PageProps) {
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Claim your account
+              Request access
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Enter the phone number your manager used to invite you.
+              Enter your details and your manager will send you an invite link.
             </p>
           </div>
 
-          <ClaimForm companyId={company_id} companyName={company.name} />
+          <JoinRequestForm companyId={company_id} companyName={company.name} />
         </div>
 
-        <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Don&apos;t have an invite?{" "}
-          <a
-            href={`/join/${company_id}/request`}
-            className="font-medium text-(--color-brand) hover:underline"
-          >
-            Request access
-          </a>
-        </p>
-
-        <p className="mt-4 text-center text-xs text-zinc-400 dark:text-zinc-600">
+        <p className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-600">
           Powered by OpsFluency &mdash; frontline knowledge for every worker
         </p>
       </div>

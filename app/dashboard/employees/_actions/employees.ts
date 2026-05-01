@@ -7,7 +7,7 @@ import { getCompanyContext } from "@/lib/auth/company-context";
 import { normalizePhone } from "@/lib/employees/phone";
 
 export type InviteResult =
-  | { ok: true }
+  | { ok: true; inviteId: string; token: string }
   | { ok: false; error: { code: string; message?: string } };
 
 const optionalEmail = z.union([z.string().email(), z.literal("")]).optional();
@@ -40,7 +40,10 @@ export async function createInvite(formData: FormData): Promise<InviteResult> {
     return { ok: false, error: { code: "INVALID_INPUT" } };
   }
 
-  const { error } = await supabase.from("employee_invites").insert({
+  const personalInviteToken = crypto.randomUUID();
+  const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: invite, error } = await supabase.from("employee_invites").insert({
     company_id,
     phone,
     name: parsed.name ?? null,
@@ -48,7 +51,9 @@ export async function createInvite(formData: FormData): Promise<InviteResult> {
     email_personal: parsed.email_personal || null,
     department_ids: parsed.department_ids,
     invited_by: userId,
-  });
+    personal_invite_token: personalInviteToken,
+    personal_invite_token_expires_at: tokenExpiresAt,
+  }).select("id").single();
 
   if (error) {
     if (error.code === "23505") {
@@ -58,7 +63,7 @@ export async function createInvite(formData: FormData): Promise<InviteResult> {
   }
 
   revalidatePath("/dashboard/employees");
-  return { ok: true };
+  return { ok: true, inviteId: invite.id, token: personalInviteToken };
 }
 
 const DeleteInviteInput = z.object({ id: z.string().uuid() });

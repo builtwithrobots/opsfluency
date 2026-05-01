@@ -11,6 +11,7 @@ import { JoinQrClient } from "./_components/JoinQrClient";
 import { PendingInvitesList, type InviteRow } from "./_components/PendingInvitesList";
 import { BulkUploadClient } from "./_components/BulkUploadClient";
 import { EditEmployeeButton } from "./_components/EditEmployeeButton";
+import { JoinRequestsList, type JoinRequestRow } from "./_components/JoinRequestsList";
 
 interface EmployeeProfile {
   clerk_user_id: string;
@@ -29,6 +30,7 @@ export default async function EmployeesPage() {
     deptsResult,
     deptAssignmentsResult,
     profilesResult,
+    joinRequestsResult,
   ] = await Promise.all([
     supabase.from("companies").select("name").eq("id", company_id).single(),
     supabase
@@ -56,11 +58,18 @@ export default async function EmployeesPage() {
       .from("employees")
       .select("clerk_user_id, phone, preferred_language, last_active_at")
       .eq("company_id", company_id),
+    supabase
+      .from("employee_join_requests")
+      .select("id, name, phone, email_personal, requested_at")
+      .eq("company_id", company_id)
+      .eq("status", "pending")
+      .order("requested_at", { ascending: false }),
   ]);
 
   const companyName = companyResult.data?.name ?? "Your Company";
   const depts = deptsResult.data ?? [];
   const invites = (invitesResult.data ?? []) as InviteRow[];
+  const joinRequests = (joinRequestsResult.data ?? []) as JoinRequestRow[];
 
   const deptMap: Record<string, string> = Object.fromEntries(
     depts.map((d: { id: string; name: string }) => [d.id, d.name]),
@@ -135,6 +144,9 @@ export default async function EmployeesPage() {
         </p>
         <JoinQrClient joinUrl={joinUrl} companyName={companyName} />
       </section>
+
+      {/* Join requests from self-serve flow */}
+      <JoinRequestsList requests={joinRequests} />
 
       {/* Pending invites */}
       <section className="flex flex-col gap-3">

@@ -46,7 +46,11 @@ export async function bulkCreateInvites(rows: unknown[]): Promise<BulkCreateResu
       email_personal: string | null;
       department_ids: string[];
       invited_by: string;
+      personal_invite_token: string;
+      personal_invite_token_expires_at: string;
     }[] = [];
+
+    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     for (let i = 0; i < validated.length; i++) {
       const row = validated[i];
@@ -62,6 +66,8 @@ export async function bulkCreateInvites(rows: unknown[]): Promise<BulkCreateResu
         email_personal: row.email_personal,
         department_ids: row.department_ids,
         invited_by: userId,
+        personal_invite_token: crypto.randomUUID(),
+        personal_invite_token_expires_at: tokenExpiresAt,
       });
     }
 
