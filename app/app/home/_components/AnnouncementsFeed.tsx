@@ -75,12 +75,13 @@ function getLinkLabel(lang: WorkerLanguage): string {
 
 interface CardProps {
   ann: AnnouncementWithRead;
+  index: number;
   lang: WorkerLanguage;
   strings: Props["strings"];
   onRead: (id: string) => void;
 }
 
-function AnnouncementCard({ ann, lang, strings, onRead }: CardProps) {
+function AnnouncementCard({ ann, index, lang, strings, onRead }: CardProps) {
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLLIElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,10 +101,15 @@ function AnnouncementCard({ ann, lang, strings, onRead }: CardProps) {
     const el = cardRef.current;
     if (!el) return;
 
+    // Stagger each card's mark-read timer by its position in the list so a
+    // viewport full of unread cards doesn't fire its state flips in lockstep
+    // and produce a visible cascade of layout updates.
+    const dwellMs = 1500 + index * 200;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          timerRef.current = setTimeout(() => onRead(ann.id), 1500);
+          timerRef.current = setTimeout(() => onRead(ann.id), dwellMs);
         } else {
           if (timerRef.current) clearTimeout(timerRef.current);
         }
@@ -116,7 +122,7 @@ function AnnouncementCard({ ann, lang, strings, onRead }: CardProps) {
       observer.disconnect();
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [ann.id, isUnread, onRead]);
+  }, [ann.id, index, isUnread, onRead]);
 
   return (
     <li
@@ -152,17 +158,20 @@ function AnnouncementCard({ ann, lang, strings, onRead }: CardProps) {
           </div>
         )}
 
-        {/* Title row — unread dot leads the title */}
+        {/* Title row — unread dot leads the title.
+            The dot slot is always rendered so the title's horizontal position
+            doesn't shift when a card flips from unread to read; only the dot's
+            colour and the title's colour transition. */}
         <div className="flex items-start gap-2">
-          {isUnread && (
-            <span
-              className="mt-[5px] size-2 shrink-0 rounded-full bg-(--color-brand)"
-              aria-hidden
-            />
-          )}
+          <span
+            aria-hidden
+            className={`mt-[5px] size-2 shrink-0 rounded-full transition-colors duration-300 ${
+              isUnread ? "bg-(--color-brand)" : "bg-transparent"
+            }`}
+          />
           <p
-            className={`text-base leading-snug ${
-              isUnread ? "font-semibold text-dc-text" : "font-medium text-dc-text-2"
+            className={`text-base leading-snug font-semibold transition-colors duration-300 ${
+              isUnread ? "text-dc-text" : "text-dc-text-2"
             }`}
           >
             {title}
@@ -320,10 +329,11 @@ export function AnnouncementsFeed({ announcements, lang, strings }: Props) {
         </div>
       ) : (
         <ul className="flex flex-col gap-4" role="list">
-          {optimisticAnn.map((ann) => (
+          {optimisticAnn.map((ann, index) => (
             <AnnouncementCard
               key={ann.id}
               ann={ann}
+              index={index}
               lang={lang}
               strings={strings}
               onRead={handleMarkRead}
