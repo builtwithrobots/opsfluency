@@ -19,6 +19,7 @@ export interface DeptRow {
   color_hex: string;
   icon_key: string;
   sort_order: number;
+  is_system: boolean;
 }
 
 interface Props {
@@ -126,6 +127,7 @@ export function DepartmentListClient({
     <ul className="mt-4 divide-y divide-[color:var(--dc-edge)] overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
       {depts.map((dept) => {
         const isHR = dept.name === "HR";
+        const isLocked = dept.is_system;
         const memberCount = countByDeptId[dept.id] ?? 0;
         const isEditing = editingId === dept.id;
         const isDragging = draggingId === dept.id;
@@ -176,6 +178,11 @@ export function DepartmentListClient({
                       HR
                     </span>
                   ) : null}
+                  {isLocked && !isHR ? (
+                    <span className="rounded border border-[color:var(--dc-edge)] bg-dc-raised px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-dc-text-3 uppercase">
+                      System
+                    </span>
+                  ) : null}
                   <span className="flex items-center gap-1 rounded border border-[color:var(--dc-edge)] bg-dc-raised px-1.5 py-0.5 text-[10px] font-medium text-dc-text-3">
                     <Users className="size-2.5" strokeWidth={2} />
                     {memberCount}
@@ -205,10 +212,10 @@ export function DepartmentListClient({
                     <input type="hidden" name="id" value={dept.id} />
                     <button
                       type="submit"
-                      disabled={isHR || memberCount > 0}
+                      disabled={isLocked || memberCount > 0}
                       title={
-                        isHR
-                          ? "HR cannot be deleted"
+                        isLocked
+                          ? "System departments cannot be deleted"
                           : memberCount > 0
                             ? "Remove all members first"
                             : undefined
@@ -254,7 +261,7 @@ export function DepartmentListClient({
               >
                 <input type="hidden" name="id" value={dept.id} />
                 {/* Disabled inputs don't submit — send the locked name via hidden field */}
-                {isHR && <input type="hidden" name="name" value={dept.name} />}
+                {isLocked && <input type="hidden" name="name" value={dept.name} />}
 
                 <label className="flex flex-col gap-1.5">
                   <span className={labelClass}>
@@ -262,17 +269,17 @@ export function DepartmentListClient({
                     <span className="ml-1 text-(--color-signal-urgent)">*</span>
                   </span>
                   <input
-                    name={isHR ? undefined : "name"}
+                    name={isLocked ? undefined : "name"}
                     type="text"
-                    required={!isHR}
+                    required={!isLocked}
                     defaultValue={dept.name}
                     maxLength={80}
-                    disabled={isHR}
+                    disabled={isLocked}
                     className={inputClass}
                   />
-                  {isHR ? (
+                  {isLocked ? (
                     <p className="text-xs text-dc-text-3">
-                      The HR department cannot be renamed.
+                      System departments cannot be renamed.
                     </p>
                   ) : null}
                 </label>

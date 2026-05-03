@@ -59,14 +59,14 @@ export async function updateDepartment(formData: FormData): Promise<void> {
 
   const { data: existing } = await supabase
     .from("departments")
-    .select("name")
+    .select("name, is_system")
     .eq("id", parsed.id)
     .eq("company_id", company_id)
     .single();
 
   if (!existing) throw new Error("Department not found");
-  if (existing.name === "HR" && parsed.name !== "HR") {
-    throw new Error("The HR department cannot be renamed");
+  if (existing.is_system && parsed.name !== existing.name) {
+    throw new Error("System departments cannot be renamed");
   }
 
   const { error } = await supabase
@@ -96,13 +96,13 @@ export async function deleteDepartment(formData: FormData): Promise<void> {
 
   const { data: existing } = await supabase
     .from("departments")
-    .select("name")
+    .select("is_system")
     .eq("id", id)
     .eq("company_id", company_id)
     .single();
 
   if (!existing) throw new Error("Department not found");
-  if (existing.name === "HR") throw new Error("The HR department cannot be deleted");
+  if (existing.is_system) throw new Error("System departments cannot be deleted");
 
   const { count } = await supabase
     .from("employee_departments")

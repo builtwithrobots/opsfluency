@@ -22,7 +22,7 @@ async function loadDepts(
 ): Promise<{ depts: DeptRow[]; countByDeptId: Record<string, number> }> {
   const { data, error } = await supabase
     .from("departments")
-    .select("id, name, color_hex, icon_key, sort_order")
+    .select("id, name, color_hex, icon_key, sort_order, is_system")
     .eq("company_id", company_id)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true }); // secondary tiebreaker
@@ -34,6 +34,7 @@ async function loadDepts(
     color_hex:  d.color_hex ?? "#a1a1aa",
     icon_key:   d.icon_key  ?? "building-2",
     sort_order: d.sort_order ?? 0,
+    is_system:  d.is_system ?? false,
   }));
 
   if (!depts.length) return { depts, countByDeptId: {} };
@@ -113,7 +114,7 @@ export async function DepartmentsTab({ editing }: Props) {
                 </li>
                 <li className="flex gap-2">
                   <span className="mt-px shrink-0">🏷️</span>
-                  <span>HR is a system department — it cannot be renamed or deleted.</span>
+                  <span>System departments (HR, Manufacturing, Quality Control, Safety, Warehouse) cannot be renamed or deleted.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="mt-px shrink-0">🗑️</span>

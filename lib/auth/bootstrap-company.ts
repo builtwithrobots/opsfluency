@@ -3,8 +3,10 @@ import "server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Creates a company + admin member + the four default departments in a
- * single Postgres transaction via the `bootstrap_company` RPC.
+ * Creates a company + admin member + the five default departments
+ * (HR, Manufacturing, Quality Control, Safety, Warehouse, marked
+ * is_system) in a single Postgres transaction via the
+ * `bootstrap_company` RPC.
  *
  * Called from the admin-signup Server Action (or a Clerk webhook) using
  * the service-role client — the caller has no `company_members` row yet,
