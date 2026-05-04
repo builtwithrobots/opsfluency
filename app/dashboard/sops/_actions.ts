@@ -298,10 +298,12 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
     const conv: SopConversionResult = result.data;
 
     // Run Haiku template recommendation in parallel with the version DB write.
+    // All DB writes after the long Sonnet call reuse the admin client already
+    // declared above — the Clerk JWT can expire during large PDF conversions.
     // recommendTemplate is fire-safe — failures return null and are never
     // surfaced to the manager. Conversion succeeds regardless.
     const [vErr, templateRec] = await Promise.all([
-      supabase
+      admin
         .from('sop_versions')
         .update({ content_en: conv.markdown, flagged_terms: conv.flagged_terms })
         .eq('id', version.id)
@@ -312,7 +314,7 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
 
     // Persist recommendation to sops row. Ignore failures — telemetry-grade write.
     if (templateRec) {
-      await supabase
+      await admin
         .from('sops')
         .update({ template_recommendation: templateRec })
         .eq('id', input.sop_id)
@@ -323,16 +325,10 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
     // If the conversion returned zero flagged terms, jump straight through to pending_translation.
     const target: SopStatus = conv.flagged_terms.length === 0 ? 'pending_translation' : 'pending_terms';
 
-    // Use the admin client for status transitions after a long Sonnet call.
-    // The Clerk JWT attached to `supabase` can expire during large PDF
-    // conversions (90-150 s), which causes the authenticated client to reject
-    // subsequent writes. Company scope was already verified above; the admin
-    // client bypass is the same justification used for the storage download.
-    const adminForTransition = getAdminClient();
-    const t1 = await transitionStatus(adminForTransition, input.sop_id, 'draft', 'pending_terms');
+    const t1 = await transitionStatus(admin, input.sop_id, 'draft', 'pending_terms');
     if (!t1.ok) return fail(t1.code, 'Failed to advance status', { db: t1.dbMessage });
     if (target === 'pending_translation') {
-      const t2 = await transitionStatus(adminForTransition, input.sop_id, 'pending_terms', 'pending_translation');
+      const t2 = await transitionStatus(admin, input.sop_id, 'pending_terms', 'pending_translation');
       if (!t2.ok) return fail(t2.code, 'Failed to advance status', { db: t2.dbMessage });
     }
 
