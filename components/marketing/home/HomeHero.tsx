@@ -22,7 +22,7 @@ export function HomeHero() {
             Bilingual SOPs. QR-triggered learning.
           </>
         }
-        headline="Make every frontline worker competent from Day 1."
+        headline="Every frontline worker confident and competent from Day 1."
         subhead="Regardless of what language they speak. Live in 24 hours, no hardware required, $149 per month."
         primary={
           <Button
