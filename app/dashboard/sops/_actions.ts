@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { AuthError, getCompanyContext } from '@/lib/auth/company-context';
 import { getSuperAdminContext } from '@/lib/auth/super-admin-context';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { type SupabaseClient } from '@supabase/supabase-js';
 import {
   convertSopFromImage,
   convertSopFromPdf,
@@ -85,11 +86,11 @@ async function getLatestVersion(
 }
 
 async function transitionStatus(
-  supabase: Awaited<ReturnType<typeof getCompanyContext>>['supabase'],
+  supabase: SupabaseClient,
   sop_id: string,
   from: SopStatus,
   to: SopStatus,
-): Promise<{ ok: true } | { ok: false; code: string }> {
+): Promise<{ ok: true } | { ok: false; code: string; dbMessage?: string }> {
   if (!ALLOWED_SOP_TRANSITIONS[from].includes(to)) {
     return { ok: false, code: 'INVALID_TRANSITION' };
   }
@@ -101,7 +102,7 @@ async function transitionStatus(
     .eq('status', from)
     .select('id')
     .maybeSingle();
-  if (error) return { ok: false, code: 'INTERNAL' };
+  if (error) return { ok: false, code: 'INTERNAL', dbMessage: error.message };
   if (!data) return { ok: false, code: 'STATUS_CHANGED' };
   return { ok: true };
 }
@@ -322,11 +323,17 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
     // If the conversion returned zero flagged terms, jump straight through to pending_translation.
     const target: SopStatus = conv.flagged_terms.length === 0 ? 'pending_translation' : 'pending_terms';
 
-    const t1 = await transitionStatus(supabase, input.sop_id, 'draft', 'pending_terms');
-    if (!t1.ok) return fail(t1.code, 'Failed to advance status');
+    // Use the admin client for status transitions after a long Sonnet call.
+    // The Clerk JWT attached to `supabase` can expire during large PDF
+    // conversions (90-150 s), which causes the authenticated client to reject
+    // subsequent writes. Company scope was already verified above; the admin
+    // client bypass is the same justification used for the storage download.
+    const adminForTransition = getAdminClient();
+    const t1 = await transitionStatus(adminForTransition, input.sop_id, 'draft', 'pending_terms');
+    if (!t1.ok) return fail(t1.code, 'Failed to advance status', { db: t1.dbMessage });
     if (target === 'pending_translation') {
-      const t2 = await transitionStatus(supabase, input.sop_id, 'pending_terms', 'pending_translation');
-      if (!t2.ok) return fail(t2.code, 'Failed to advance status');
+      const t2 = await transitionStatus(adminForTransition, input.sop_id, 'pending_terms', 'pending_translation');
+      if (!t2.ok) return fail(t2.code, 'Failed to advance status', { db: t2.dbMessage });
     }
 
     revalidatePath(`/dashboard/sops/${input.sop_id}`);
