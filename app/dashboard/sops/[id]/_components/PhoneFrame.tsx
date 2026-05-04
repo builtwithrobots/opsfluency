@@ -1,3 +1,8 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { ArrowUp } from "lucide-react";
+
 /**
  * Reusable phone-frame around an iframe of `/app/sop/[id]?preview=1`.
  *
@@ -16,6 +21,27 @@ interface PhoneFrameProps {
 }
 
 export function PhoneFrame({ src, title, caption }: PhoneFrameProps) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  function postScrollTop(enabled: boolean) {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "OPSF_SCROLL_TOP", enabled },
+      window.location.origin,
+    );
+  }
+
+  function handleIframeLoad() {
+    // Re-send after every navigation so the new page's listener gets the state.
+    if (showScrollTop) postScrollTop(true);
+  }
+
+  function toggleScrollTop() {
+    const next = !showScrollTop;
+    setShowScrollTop(next);
+    postScrollTop(next);
+  }
+
   return (
     <div className="flex flex-col items-center gap-3">
       {/* Chassis — light silver, matching the worker app mockup */}
@@ -75,16 +101,35 @@ export function PhoneFrame({ src, title, caption }: PhoneFrameProps) {
 
           {/* Worker page iframe — 800px keeps total screen height at 844 */}
           <iframe
+            ref={iframeRef}
             title={title}
             src={src}
             width={390}
             height={800}
+            onLoad={handleIframeLoad}
             sandbox="allow-scripts allow-same-origin allow-forms"
             className="block border-0 bg-white"
             style={{ width: 390, height: 800 }}
           />
         </div>
       </div>
+
+      {/* Scroll-to-top toggle */}
+      <button
+        type="button"
+        onClick={toggleScrollTop}
+        aria-pressed={showScrollTop}
+        title={showScrollTop ? "Hide scroll-to-top button" : "Show scroll-to-top button"}
+        className={[
+          "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+          showScrollTop
+            ? "border-(--color-brand)/30 bg-(--color-brand)/10 text-(--color-brand)"
+            : "border-[color:var(--dc-edge)] bg-dc-surface text-dc-text-2 hover:text-dc-text",
+        ].join(" ")}
+      >
+        <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden />
+        Scroll-to-top
+      </button>
 
       {caption && (
         <p className="text-xs text-dc-text-3">{caption}</p>
