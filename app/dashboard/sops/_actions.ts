@@ -266,6 +266,7 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
     if (isPdfMime(mimeType)) {
       result = await convertSopFromPdf({
         pdfBase64: fileBuf.toString('base64'),
+        pdfBuffer: fileBuf,
         glossary,
         sopId: input.sop_id,
         companyId: company_id,

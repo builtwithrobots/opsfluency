@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Copy, Check, CheckCircle2 } from 'lucide-react';
+import type { ConversionProgressState } from './RunConversionButton';
 
 interface ProgressStage {
   /** Show this label once `elapsed_ms` reaches `at_ms`. */
@@ -19,22 +20,13 @@ interface JobProgressProps {
 }
 
 /**
- * Animated progress UI for a long-running server action.
- *
- * The bar fills toward `expectedMs` using an `1 - exp(-elapsed/k)` curve so it
- * never sits perfectly still and never reaches 100% until the parent un-mounts
- * this (i.e. the call returned). Stage labels rotate through what the call is
- * actually doing — "Reading the document", "Sending to Sonnet", etc.
- *
- * Honest design notes:
- *   - We never claim a percentage we don't know — the bar caps at 92% while
- *     the call is in flight; only success/failure can move it past that.
- *   - Elapsed time is shown in mm:ss so a stuck call is visually obvious.
+ * Animated progress UI for long-running server actions without real backend
+ * progress signals (e.g. translation). Uses a fake asymptotic curve so the
+ * bar never sits perfectly still and never reaches 100% until un-mounted.
+ * Kept for translation — conversion uses ConversionProgress instead.
  */
 export function JobProgress({ expectedMs, headline, stages }: JobProgressProps) {
   const [elapsed, setElapsed] = useState(0);
-  // Initialised inside useEffect — calling Date.now() during render trips the
-  // React 19 "impure function during render" lint rule.
   const startRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -46,12 +38,10 @@ export function JobProgress({ expectedMs, headline, stages }: JobProgressProps) 
     return () => window.clearInterval(id);
   }, []);
 
-  // Asymptotic curve toward 92% — the easiest "honest" feel.
-  const k = expectedMs / 2.5; // tune-knob: lower = fills faster early
+  const k = expectedMs / 2.5;
   const raw = 1 - Math.exp(-elapsed / k);
   const pct = Math.min(0.92, raw) * 100;
 
-  // Pick latest stage whose at_ms ≤ elapsed.
   const stage = stages.reduce<ProgressStage | null>((acc, s) => (s.at_ms <= elapsed ? s : acc), null);
 
   const seconds = Math.floor(elapsed / 1000);
@@ -86,16 +76,151 @@ export function JobProgress({ expectedMs, headline, stages }: JobProgressProps) 
   );
 }
 
+// ---------------------------------------------------------------------------
+// ConversionProgress — real chunk-aware progress for the SSE conversion path
+// ---------------------------------------------------------------------------
+
+interface ConversionProgressProps {
+  progress: ConversionProgressState;
+}
+
+function formatEta(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `~${s}s remaining`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `~${m}m ${rem}s remaining`;
+}
+
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${mm}:${ss.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Chunk-aware progress indicator for the SSE-powered SOP conversion pipeline.
+ *
+ * Layout:
+ *   headline + elapsed timer
+ *   animated label (fades between chunk labels)
+ *   section pill row (one pill per chunk, fills green as each completes)
+ *   progress bar (accurate: chunk progress → 80%, flagging → 95%)
+ *   ETA chip (shown once at least one chunk is done)
+ */
+export function ConversionProgress({ progress }: ConversionProgressProps) {
+  const { phase, chunksDone, chunksTotal, currentLabel, elapsedMs } = progress;
+
+  // Progress percentage:
+  //   Converting — each chunk contributes (80% / chunksTotal)
+  //   Flagging   — jumps to 88% and slowly approaches 95% while waiting
+  //   Done       — 100% (component unmounted by parent)
+  let pct: number;
+  if (phase === 'flagging') {
+    // Asymptotic from 80% toward 95% during flagging (typically fast)
+    const flagElapsedMs = elapsedMs - (chunksTotal > 0 ? (elapsedMs * 0.8) : 0);
+    const k = 20_000 / 2.5;
+    pct = 80 + Math.min(15, (1 - Math.exp(-Math.max(0, flagElapsedMs) / k)) * 15);
+  } else {
+    const conversionPct = chunksTotal > 0 ? (chunksDone / chunksTotal) * 80 : 0;
+    pct = conversionPct;
+  }
+
+  // ETA — only show once we have real data (at least one chunk done).
+  let etaText: string | null = null;
+  if (phase === 'converting' && chunksDone > 0 && chunksDone < chunksTotal) {
+    const avgMsPerChunk = elapsedMs / chunksDone;
+    const remaining = (chunksTotal - chunksDone) * avgMsPerChunk;
+    etaText = formatEta(remaining);
+  }
+
+  const showPills = chunksTotal > 1;
+
+  return (
+    <div className="rounded-xl border border-(--color-brand) bg-(--color-brand)/5 p-5">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-dc-text">Claude is converting your document</p>
+        <span className="font-mono text-xs text-dc-text-3" aria-label="Elapsed time">
+          {formatElapsed(elapsedMs)}
+        </span>
+      </div>
+
+      {/* Animated label */}
+      <p
+        className="mt-1 text-xs text-dc-text-2 transition-opacity duration-300"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {phase === 'converting' && chunksTotal > 1
+          ? `Converting section ${chunksDone + 1} of ${chunksTotal}${currentLabel ? ` — ${currentLabel}` : ''}`
+          : currentLabel}
+      </p>
+
+      {/* Section pills — only when multiple chunks */}
+      {showPills && (
+        <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Section progress">
+          {Array.from({ length: chunksTotal }, (_, i) => {
+            const isDone = i < chunksDone;
+            const isActive = phase === 'converting' && i === chunksDone;
+            return (
+              <span
+                key={i}
+                className={[
+                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors duration-300',
+                  isDone
+                    ? 'bg-(--color-signal-ok)/15 text-(--color-signal-ok)'
+                    : isActive
+                      ? 'bg-(--color-brand)/20 text-(--color-brand)'
+                      : 'bg-dc-raised text-dc-text-3',
+                ].join(' ')}
+                aria-label={`Section ${i + 1} ${isDone ? 'complete' : isActive ? 'in progress' : 'pending'}`}
+              >
+                {isDone && (
+                  <CheckCircle2 className="size-2.5 shrink-0" aria-hidden />
+                )}
+                {i + 1}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Progress bar */}
+      <div
+        className="mt-3 h-2 overflow-hidden rounded-full bg-dc-raised"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+        aria-label="Conversion progress"
+      >
+        <div
+          className="h-full rounded-full bg-(--color-brand) transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      {/* ETA chip */}
+      {etaText && (
+        <p className="mt-2 text-[11px] text-dc-text-3" aria-live="polite">
+          {etaText}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// JobError — unchanged
+// ---------------------------------------------------------------------------
+
 interface JobErrorProps {
-  /** Short error code like `AI_TIMEOUT`. */
   code: string;
-  /** Human-readable message; may be undefined. */
   message?: string;
-  /** Full debug payload — duration_ms, attempt, raw, model, etc. */
   details?: unknown;
-  /** Called when the manager clicks Retry. Omit to hide the button. */
   onRetry?: () => void;
-  /** Adds an extra labelled context block below the error code (e.g. SOP id). */
   context?: Record<string, string | number | undefined>;
 }
 

@@ -1,12 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { runConversion } from '../../_actions';
-import { JobError, JobProgress } from './JobFeedback';
+import { JobError, ConversionProgress } from './JobFeedback';
 
 interface Props {
   sopId: string;
@@ -19,41 +18,155 @@ interface ErrorState {
   details?: unknown;
 }
 
-const CONVERSION_STAGES = [
-  { at_ms: 0,       label: 'Reading the uploaded document…' },
-  { at_ms: 4_000,   label: 'Sending to Claude Sonnet…' },
-  { at_ms: 8_000,   label: 'Analyzing structure — headings, steps, callouts…' },
-  { at_ms: 25_000,  label: 'Identifying site-specific terminology…' },
-  { at_ms: 45_000,  label: 'Document is large — processing in sections…' },
-  { at_ms: 90_000,  label: 'Almost there — finalizing the response…' },
-  { at_ms: 150_000, label: 'Still working — large or scanned PDFs can take a while.' },
-];
+export interface ConversionProgressState {
+  phase: 'converting' | 'flagging';
+  chunksDone: number;
+  chunksTotal: number;
+  currentLabel: string;
+  elapsedMs: number;
+}
 
 export function RunConversionButton({ sopId, disabled }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [progress, setProgress] = useState<ConversionProgressState | null>(null);
   const [error, setError] = useState<ErrorState | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const startRef = useRef<number>(0);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  function go() {
+  const stopElapsedTimer = useCallback(() => {
+    if (elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current);
+      elapsedTimerRef.current = null;
+    }
+  }, []);
+
+  const go = useCallback(async () => {
     setError(null);
-    startTransition(async () => {
-      const r = await runConversion({ sop_id: sopId });
-      if (!r.ok) {
-        setError({ code: r.error.code, message: r.error.message, details: r.error.details });
+    setProgress({
+      phase: 'converting',
+      chunksDone: 0,
+      chunksTotal: 1,
+      currentLabel: 'Reading the uploaded document…',
+      elapsedMs: 0,
+    });
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+    startRef.current = Date.now();
+
+    // Tick elapsed time every 200ms for the ETA chip.
+    elapsedTimerRef.current = setInterval(() => {
+      setProgress((prev) =>
+        prev ? { ...prev, elapsedMs: Date.now() - startRef.current } : prev,
+      );
+    }, 200);
+
+    try {
+      const response = await fetch(`/api/sops/${sopId}/convert`, {
+        method: 'POST',
+        signal: abort.signal,
+      });
+
+      // Auth and pre-flight errors come back as plain JSON before the stream.
+      if (!response.ok || !response.body) {
+        const body = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string } };
+        const err = body?.error ?? {};
+        stopElapsedTimer();
+        setProgress(null);
+        setError({ code: err.code ?? 'INTERNAL', message: err.message });
         return;
       }
-      router.refresh();
-    });
-  }
 
-  if (isPending) {
+      // Parse the SSE stream line-by-line.
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let lastEvent = '';
+
+      outer: while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            lastEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            let payload: Record<string, unknown>;
+            try {
+              payload = JSON.parse(line.slice(6)) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+
+            switch (lastEvent) {
+              case 'chunk_start':
+                setProgress((prev) => ({
+                  phase: 'converting',
+                  chunksDone: (prev?.chunksDone ?? 0),
+                  chunksTotal: (payload.total as number) ?? 1,
+                  currentLabel: (payload.label as string) || 'Processing…',
+                  elapsedMs: Date.now() - startRef.current,
+                }));
+                break;
+
+              case 'chunk_done':
+                setProgress((prev) => ({
+                  phase: 'converting',
+                  chunksDone: (payload.chunk as number) ?? 1,
+                  chunksTotal: (payload.total as number) ?? 1,
+                  currentLabel: prev?.currentLabel ?? '',
+                  elapsedMs: Date.now() - startRef.current,
+                }));
+                break;
+
+              case 'flagging_start':
+                setProgress((prev) => ({
+                  phase: 'flagging',
+                  chunksDone: prev?.chunksTotal ?? 1,
+                  chunksTotal: prev?.chunksTotal ?? 1,
+                  currentLabel: 'Identifying site-specific terminology…',
+                  elapsedMs: Date.now() - startRef.current,
+                }));
+                break;
+
+              case 'done':
+                stopElapsedTimer();
+                setProgress(null);
+                router.refresh();
+                break outer;
+
+              case 'error': {
+                stopElapsedTimer();
+                setProgress(null);
+                setError({
+                  code: (payload.code as string) ?? 'INTERNAL',
+                  message: payload.message as string | undefined,
+                  details: payload,
+                });
+                break outer;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      stopElapsedTimer();
+      setProgress(null);
+      // AbortError fires when user navigates away — don't show error.
+      if (e instanceof Error && e.name === 'AbortError') return;
+      setError({ code: 'INTERNAL', message: e instanceof Error ? e.message : undefined });
+    }
+  }, [sopId, router, stopElapsedTimer]);
+
+  if (progress) {
     return (
       <div className="flex w-full flex-col gap-3">
-        <JobProgress
-          headline="Claude is converting your document"
-          expectedMs={120_000}
-          stages={CONVERSION_STAGES}
-        />
+        <ConversionProgress progress={progress} />
       </div>
     );
   }

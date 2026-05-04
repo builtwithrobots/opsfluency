@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { GlossaryRow } from "@/lib/types/glossary";
+import { extractPdfText } from "./pdf-extraction";
 
 import { SONNET_MODEL, callSonnet, type SonnetResult, type SonnetUserContent } from "./sonnet";
 
@@ -26,11 +27,13 @@ import { SONNET_MODEL, callSonnet, type SonnetResult, type SonnetUserContent } f
  * Per CLAUDE.md → "AI call conventions": 180s timeout, 1 retry on
  * transient errors, prompt caching on system prompts.
  *
- * Large-document fallback: if either call returns AI_TRUNCATED, the pipeline
- * automatically retries using a chunked strategy transparent to all callers.
- * Call 2 splits by heading boundaries. Call 1 (text path only) splits at
- * paragraph boundaries. PDF/image paths cannot be chunked without a PDF
- * extraction library and surface AI_TRUNCATED as-is on Call 1.
+ * Large-document handling — proactive chunking:
+ *   If text exceeds PROACTIVE_CHUNK_CHARS the pipeline splits the document
+ *   before calling Sonnet (not after AI_TRUNCATED). Each completed chunk
+ *   fires onChunkProgress so callers can stream real progress to the UI.
+ *   For PDFs, text is extracted with pdf-parse first; scanned/image PDFs
+ *   that yield too little text fall back to Sonnet's native vision path.
+ *   Call 2 (flagging) also chunks proactively on its own threshold.
  */
 
 export interface FlaggedTerm {
@@ -47,7 +50,14 @@ export interface FlaggedTerm {
 export interface SopConversionResult {
   markdown: string;
   flagged_terms: FlaggedTerm[];
+  /** Total number of conversion chunks processed (1 = single-call, >1 = chunked). */
+  chunks_total: number;
 }
+
+/** Progress event emitted after each chunk during a multi-chunk conversion. */
+export type ChunkProgressEvent =
+  | { type: "chunk_start"; index: number; total: number; label: string }
+  | { type: "chunk_done"; index: number; total: number };
 
 // ---------------------------------------------------------------------------
 // Call 1 — Sonnet: document → Markdown
@@ -147,18 +157,35 @@ function parseFlaggingResponse(rawText: string): FlaggedTermsOnly {
 // Chunking helpers
 // ---------------------------------------------------------------------------
 
-// Target sizes chosen so each chunk produces well under the output token cap
-// in the worst-case (dense terminology) scenario.
-const FLAGGING_CHUNK_MAX_CHARS = 8_000;
+/**
+ * Proactive split threshold for text conversion (Call 1).
+ * Documents larger than this are split before sending to Sonnet.
+ * Chosen so each chunk generates ≤6 000 output tokens → ~30–40s per chunk.
+ * Smaller chunks = shorter individual calls + real progress milestones.
+ */
+const PROACTIVE_CHUNK_CHARS = 20_000;
+
+/** Reactive fallback: only kicks in if a proactive chunk itself triggers AI_TRUNCATED. */
 const CONVERSION_TEXT_CHUNK_MAX_CHARS = 60_000;
 
+/** Flagging (Call 2) — heading-bounded chunks for term identification. */
+const FLAGGING_CHUNK_MAX_CHARS = 8_000;
+
+/** Extract a human-readable label from the start of a text/Markdown chunk. */
+function extractChunkLabel(text: string, fallbackIndex: number): string {
+  const headingMatch = text.match(/^#{1,4}\s+(.+)/m);
+  if (headingMatch) return headingMatch[1].trim().slice(0, 60);
+  const capsLine = text.match(/^([A-Z][^\n]{10,60})$/m);
+  if (capsLine) return capsLine[1].trim().slice(0, 60);
+  return `Section ${fallbackIndex + 1}`;
+}
+
 /**
- * Splits a Markdown string into heading-bounded chunks for per-section term
- * flagging. Split priority: H1/H2 → H3/H4 → paragraph breaks. Each chunk is
- * a standalone Markdown fragment with enough context to flag terms correctly.
+ * Splits text at paragraph boundaries, targeting chunks ≤ maxChars.
+ * Primary split: H1/H2 headings. Secondary: H3/H4. Fallback: paragraph breaks.
  */
-function splitMarkdownForFlagging(markdown: string): string[] {
-  if (markdown.length <= FLAGGING_CHUNK_MAX_CHARS) return [markdown];
+function splitTextProactively(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
 
   function groupByBoundary(parts: string[], max: number): string[] {
     const out: string[] = [];
@@ -175,27 +202,24 @@ function splitMarkdownForFlagging(markdown: string): string[] {
     return out;
   }
 
-  // Pass 1: H1/H2 headings
-  let chunks = groupByBoundary(
-    markdown.split(/(?=^#{1,2} )/m),
-    FLAGGING_CHUNK_MAX_CHARS,
-  );
+  // Pass 1: H1/H2
+  let chunks = groupByBoundary(text.split(/(?=^#{1,2} )/m), maxChars);
 
-  // Pass 2: H3/H4 headings for any still-oversized chunks
+  // Pass 2: H3/H4 for any still-oversized chunks
   chunks = chunks.flatMap((c) => {
-    if (c.length <= FLAGGING_CHUNK_MAX_CHARS) return [c];
-    return groupByBoundary(c.split(/(?=^#{3,4} )/m), FLAGGING_CHUNK_MAX_CHARS);
+    if (c.length <= maxChars) return [c];
+    return groupByBoundary(c.split(/(?=^#{3,4} )/m), maxChars);
   });
 
   // Pass 3: paragraph breaks
   chunks = chunks.flatMap((c) => {
-    if (c.length <= FLAGGING_CHUNK_MAX_CHARS) return [c];
+    if (c.length <= maxChars) return [c];
     const paras = c.split(/\n\n+/);
     const out: string[] = [];
     let cur = "";
     for (const para of paras) {
       const sep = cur.length > 0 ? "\n\n" : "";
-      if (cur.length + sep.length + para.length > FLAGGING_CHUNK_MAX_CHARS && cur.length > 0) {
+      if (cur.length + sep.length + para.length > maxChars && cur.length > 0) {
         out.push(cur);
         cur = para;
       } else {
@@ -210,27 +234,11 @@ function splitMarkdownForFlagging(markdown: string): string[] {
 }
 
 /**
- * Splits plain text at paragraph boundaries for chunked Call 1 conversion.
+ * Splits a Markdown string into heading-bounded chunks for per-section term
+ * flagging. Split priority: H1/H2 → H3/H4 → paragraph breaks.
  */
-function splitTextForConversion(text: string): string[] {
-  if (text.length <= CONVERSION_TEXT_CHUNK_MAX_CHARS) return [text];
-
-  const paragraphs = text.split(/\n\n+/);
-  const chunks: string[] = [];
-  let cur = "";
-
-  for (const para of paragraphs) {
-    const sep = cur.length > 0 ? "\n\n" : "";
-    if (cur.length + sep.length + para.length > CONVERSION_TEXT_CHUNK_MAX_CHARS && cur.length > 0) {
-      chunks.push(cur);
-      cur = para;
-    } else {
-      cur = cur + sep + para;
-    }
-  }
-  if (cur.length > 0) chunks.push(cur);
-
-  return chunks.filter((c) => c.trim().length > 0);
+function splitMarkdownForFlagging(markdown: string): string[] {
+  return splitTextProactively(markdown, FLAGGING_CHUNK_MAX_CHARS);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,8 +295,9 @@ async function flagTermsInChunks(
 }
 
 /**
- * Runs the flagging call on `markdown`. On AI_TRUNCATED, automatically
- * retries using heading-bounded chunks if the Markdown can be split.
+ * Runs the flagging call on `markdown`. Proactively chunks if markdown
+ * exceeds FLAGGING_CHUNK_MAX_CHARS. On AI_TRUNCATED, retries using finer
+ * heading-bounded chunks if the Markdown can be split.
  * Transparent to all callers — managers never see AI_TRUNCATED from this step
  * unless even the individual chunks are too large.
  */
@@ -298,6 +307,14 @@ async function runFlaggingWithFallback(
   ctx: { sopId: string; companyId: string },
   signal?: AbortSignal,
 ): Promise<SonnetResult<FlaggedTermsOnly>> {
+  // Proactively chunk if markdown is large enough to warrant it.
+  if (markdown.length > FLAGGING_CHUNK_MAX_CHARS) {
+    const chunks = splitMarkdownForFlagging(markdown);
+    if (chunks.length > 1) {
+      return flagTermsInChunks(chunks, glossary, ctx, signal);
+    }
+  }
+
   const result = await callSonnet<FlaggedTermsOnly>(
     {
       model: SONNET_MODEL,
@@ -321,7 +338,7 @@ async function runFlaggingWithFallback(
 }
 
 // ---------------------------------------------------------------------------
-// Shared pipeline runner (PDF and image paths)
+// Shared pipeline runner (PDF vision and image paths — no proactive chunking)
 // ---------------------------------------------------------------------------
 
 interface ConvertSopBaseInput {
@@ -329,6 +346,7 @@ interface ConvertSopBaseInput {
   sopId: string;
   companyId: string;
   signal?: AbortSignal;
+  onChunkProgress?: (event: ChunkProgressEvent) => void;
 }
 
 async function runPipeline(
@@ -337,7 +355,9 @@ async function runPipeline(
 ): Promise<SonnetResult<SopConversionResult>> {
   const ctx = { sopId: base.sopId, companyId: base.companyId };
 
-  // Step 1 — Sonnet converts the raw document to Markdown.
+  // Single vision call — no proactive chunking (can't split a PDF/image block).
+  base.onChunkProgress?.({ type: "chunk_start", index: 0, total: 1, label: "Document" });
+
   const conversionResult = await callSonnet<MarkdownOnly>(
     {
       model: SONNET_MODEL,
@@ -352,10 +372,10 @@ async function runPipeline(
 
   if (!conversionResult.ok) return conversionResult;
 
+  base.onChunkProgress?.({ type: "chunk_done", index: 0, total: 1 });
+
   const { markdown } = conversionResult.data;
 
-  // Step 2 — Sonnet flags site-specific terms. Automatically chunks and retries
-  // on AI_TRUNCATED so terminology-dense documents don't surface errors to managers.
   const flaggingResult = await runFlaggingWithFallback(
     markdown,
     base.glossary,
@@ -370,10 +390,63 @@ async function runPipeline(
     data: {
       markdown,
       flagged_terms: flaggingResult.data.flagged_terms,
+      chunks_total: 1,
     },
     usage: {
       input_tokens: conversionResult.usage.input_tokens + flaggingResult.usage.input_tokens,
       output_tokens: conversionResult.usage.output_tokens + flaggingResult.usage.output_tokens,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Chunked text conversion (Call 1 — text path, proactive or reactive)
+// ---------------------------------------------------------------------------
+
+async function convertTextInChunks(
+  base: ConvertSopBaseInput,
+  chunks: string[],
+  ctx: { sopId: string; companyId: string },
+): Promise<SonnetResult<SopConversionResult>> {
+  const parts: string[] = [];
+  let convInputTokens = 0;
+  let convOutputTokens = 0;
+  const total = chunks.length;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const label = extractChunkLabel(chunks[i], i);
+    base.onChunkProgress?.({ type: "chunk_start", index: i, total, label });
+
+    const result = await callSonnet<MarkdownOnly>(
+      {
+        model: SONNET_MODEL,
+        systemPrompt: CONVERSION_SYSTEM_PROMPT,
+        userMessage: `Convert the following document section. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${chunks[i]}\n---END DOCUMENT---`,
+        maxTokens: 16384,
+        parse: parseMarkdownResponse,
+        signal: base.signal,
+      },
+      ctx,
+    );
+
+    if (!result.ok) return result;
+
+    base.onChunkProgress?.({ type: "chunk_done", index: i, total });
+    parts.push(result.data.markdown);
+    convInputTokens += result.usage.input_tokens;
+    convOutputTokens += result.usage.output_tokens;
+  }
+
+  const markdown = parts.join("\n\n---\n\n");
+  const flaggingResult = await runFlaggingWithFallback(markdown, base.glossary, ctx, base.signal);
+  if (!flaggingResult.ok) return flaggingResult;
+
+  return {
+    ok: true,
+    data: { markdown, flagged_terms: flaggingResult.data.flagged_terms, chunks_total: total },
+    usage: {
+      input_tokens: convInputTokens + flaggingResult.usage.input_tokens,
+      output_tokens: convOutputTokens + flaggingResult.usage.output_tokens,
     },
   };
 }
@@ -388,13 +461,22 @@ export interface ConvertSopFromTextInput extends ConvertSopBaseInput {
 
 /**
  * Converts a plain-text or text-extracted document into the SOP Markdown shape.
- * If the document is too large for a single Call 1 conversion, it is
- * automatically split at paragraph boundaries and converted in sections.
+ * Proactively chunks if the document exceeds PROACTIVE_CHUNK_CHARS so the
+ * caller receives real per-chunk progress events instead of a single long wait.
  */
 export async function convertSopFromText(
   input: ConvertSopFromTextInput,
 ): Promise<SonnetResult<SopConversionResult>> {
   const ctx = { sopId: input.sopId, companyId: input.companyId };
+
+  // Proactive split — do this before calling Sonnet, not after AI_TRUNCATED.
+  const chunks = splitTextProactively(input.documentText, PROACTIVE_CHUNK_CHARS);
+  if (chunks.length > 1) {
+    return convertTextInChunks(input, chunks, ctx);
+  }
+
+  // Single chunk — one Sonnet call with progress bookends.
+  input.onChunkProgress?.({ type: "chunk_start", index: 0, total: 1, label: extractChunkLabel(input.documentText, 0) });
 
   const conversionResult = await callSonnet<MarkdownOnly>(
     {
@@ -409,14 +491,18 @@ export async function convertSopFromText(
   );
 
   if (!conversionResult.ok) {
+    // Reactive fallback: if even the single chunk is too big, split at
+    // paragraph boundaries and retry — keeps AI_TRUNCATED off the manager UI.
     if (conversionResult.error.code === "AI_TRUNCATED") {
-      const chunks = splitTextForConversion(input.documentText);
-      if (chunks.length > 1) {
-        return convertTextInChunks(input, chunks, ctx);
+      const reactiveChunks = splitTextProactively(input.documentText, CONVERSION_TEXT_CHUNK_MAX_CHARS);
+      if (reactiveChunks.length > 1) {
+        return convertTextInChunks(input, reactiveChunks, ctx);
       }
     }
     return conversionResult;
   }
+
+  input.onChunkProgress?.({ type: "chunk_done", index: 0, total: 1 });
 
   const { markdown } = conversionResult.data;
   const flaggingResult = await runFlaggingWithFallback(markdown, input.glossary, ctx, input.signal);
@@ -424,7 +510,7 @@ export async function convertSopFromText(
 
   return {
     ok: true,
-    data: { markdown, flagged_terms: flaggingResult.data.flagged_terms },
+    data: { markdown, flagged_terms: flaggingResult.data.flagged_terms, chunks_total: 1 },
     usage: {
       input_tokens: conversionResult.usage.input_tokens + flaggingResult.usage.input_tokens,
       output_tokens: conversionResult.usage.output_tokens + flaggingResult.usage.output_tokens,
@@ -432,65 +518,40 @@ export async function convertSopFromText(
   };
 }
 
-/**
- * Converts oversized plain-text input in paragraph-bounded chunks, then merges
- * the resulting Markdown sections and flags terms across the full document.
- */
-async function convertTextInChunks(
-  base: ConvertSopBaseInput,
-  chunks: string[],
-  ctx: { sopId: string; companyId: string },
-): Promise<SonnetResult<SopConversionResult>> {
-  const parts: string[] = [];
-  let convInputTokens = 0;
-  let convOutputTokens = 0;
-
-  for (const chunk of chunks) {
-    const result = await callSonnet<MarkdownOnly>(
-      {
-        model: SONNET_MODEL,
-        systemPrompt: CONVERSION_SYSTEM_PROMPT,
-        userMessage: `Convert the following document section. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${chunk}\n---END DOCUMENT---`,
-        maxTokens: 16384,
-        parse: parseMarkdownResponse,
-        signal: base.signal,
-      },
-      ctx,
-    );
-
-    if (!result.ok) return result;
-
-    parts.push(result.data.markdown);
-    convInputTokens += result.usage.input_tokens;
-    convOutputTokens += result.usage.output_tokens;
-  }
-
-  const markdown = parts.join("\n\n---\n\n");
-  const flaggingResult = await runFlaggingWithFallback(markdown, base.glossary, ctx, base.signal);
-  if (!flaggingResult.ok) return flaggingResult;
-
-  return {
-    ok: true,
-    data: { markdown, flagged_terms: flaggingResult.data.flagged_terms },
-    usage: {
-      input_tokens: convInputTokens + flaggingResult.usage.input_tokens,
-      output_tokens: convOutputTokens + flaggingResult.usage.output_tokens,
-    },
-  };
-}
-
 export interface ConvertSopFromPdfInput extends ConvertSopBaseInput {
   pdfBase64: string;
+  /** Raw PDF bytes — used to attempt text extraction before the vision path. */
+  pdfBuffer?: Buffer;
 }
 
 /**
- * Converts a PDF document into the SOP Markdown shape using Anthropic's
- * native document block — no PDF parsing library needed. Handles both
- * digital-text PDFs and scanned (image-only) PDFs in a single Sonnet call.
+ * Converts a PDF document into the SOP Markdown shape.
+ *
+ * First attempts to extract machine-readable text via pdf-parse:
+ *   - If extraction succeeds (typed PDF): routes to convertSopFromText so the
+ *     document benefits from proactive chunking and real per-chunk progress.
+ *   - If extraction fails or yields < 500 chars (scanned/image PDF): falls back
+ *     to Anthropic's native document block — Sonnet reads the PDF as a file
+ *     via vision, which handles both digital-text and scanned layouts.
  */
 export async function convertSopFromPdf(
   input: ConvertSopFromPdfInput,
 ): Promise<SonnetResult<SopConversionResult>> {
+  if (input.pdfBuffer) {
+    const extracted = await extractPdfText(input.pdfBuffer);
+    if (extracted) {
+      return convertSopFromText({
+        documentText: extracted.text,
+        glossary: input.glossary,
+        sopId: input.sopId,
+        companyId: input.companyId,
+        signal: input.signal,
+        onChunkProgress: input.onChunkProgress,
+      });
+    }
+  }
+
+  // Scanned or buffer not provided — use Sonnet's native vision path.
   const userMessage: SonnetUserContent = [
     {
       type: "document",
