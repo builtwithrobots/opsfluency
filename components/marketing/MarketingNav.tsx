@@ -1,4 +1,4 @@
-// v1.0.1
+// v1.0.2
 // Marketing nav. Sticky top bar, logo left, primary links middle, CTA +
 // theme toggle right. Mobile: hamburger opens a full-screen sheet.
 // <nav aria-label="Primary">.
@@ -18,7 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/marketing/Button";
 import { Container } from "@/components/marketing/Container";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { SpeechLogo } from "@/components/ui/SpeechLogo";
+import { BeaconLogo } from "@/components/ui/BeaconLogo";
 
 type NavLink = { label: string; href: string };
 
@@ -76,7 +76,7 @@ export function MarketingNav() {
             className="inline-flex items-center gap-2"
             aria-label="OpsFluency home"
           >
-            <SpeechLogo size="md" />
+            <BeaconLogo size="md" />
             <span
               className="text-xl font-bold tracking-tight text-dc-text"
               style={{ fontFamily: "var(--font-display)" }}
