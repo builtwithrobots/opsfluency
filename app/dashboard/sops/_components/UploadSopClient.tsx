@@ -93,7 +93,7 @@ export function UploadSopClient({ departments, scope }: Props) {
 
   function validateAndAccept(f: File): boolean {
     if (!(SOP_UPLOAD_MIME_TYPES as readonly string[]).includes(f.type)) {
-      setError('Unsupported file type. Use PDF, TXT, JPG, PNG, or HEIC.');
+      setError('Unsupported file type. Use PDF, DOCX, DOC, TXT, JPG, or PNG.');
       return false;
     }
     if (f.size > SOP_UPLOAD_MAX_BYTES) {
@@ -193,7 +193,7 @@ export function UploadSopClient({ departments, scope }: Props) {
             </button>
           </div>
           <DialogDescription>
-            PDF, TXT, JPG, PNG, or HEIC up to 10 MB. One procedure per file works best — keep it under 10 pages for fastest results.
+            PDF, DOCX, DOC, TXT, JPG, or PNG up to 10 MB. One procedure per file works best — keep it under 10 pages for fastest results.
           </DialogDescription>
 
           <DialogBody className="flex flex-col gap-4">
@@ -229,7 +229,7 @@ export function UploadSopClient({ departments, scope }: Props) {
                 <>
                   <Upload className="size-7 text-dc-text-3" strokeWidth={1.5} aria-hidden />
                   <p className="text-sm font-medium text-dc-text">Drop a file or click to browse</p>
-                  <p className="text-xs text-dc-text-3">PDF · TXT · JPG · PNG · HEIC · max 10 MB · one procedure per file</p>
+                  <p className="text-xs text-dc-text-3">PDF · DOCX · DOC · TXT · JPG · PNG · max 10 MB · one procedure per file</p>
                 </>
               )}
             </label>
