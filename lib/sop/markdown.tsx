@@ -60,23 +60,23 @@ function flattenText(node: ReactNode): string {
 }
 
 const components: Components = {
-  h1: ({ children }) => (
-    <h2 className="font-display mt-2 mb-4 text-2xl font-bold text-dc-text">{children}</h2>
+  h1: ({ children, id }) => (
+    <h2 id={id} className="font-display mt-2 mb-4 text-2xl font-bold text-dc-text">{children}</h2>
   ),
-  h2: ({ children }) => (
-    <h3 className="mt-6 mb-3 text-xl font-semibold text-dc-text">{children}</h3>
+  h2: ({ children, id }) => (
+    <h3 id={id} className="mt-6 mb-3 text-xl font-semibold text-dc-text">{children}</h3>
   ),
-  h3: ({ children }) => (
-    <h4 className="mt-5 mb-2 text-lg font-semibold text-dc-text">{children}</h4>
+  h3: ({ children, id }) => (
+    <h4 id={id} className="mt-5 mb-2 text-lg font-semibold text-dc-text">{children}</h4>
   ),
-  h4: ({ children }) => (
-    <h5 className="mt-4 mb-2 text-base font-semibold text-dc-text">{children}</h5>
+  h4: ({ children, id }) => (
+    <h5 id={id} className="mt-4 mb-2 text-base font-semibold text-dc-text">{children}</h5>
   ),
-  h5: ({ children }) => (
-    <h6 className="mt-4 mb-2 text-base font-semibold text-dc-text">{children}</h6>
+  h5: ({ children, id }) => (
+    <h6 id={id} className="mt-4 mb-2 text-base font-semibold text-dc-text">{children}</h6>
   ),
-  h6: ({ children }) => (
-    <h6 className="mt-4 mb-2 text-base font-semibold text-dc-text">{children}</h6>
+  h6: ({ children, id }) => (
+    <h6 id={id} className="mt-4 mb-2 text-base font-semibold text-dc-text">{children}</h6>
   ),
 
   p: ({ children }) => (
