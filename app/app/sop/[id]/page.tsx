@@ -4,6 +4,7 @@ import { AuthError, getCompanyContext, type Role } from '@/lib/auth/company-cont
 import { passesAudience, type QrAudience } from '@/lib/qr/audience';
 import type { WorkerLanguage, SopTemplate } from '@/lib/types/sop';
 import { TemplateRenderer } from '@/components/sop/TemplateRenderer';
+import type { HrContact } from '@/components/sop/OnboardingRenderer';
 import { LanguageToggleClient } from './_components/LanguageToggleClient';
 import { VideoButtonClient } from './_components/VideoButtonClient';
 
@@ -172,6 +173,23 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
 
   const content = lang === 'es' ? (version.content_es ?? version.content_en ?? '') : (version.content_en ?? '');
 
+  // Fetch HR contacts only for onboarding SOPs. Defensive try/catch so a
+  // missing table (migration not yet applied) never blocks the page load.
+  let hrContacts: HrContact[] = [];
+  if (sopTemplate === 'onboarding') {
+    try {
+      const { data: contactRows } = await supabase
+        .from('hr_contacts')
+        .select('id, name, title, email, phone, photo_url')
+        .eq('company_id', company_id)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+      hrContacts = (contactRows ?? []) as HrContact[];
+    } catch {
+      // migration not yet applied — render without contact cards
+    }
+  }
+
   return (
     <main className="mx-auto min-h-[100dvh] max-w-2xl px-5 py-6 sm:px-6 sm:py-10" lang={lang}>
       <header className="mb-5 flex items-center justify-between gap-3">
@@ -188,7 +206,7 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
       )}
 
       <article className="text-[17px] leading-relaxed">
-        <TemplateRenderer content={content} template={sopTemplate} lang={lang} />
+        <TemplateRenderer content={content} template={sopTemplate} lang={lang} hrContacts={hrContacts} />
       </article>
     </main>
   );
