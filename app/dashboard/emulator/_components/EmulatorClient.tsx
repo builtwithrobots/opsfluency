@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowUp,
   BatteryFull,
   ExternalLink,
   RefreshCw,
@@ -36,6 +37,7 @@ interface Props {
 export function EmulatorClient({ initialLang }: Props) {
   const [device, setDevice] = useState<Device>("phone");
   const [lang, setLang] = useState<WorkerLanguage>(initialLang);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Tracks the iframe's current pathname so the address bar reflects
   // navigation inside the worker app. Read on every iframe `load`
@@ -49,6 +51,13 @@ export function EmulatorClient({ initialLang }: Props) {
   // navigation (which would race with the read of pathname below).
   const initialSrc = `${DEFAULT_PATH}?lang=${lang}`;
 
+  function postScrollTop(enabled: boolean) {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "OPSF_SCROLL_TOP", enabled },
+      window.location.origin,
+    );
+  }
+
   function handleIframeLoad() {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
@@ -59,6 +68,15 @@ export function EmulatorClient({ initialLang }: Props) {
       // Cross-origin would throw; same-origin iframe shouldn't, but
       // swallow defensively so the emulator never crashes the dashboard.
     }
+    // Re-send scroll-top preference after every navigation — the new
+    // page's listener needs to receive the current state on mount.
+    if (showScrollTop) postScrollTop(true);
+  }
+
+  function toggleScrollTop() {
+    const next = !showScrollTop;
+    setShowScrollTop(next);
+    postScrollTop(next);
   }
 
   function reload() {
@@ -97,6 +115,7 @@ export function EmulatorClient({ initialLang }: Props) {
         <div className="flex flex-wrap items-center gap-3">
           <DeviceToggle current={device} onSelect={setDevice} />
           <LangToggle current={lang} onSelect={pickLang} />
+          <ScrollTopToggle enabled={showScrollTop} onToggle={toggleScrollTop} />
         </div>
 
         <div className="flex items-center gap-2">
@@ -258,6 +277,34 @@ function LangToggle({
         </button>
       ))}
     </div>
+  );
+}
+
+// ── Scroll-to-top toggle ─────────────────────────────────────────────────────
+
+function ScrollTopToggle({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={enabled}
+      title={enabled ? "Hide scroll-to-top button" : "Show scroll-to-top button"}
+      className={[
+        "flex min-h-[36px] items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+        enabled
+          ? "border-(--color-brand)/30 bg-(--color-brand)/10 text-(--color-brand)"
+          : "border-dc-edge bg-dc-bg text-dc-text-2 hover:text-dc-text",
+      ].join(" ")}
+    >
+      <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden />
+      Scroll top
+    </button>
   );
 }
 

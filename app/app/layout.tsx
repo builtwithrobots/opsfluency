@@ -87,7 +87,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {/* Pad the bottom so page content is never hidden behind the nav. */}
       <div className="pb-20">{children}</div>
       <BottomNav lang={navLang} />
-      {!isEmbedded && <ScrollToTopButton />}
+      <ScrollToTopButton isEmbedded={isEmbedded} />
     </>
   );
 }
