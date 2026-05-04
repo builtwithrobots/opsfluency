@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
 
 /**
  * SOP-flavoured Markdown renderer. Backed by `react-markdown` +
@@ -200,7 +201,7 @@ const components: Components = {
 export function renderMarkdown(source: string, opts: RenderOptions = {}): ReactNode {
   return (
     <div className={opts.className}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]} components={components}>
         {source}
       </ReactMarkdown>
     </div>
