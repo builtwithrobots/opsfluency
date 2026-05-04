@@ -32,9 +32,11 @@ import {
   WORKER_LANGUAGES,
   isImageMime,
   isPdfMime,
+  isWordMime,
   type SopStatus,
   type SopTemplate,
 } from '@/lib/types/sop';
+import { extractWordText } from '@/lib/ai/docx-extraction';
 
 type ActionResult<T = undefined> =
   | (T extends undefined ? { ok: true } : { ok: true; data: T })
@@ -267,6 +269,14 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
       result = await convertSopFromPdf({
         pdfBase64: fileBuf.toString('base64'),
         pdfBuffer: fileBuf,
+        glossary,
+        sopId: input.sop_id,
+        companyId: company_id,
+      });
+    } else if (isWordMime(mimeType)) {
+      const extracted = await extractWordText(fileBuf);
+      result = await convertSopFromText({
+        documentText: extracted?.text ?? fileBuf.toString('utf-8'),
         glossary,
         sopId: input.sop_id,
         companyId: company_id,

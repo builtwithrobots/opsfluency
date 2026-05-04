@@ -47,19 +47,19 @@ export function canTransitionSop(from: SopStatus, to: SopStatus): boolean {
 }
 
 /**
- * MIME types accepted by the SOP upload dropzone. PDFs and images are sent
- * to Sonnet directly (document/vision blocks); TXT is read as text. DOCX is
- * intentionally excluded from MVP — the cost of a `mammoth` dependency to
- * extract text isn't worth it when "save as PDF" is one click in Office.
- * Re-add `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
- * here when a customer actually asks for it.
+ * MIME types accepted by the SOP upload dropzone.
+ * - PDF/images → Sonnet document/vision blocks
+ * - TXT → utf-8 text path
+ * - DOCX → mammoth text extraction → chunked text path
+ * - DOC (legacy binary) → mammoth extraction attempt; falls back to text decode
  */
 export const SOP_UPLOAD_MIME_TYPES = [
   "application/pdf",
   "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
   "image/jpeg",
   "image/png",
-  "image/heic",
   "image/heif",
 ] as const;
 
@@ -71,6 +71,13 @@ export function isImageMime(mime: string): boolean {
 
 export function isPdfMime(mime: string): boolean {
   return mime === "application/pdf";
+}
+
+export function isWordMime(mime: string): boolean {
+  return (
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "application/msword"
+  );
 }
 
 export const SOP_UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // 10 MB

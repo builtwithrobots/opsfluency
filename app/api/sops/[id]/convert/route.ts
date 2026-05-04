@@ -12,11 +12,13 @@ import {
 } from "@/lib/ai/sop-conversion";
 import { recommendTemplate } from "@/lib/ai/template-recommender";
 import type { GlossaryRow } from "@/lib/types/glossary";
+import { extractWordText } from "@/lib/ai/docx-extraction";
 import {
   ALLOWED_SOP_TRANSITIONS,
   SOP_UPLOADS_BUCKET,
   isImageMime,
   isPdfMime,
+  isWordMime,
   type SopStatus,
 } from "@/lib/types/sop";
 
@@ -164,6 +166,16 @@ export async function POST(
           result = await convertSopFromPdf({
             pdfBase64: fileBuf.toString("base64"),
             pdfBuffer: fileBuf,
+            glossary,
+            sopId: sop_id,
+            companyId: company_id,
+            signal: abortController.signal,
+            onChunkProgress,
+          });
+        } else if (isWordMime(mimeType)) {
+          const extracted = await extractWordText(fileBuf);
+          result = await convertSopFromText({
+            documentText: extracted?.text ?? fileBuf.toString("utf-8"),
             glossary,
             sopId: sop_id,
             companyId: company_id,
