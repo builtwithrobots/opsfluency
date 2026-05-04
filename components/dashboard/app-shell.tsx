@@ -24,7 +24,7 @@ import { useSidebarCollapsed } from "@/components/ui/sidebar-collapsed-context";
 import { SidebarLayout } from "@/components/ui/sidebar-layout";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { SpeechLogo } from "@/components/ui/SpeechLogo";
+import { BeaconLogo } from "@/components/ui/BeaconLogo";
 
 import {
   brandNameClasses,
@@ -45,7 +45,7 @@ interface AppShellProps {
 // ── Brand mark ──────────────────────────────────────────────────────────────
 
 function BrandMark() {
-  return <SpeechLogo size="lg" className="shrink-0" />;
+  return <BeaconLogo size="lg" className="shrink-0" />;
 }
 
 // ── Company context label (above user footer, below footer divider) ──────────

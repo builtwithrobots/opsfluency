@@ -1,33 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <defs>
-    <clipPath id="badge-clip">
-      <rect width="32" height="32" rx="7"/>
-    </clipPath>
-  </defs>
+  <style>
+    .badge { fill: #14B8A6; }
+    .icon-stroke { stroke: white; }
+    .icon-fill   { fill: white; }
+    @media (prefers-color-scheme: dark) {
+      .badge       { fill: white; }
+      .icon-stroke { stroke: #14B8A6; }
+      .icon-fill   { fill: #14B8A6; }
+    }
+  </style>
 
   <!-- Teal rounded-square badge -->
-  <rect fill="#14B8A6" width="32" height="32" rx="7"/>
+  <rect class="badge" width="32" height="32" rx="6"/>
 
-  <!-- Speech icon bottom-aligned, clipped to badge for clean bleed -->
-  <g clip-path="url(#badge-clip)">
-    <g transform="translate(3, 2) scale(1.08)">
-      <!-- Body -- fill only, extended to y=30 for clean clip bleed -->
-      <path
-        d="M8.8 20v-4.1l1.9.2a2.3 2.3 0 0 0 2.164-2.1V8.3A5.37 5.37 0 0 0 2 8.25c0 2.8.656 3.054 1 4.55a5.77 5.77 0 0 1 .029 2.758L2 30H8.8Z"
-        fill="white"
-      />
-      <!-- Head circle with thin teal border -->
-      <circle cx="6.8" cy="5.8" r="3.2" fill="white" stroke="#14B8A6" stroke-width="0.75"/>
-      <!-- Inner arc -->
-      <path
-        d="M17 15a3.5 3.5 0 0 0-.025-4.975"
-        stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"
-      />
-      <!-- Outer arc -->
-      <path
-        d="M19.8 17.8a7.5 7.5 0 0 0 .003-10.603"
-        stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"
-      />
-    </g>
+  <!-- Podcast icon scaled to 85% of badge (27.2px), centred (offset 2.4px) -->
+  <g transform="translate(2.4, 2.4) scale(1.133)">
+    <!-- Outer arc -->
+    <path class="icon-stroke" d="M16.85 18.58a9 9 0 1 0-9.7 0"
+      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Inner arc -->
+    <path class="icon-stroke" d="M8 14a5 5 0 1 1 8 0"
+      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Head dot -->
+    <circle class="icon-fill" cx="12" cy="11" r="1"/>
+    <!-- Body teardrop -->
+    <path class="icon-fill" d="M13 17a1 1 0 1 0-2 0l.5 4.5a0.5 0.5 0 0 0 1 0z"/>
   </g>
 </svg>
