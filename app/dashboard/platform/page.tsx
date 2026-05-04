@@ -8,7 +8,7 @@ import { HealthTab } from "./_tabs/health-tab";
 import { ImpersonationTab } from "./_tabs/impersonation-tab";
 import { SandboxTab } from "./_tabs/sandbox-tab";
 import { SeedTab } from "./_tabs/seed-tab";
-import { TenantsTab } from "./_tabs/tenants-tab";
+import { TenantsTab, type ShowFilter } from "./_tabs/tenants-tab";
 
 // Every /dashboard/platform route is already gated by the PlatformLayout
 // (which calls getSuperAdminContext). This page is the tabbed entry
@@ -39,12 +39,19 @@ function resolveTab(raw: string | undefined): TabId {
   return VALID_TABS.includes(raw as TabId) ? (raw as TabId) : "ai";
 }
 
+const VALID_SHOW: readonly ShowFilter[] = ["active", "inactive", "all"] as const;
+
+function resolveShow(raw: string | undefined): ShowFilter {
+  return VALID_SHOW.includes(raw as ShowFilter) ? (raw as ShowFilter) : "active";
+}
+
 interface PageProps {
-  searchParams: Promise<{ tab?: string; preset?: string; q?: string; days?: string; expand?: string }>;
+  searchParams: Promise<{ tab?: string; preset?: string; q?: string; days?: string; expand?: string; show?: string }>;
 }
 
 export default async function PlatformPage({ searchParams }: PageProps) {
-  const { tab: rawTab, days: rawDays, expand } = await searchParams;
+  const { tab: rawTab, days: rawDays, expand, show: rawShow } = await searchParams;
+  const show = resolveShow(rawShow);
   const tab = resolveTab(rawTab);
   const days = rawDays ? Math.max(1, parseInt(rawDays, 10) || 30) : 30;
 
@@ -71,7 +78,7 @@ export default async function PlatformPage({ searchParams }: PageProps) {
 
       <DashboardTabs tabs={tabs} activeTab={tab} />
 
-      {tab === "tenants" && <TenantsTab expandedId={expand} />}
+      {tab === "tenants" && <TenantsTab expandedId={expand} show={show} />}
       {tab === "seed" && <SeedTab />}
       {tab === "sandbox" && <SandboxTab />}
       {tab === "admins" && <AdminsTab />}

@@ -13,6 +13,7 @@ export type AuthErrorCode =
   | "UNAUTHENTICATED"
   | "NO_COMPANY"
   | "FORBIDDEN"
+  | "COMPANY_DEACTIVATED"
   | "AUTH_BRIDGE_FAILED";
 
 export class AuthError extends Error {
@@ -131,6 +132,20 @@ export async function getCompanyContext(
 
   if (lockRow?.locked_at) {
     throw new AuthError("FORBIDDEN", "This account has been locked by an administrator.");
+  }
+
+  // Check whether the company itself has been soft-deactivated. Use the
+  // admin client so a missing or misconfigured RLS policy on `companies`
+  // never silently hides the flag and lets a deactivated tenant through.
+  const adminClient = getAdminClient();
+  const { data: companyRow } = await adminClient
+    .from("companies")
+    .select("deactivated_at")
+    .eq("id", member.company_id)
+    .maybeSingle();
+
+  if (companyRow?.deactivated_at) {
+    throw new AuthError("COMPANY_DEACTIVATED", "This company account has been deactivated.");
   }
 
   if (required && role !== "admin" && role !== required) {

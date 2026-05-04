@@ -15,7 +15,8 @@ interface Resolved {
 
 type ResolveResult =
   | { kind: "viewer"; resolved: Resolved }
-  | { kind: "bridgeError"; detail?: string };
+  | { kind: "bridgeError"; detail?: string }
+  | { kind: "deactivated" };
 
 async function resolveViewer(): Promise<ResolveResult> {
   try {
@@ -131,6 +132,9 @@ async function resolveViewer(): Promise<ResolveResult> {
     if (e instanceof AuthError && e.code === "AUTH_BRIDGE_FAILED") {
       return { kind: "bridgeError", detail: e.detail };
     }
+    if (e instanceof AuthError && e.code === "COMPANY_DEACTIVATED") {
+      return { kind: "deactivated" };
+    }
     throw e;
   }
 }
@@ -138,6 +142,27 @@ async function resolveViewer(): Promise<ResolveResult> {
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const result = await resolveViewer();
   if (result.kind === "bridgeError") return <AuthBridgeError detail={result.detail} />;
+  if (result.kind === "deactivated") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-dc-base px-6">
+        <div className="max-w-md rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-amber-500/10">
+            <svg className="size-6 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <h1 className="text-lg font-semibold text-dc-text">Account suspended</h1>
+          <p className="mt-2 text-sm text-dc-text-2">
+            This company account has been deactivated. Please contact your administrator or{" "}
+            <a href="mailto:support@opsfluency.com" className="text-(--color-brand) underline underline-offset-2">
+              OpsFluency support
+            </a>{" "}
+            to restore access.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const { viewer, impersonatingCompanyName } = result.resolved;
 
