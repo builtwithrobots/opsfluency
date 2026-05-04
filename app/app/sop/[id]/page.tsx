@@ -47,13 +47,15 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
 
   const { data: sop } = await supabase
     .from('sops')
-    .select('id, title, status, template')
+    .select('id, title, status, template, template_recommendation')
     .eq('id', id)
     .maybeSingle();
   if (!sop) notFound();
 
   const sopTemplate: SopTemplate | null =
-    ((sop as { template?: SopTemplate | null }).template) ?? null;
+    ((sop as { template?: SopTemplate | null }).template) ??
+    ((sop as { template_recommendation?: { recommended?: SopTemplate } | null }).template_recommendation?.recommended) ??
+    null;
 
   // Archived SOPs are never shown to workers.
   if (sop.status === 'archived') {
