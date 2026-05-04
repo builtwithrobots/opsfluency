@@ -2,8 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 
 import { AuthError, getCompanyContext, type Role } from '@/lib/auth/company-context';
 import { passesAudience, type QrAudience } from '@/lib/qr/audience';
-import { renderMarkdown } from '@/lib/sop/markdown';
-import type { WorkerLanguage } from '@/lib/types/sop';
+import type { WorkerLanguage, SopTemplate } from '@/lib/types/sop';
+import { TemplateRenderer } from '@/components/sop/TemplateRenderer';
 import { LanguageToggleClient } from './_components/LanguageToggleClient';
 import { VideoButtonClient } from './_components/VideoButtonClient';
 
@@ -47,10 +47,13 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
 
   const { data: sop } = await supabase
     .from('sops')
-    .select('id, title, status')
+    .select('id, title, status, template')
     .eq('id', id)
     .maybeSingle();
   if (!sop) notFound();
+
+  const sopTemplate: SopTemplate | null =
+    ((sop as { template?: SopTemplate | null }).template) ?? null;
 
   // Archived SOPs are never shown to workers.
   if (sop.status === 'archived') {
@@ -183,7 +186,7 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
       )}
 
       <article className="text-[17px] leading-relaxed">
-        {renderMarkdown(content)}
+        <TemplateRenderer content={content} template={sopTemplate} lang={lang} />
       </article>
     </main>
   );

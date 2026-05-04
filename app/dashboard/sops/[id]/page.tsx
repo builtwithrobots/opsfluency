@@ -31,6 +31,9 @@ import { AudienceClient } from './_components/AudienceClient';
 import { VideoClient } from './_components/VideoClient';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import type { Role } from '@/lib/auth/company-context';
+import type { SopTemplate } from '@/lib/types/sop';
+import type { TemplateRecommendation } from '@/lib/ai/template-recommender';
+import { TemplatePickerClient } from './_components/TemplatePickerClient';
 
 const VALID_TABS = ['original', 'english', 'spanish', 'app', 'audience', 'video', 'versions', 'qr'] as const;
 type Tab = (typeof VALID_TABS)[number];
@@ -192,6 +195,26 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     console.warn('[sop detail] video_url read failed', { id, message: err instanceof Error ? err.message : String(err) });
   }
 
+  // template + template_recommendation live behind migration 20260504000001.
+  // Read defensively so a missing column never breaks the detail page.
+  let sopTemplate: SopTemplate | null = null;
+  let sopTemplateRec: TemplateRecommendation | null = null;
+  try {
+    const { data: tRow } = await supabase
+      .from('sops')
+      .select('template, template_recommendation')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    sopTemplate = ((tRow as { template?: SopTemplate | null } | null)?.template ?? null);
+    const raw = (tRow as { template_recommendation?: unknown } | null)?.template_recommendation;
+    if (raw && typeof raw === 'object') {
+      sopTemplateRec = raw as TemplateRecommendation;
+    }
+  } catch {
+    // migration not yet applied — picker renders without recommendation
+  }
+
   const tabs: TabDef[] = [
     { id: 'original', label: 'Original',   href: `/dashboard/sops/${id}?tab=original` },
     { id: 'english',  label: 'English',    href: `/dashboard/sops/${id}?tab=english` },
@@ -258,9 +281,16 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
       )}
 
       {tab === 'english' && latest?.content_en && (
-        <article className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
-          {renderMarkdown(latest.content_en, { className: 'max-w-none' })}
-        </article>
+        <>
+          <TemplatePickerClient
+            sopId={id}
+            currentTemplate={sopTemplate}
+            recommendation={sopTemplateRec}
+          />
+          <article className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface p-6">
+            {renderMarkdown(latest.content_en, { className: 'max-w-none' })}
+          </article>
+        </>
       )}
       {tab === 'english' && !latest?.content_en && (
         <EmptyTab message="English Markdown will appear here once Sonnet conversion runs." />

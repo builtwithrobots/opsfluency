@@ -13,6 +13,7 @@ import {
   type FlaggedTerm,
   type SopConversionResult,
 } from '@/lib/ai/sop-conversion';
+import { recommendTemplate } from '@/lib/ai/template-recommender';
 import type { GlossaryRow } from '@/lib/types/glossary';
 // `translateMarkdown` (flat-text path) is kept exported for the glossary
 // suggest-translation feature; runTranslation switched to the structured
@@ -26,10 +27,12 @@ import {
   SOP_UPLOADS_BUCKET,
   SOP_UPLOAD_MAX_BYTES,
   SOP_UPLOAD_MIME_TYPES,
+  SOP_TEMPLATE,
   WORKER_LANGUAGES,
   isImageMime,
   isPdfMime,
   type SopStatus,
+  type SopTemplate,
 } from '@/lib/types/sop';
 
 type ActionResult<T = undefined> =
@@ -293,15 +296,27 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
 
     const conv: SopConversionResult = result.data;
 
-    // Persist English markdown + flagged terms onto the latest version.
-    const { error: vErr } = await supabase
-      .from('sop_versions')
-      .update({
-        content_en: conv.markdown,
-        flagged_terms: conv.flagged_terms,
-      })
-      .eq('id', version.id);
+    // Run Haiku template recommendation in parallel with the version DB write.
+    // recommendTemplate is fire-safe — failures return null and are never
+    // surfaced to the manager. Conversion succeeds regardless.
+    const [vErr, templateRec] = await Promise.all([
+      supabase
+        .from('sop_versions')
+        .update({ content_en: conv.markdown, flagged_terms: conv.flagged_terms })
+        .eq('id', version.id)
+        .then((r) => r.error),
+      recommendTemplate(conv.markdown, { sopId: input.sop_id, companyId: company_id }),
+    ]);
     if (vErr) return fail('INTERNAL', vErr.message);
+
+    // Persist recommendation to sops row. Ignore failures — telemetry-grade write.
+    if (templateRec) {
+      await supabase
+        .from('sops')
+        .update({ template_recommendation: templateRec })
+        .eq('id', input.sop_id)
+        .eq('company_id', company_id);
+    }
 
     // Transition: draft → pending_terms (always — manager confirms even with zero flagged terms).
     // If the conversion returned zero flagged terms, jump straight through to pending_translation.
@@ -324,7 +339,36 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
   }
 }
 
-// ── 3. Define flagged terms ───────────────────────────────────────────────────
+// ── 3. Update template selection ─────────────────────────────────────────────
+
+const UpdateSopTemplateSchema = z.object({
+  sop_id: z.string().uuid(),
+  template: z.enum(SOP_TEMPLATE),
+});
+
+export async function updateSopTemplate(raw: unknown): Promise<ActionResult> {
+  try {
+    const { supabase, company_id } = await getCompanyContext('manager');
+    const input = UpdateSopTemplateSchema.parse(raw);
+
+    const { error } = await supabase
+      .from('sops')
+      .update({ template: input.template as SopTemplate })
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id);
+
+    if (error) return fail('INTERNAL', error.message);
+
+    revalidatePath(`/dashboard/sops/${input.sop_id}`);
+    return { ok: true };
+  } catch (e) {
+    const handled = handleAuthError(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── 4. Define flagged terms ───────────────────────────────────────────────────
 
 /**
  * Per-term resolution sent from the TermsGateClient when a flagged term
