@@ -23,7 +23,7 @@ const SIZE_MAP: Record<Size, { badge: number; radius: number }> = {
   lg: { badge: 58, radius: 12 },
 };
 
-export function BeaconLogo({ size = 'md', variant: _variant = 'light', className }: BeaconLogoProps) {
+export function BeaconLogo({ size = 'md', className }: BeaconLogoProps) {
   const { badge, radius } = SIZE_MAP[size];
 
   // Scale the 24x24 Lucide viewBox to fill 85% of the badge, centred.

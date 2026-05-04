@@ -1,4 +1,4 @@
-// v1.0.1
+// v1.0.2
 // Marketing nav. Sticky top bar, logo left, primary links middle, CTA +
 // theme toggle right. Mobile: hamburger opens a full-screen sheet.
 // <nav aria-label="Primary">.
