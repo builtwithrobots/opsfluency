@@ -21,9 +21,10 @@
     <!-- Inner arc -->
     <path class="icon-stroke" d="M8 14a5 5 0 1 1 8 0"
       stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <!-- Head dot -->
-    <circle class="icon-fill" cx="12" cy="11" r="1"/>
-    <!-- Body teardrop -->
-    <path class="icon-fill" d="M13 17a1 1 0 1 0-2 0l.5 4.5a0.5 0.5 0 0 0 1 0z"/>
+    <!-- Head dot -- stroke added to match Lucide root stroke-width -->
+    <circle class="icon-fill icon-stroke" cx="12" cy="11" r="1" stroke-width="2.2"/>
+    <!-- Body teardrop -- stroke added for same reason -->
+    <path class="icon-fill icon-stroke" d="M13 17a1 1 0 1 0-2 0l.5 4.5a0.5 0.5 0 0 0 1 0z"
+      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>

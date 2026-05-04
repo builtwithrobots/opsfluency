@@ -68,13 +68,22 @@ export function BeaconLogo({ size = 'md', className }: BeaconLogoProps) {
           className="animate-beacon-arc-inner"
         />
 
-        {/* Head/dot -- static */}
-        <circle cx="12" cy="11" r="1" fill="currentColor" />
+        {/* Head/dot -- stroke added to match Lucide root stroke-width, making it prominent */}
+        <circle
+          cx="12" cy="11" r="1"
+          fill="currentColor"
+          stroke="white"
+          strokeWidth="2.2"
+        />
 
-        {/* Body/teardrop -- static */}
+        {/* Body/teardrop -- stroke added for same reason */}
         <path
           d="M13 17a1 1 0 1 0-2 0l.5 4.5a0.5 0.5 0 0 0 1 0z"
           fill="currentColor"
+          stroke="white"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       </g>
     </svg>
