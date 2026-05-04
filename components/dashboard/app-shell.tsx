@@ -45,7 +45,7 @@ interface AppShellProps {
 // ── Brand mark ──────────────────────────────────────────────────────────────
 
 function BrandMark() {
-  return <SpeechLogo size="md" className="shrink-0" />;
+  return <SpeechLogo size="lg" className="shrink-0" />;
 }
 
 // ── Company context label (above user footer, below footer divider) ──────────

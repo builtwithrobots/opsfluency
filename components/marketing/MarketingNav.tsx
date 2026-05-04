@@ -76,9 +76,9 @@ export function MarketingNav() {
             className="inline-flex items-center gap-2"
             aria-label="OpsFluency home"
           >
-            <SpeechLogo size="sm" />
+            <SpeechLogo size="md" />
             <span
-              className="text-lg font-bold tracking-tight text-dc-text"
+              className="text-xl font-bold tracking-tight text-dc-text"
               style={{ fontFamily: "var(--font-display)" }}
             >
               OPS<span style={{ color: "var(--color-brand)" }}>FLUENCY</span>
