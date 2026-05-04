@@ -269,14 +269,23 @@
   50%      { opacity: 0.65; }
 }
 
-.animate-heartbeat    { animation: heartbeat 2s ease-in-out infinite; }
-.animate-signal-pulse { animation: signalPulse 2s ease-in-out infinite; }
-.animate-brand-glow   { animation: brandGlow 3s ease-in-out infinite; }
-.animate-fade-in      { animation: fadeIn 180ms ease-out both; }
-.animate-calm-pulse   { animation: calmPulse 3.2s ease-in-out infinite; }
+@keyframes speechArcPulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1;   }
+}
+
+.animate-heartbeat      { animation: heartbeat 2s ease-in-out infinite; }
+.animate-signal-pulse   { animation: signalPulse 2s ease-in-out infinite; }
+.animate-brand-glow     { animation: brandGlow 3s ease-in-out infinite; }
+.animate-fade-in        { animation: fadeIn 180ms ease-out both; }
+.animate-calm-pulse     { animation: calmPulse 3.2s ease-in-out infinite; }
+.animate-speech-arc-inner { animation: speechArcPulse 2.2s ease-in-out infinite; }
+.animate-speech-arc-outer { animation: speechArcPulse 2.2s ease-in-out 0.25s infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-calm-pulse { animation: none; }
+  .animate-calm-pulse       { animation: none; }
+  .animate-speech-arc-inner { animation: none; opacity: 1; }
+  .animate-speech-arc-outer { animation: none; opacity: 1; }
 }
 
 /* ── RADIX ACCORDION ─────────────────────────────────────────────────────

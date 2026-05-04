@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/marketing/Button";
 import { Container } from "@/components/marketing/Container";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { SpeechLogo } from "@/components/ui/SpeechLogo";
 
 type NavLink = { label: string; href: string };
 
@@ -75,15 +76,12 @@ export function MarketingNav() {
             className="inline-flex items-center gap-2"
             aria-label="OpsFluency home"
           >
-            <span
-              aria-hidden="true"
-              className="inline-block h-2 w-2 rounded-full bg-[var(--color-signal-live)] animate-calm-pulse"
-            />
+            <SpeechLogo size="sm" />
             <span
               className="text-lg font-bold tracking-tight text-dc-text"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              OpsFluency
+              OPS<span style={{ color: "var(--color-brand)" }}>FLUENCY</span>
             </span>
           </Link>
 

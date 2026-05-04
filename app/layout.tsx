@@ -14,6 +14,12 @@ export const metadata: Metadata = {
   title: "OpsFluency: Frontline Knowledge for Multilingual Teams",
   description:
     "Bilingual SOP publishing, QR-triggered learning, and departmental communication for warehouse and manufacturing facilities.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+  },
 };
 
 const chakraPetch = Chakra_Petch({

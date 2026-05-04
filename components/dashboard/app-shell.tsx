@@ -24,6 +24,7 @@ import { useSidebarCollapsed } from "@/components/ui/sidebar-collapsed-context";
 import { SidebarLayout } from "@/components/ui/sidebar-layout";
 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { SpeechLogo } from "@/components/ui/SpeechLogo";
 
 import {
   brandNameClasses,
@@ -44,19 +45,7 @@ interface AppShellProps {
 // ── Brand mark ──────────────────────────────────────────────────────────────
 
 function BrandMark() {
-  return (
-    <motion.span
-      aria-hidden
-      className="relative flex size-8 shrink-0 items-center justify-center rounded-md bg-(--color-brand)"
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-    >
-      <span className="font-display text-[11px] font-bold tracking-tight text-white select-none">
-        OF
-      </span>
-    </motion.span>
-  );
+  return <SpeechLogo size="md" className="shrink-0" />;
 }
 
 // ── Company context label (above user footer, below footer divider) ──────────
