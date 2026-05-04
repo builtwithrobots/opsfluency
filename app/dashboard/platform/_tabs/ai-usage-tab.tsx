@@ -365,7 +365,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
         <div className="grid gap-3 sm:grid-cols-2">
           <UnitBreakdown
             title="Tokens"
-            subtitle="Anthropic — SOP conversion"
+            subtitle="Anthropic — conversion + recommendations"
             icon={<Cpu className="size-4" strokeWidth={2} />}
             input={data.totalInputTokens}
             output={data.totalOutputTokens}
