@@ -1,3 +1,5 @@
+import GithubSlugger from "github-slugger";
+
 import { renderMarkdown } from "@/lib/sop/markdown";
 
 interface Props {
@@ -11,18 +13,37 @@ interface TocItem {
   slug: string;
 }
 
+/**
+ * Strip the most common inline Markdown from a heading so the plain text
+ * matches what rehype-slug sees after the AST is rendered to HTML.
+ * rehype-slug slugs the rendered text node, not the raw Markdown.
+ */
+function stripInlineMarkdown(raw: string): string {
+  return raw
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1") // bold / italic / bold-italic
+    .replace(/`([^`]+)`/g, "$1")              // inline code
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // links — keep display text
+    .trim();
+}
+
+/**
+ * Build the TOC using the same slugger as rehype-slug so TOC href values
+ * match the id attributes on the rendered headings exactly.
+ *
+ * A fresh GithubSlugger instance is created per call so duplicate heading
+ * deduplication (slug, slug-1, slug-2 …) mirrors what rehype-slug produces
+ * for this specific document.
+ */
 function extractToc(markdown: string): TocItem[] {
   const headingRe = /^(#{2,3})\s+(.+)$/gm;
+  const slugger = new GithubSlugger();
   const items: TocItem[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = headingRe.exec(markdown)) !== null) {
     const level = match[1].length as 2 | 3;
-    const text = match[2].trim();
-    const slug = text
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-");
+    const text = stripInlineMarkdown(match[2]);
+    const slug = slugger.slug(text);
     items.push({ level, text, slug });
   }
 
