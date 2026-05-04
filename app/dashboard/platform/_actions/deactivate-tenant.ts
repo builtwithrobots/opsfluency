@@ -43,25 +43,20 @@ export async function deactivateTenant(formData: FormData): Promise<DeactivateTe
 
 /**
  * Reactivate a previously deactivated tenant by clearing deactivated_at.
+ * Returns void so it can be used directly as a <form action>.
  */
-export async function reactivateTenant(formData: FormData): Promise<DeactivateTenantResult> {
-  try {
-    await getSuperAdminContext();
-    const { company_id } = Input.parse({ company_id: formData.get("company_id") });
+export async function reactivateTenant(formData: FormData): Promise<void> {
+  await getSuperAdminContext();
+  const { company_id } = Input.parse({ company_id: formData.get("company_id") });
 
-    const admin = getAdminClient();
-    const { error } = await admin
-      .from("companies")
-      .update({ deactivated_at: null })
-      .eq("id", company_id)
-      .not("deactivated_at", "is", null);
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from("companies")
+    .update({ deactivated_at: null })
+    .eq("id", company_id)
+    .not("deactivated_at", "is", null);
 
-    if (error) return { ok: false, error: error.message };
+  if (error) throw new Error(error.message);
 
-    revalidatePath("/dashboard/platform");
-    return { ok: true };
-  } catch (e) {
-    if (e instanceof z.ZodError) return { ok: false, error: "Invalid company ID." };
-    return { ok: false, error: e instanceof Error ? e.message : "Reactivation failed." };
-  }
+  revalidatePath("/dashboard/platform");
 }
