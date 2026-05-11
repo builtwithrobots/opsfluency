@@ -1,5 +1,6 @@
 import {
   Bell,
+  BookOpen,
   Building2,
   FileText,
   Home,
@@ -78,6 +79,7 @@ const primary: NavSection = {
     // the PreviewBanner offering a one-click "Back to dashboard" return.
     { href: "/app/scan",            label: "Scanner",  icon: ScanLine,  match: "prefix", visibility: { member: ["manager"] } },
     { href: "/dashboard/announcements", label: "Announcements", icon: Bell,           match: "prefix", visibility: { member: ["manager"] } },
+    { href: "/dashboard/templates",     label: "Templates",     icon: BookOpen,       match: "prefix", visibility: { member: ["manager"] } },
     // Items below are planned but not yet built; uncomment as pages ship:
     // { href: "/dashboard/import",        label: "Import",        icon: Upload,         match: "prefix", visibility: { member: ["manager"] } },
     // { href: "/dashboard/monitors",      label: "Monitors",      icon: MonitorSpeaker, match: "prefix", visibility: { member: ["manager"] } },
