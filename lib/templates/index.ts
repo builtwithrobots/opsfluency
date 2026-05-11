@@ -9,6 +9,8 @@ export interface SopStarterTemplate {
   style: Exclude<SopTemplate, "onboarding">;
   category: TemplateCategory;
   filename: string;
+  /** Hidden from the UI; template and DOCX kept for a future release. */
+  hidden?: boolean;
 }
 
 export const SOP_STARTER_TEMPLATES: SopStarterTemplate[] = [
@@ -56,6 +58,7 @@ export const SOP_STARTER_TEMPLATES: SopStarterTemplate[] = [
     style: "safety-checklist",
     category: "Safety",
     filename: "sop-daily-safety-inspection.docx",
+    hidden: true,
   },
   {
     id: "ppe-requirements",
@@ -65,6 +68,7 @@ export const SOP_STARTER_TEMPLATES: SopStarterTemplate[] = [
     style: "safety-checklist",
     category: "Safety",
     filename: "sop-ppe-requirements.docx",
+    hidden: true,
   },
 ];
 

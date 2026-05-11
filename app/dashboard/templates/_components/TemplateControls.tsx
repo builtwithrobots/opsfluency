@@ -4,15 +4,14 @@ import { Search } from "lucide-react";
 
 import clsx from "clsx";
 
-import { STYLE_LABELS, type SopStarterTemplate } from "@/lib/templates/index";
+import { STYLE_LABELS } from "@/lib/templates/index";
 
-type StyleFilter = SopStarterTemplate["style"] | "all";
+type StyleFilter = "step-by-step" | "reference" | "all";
 
 const TABS: { value: StyleFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "step-by-step", label: STYLE_LABELS["step-by-step"] },
   { value: "reference", label: STYLE_LABELS["reference"] },
-  { value: "safety-checklist", label: STYLE_LABELS["safety-checklist"] },
 ];
 
 interface Props {

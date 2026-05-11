@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { SOP_STARTER_TEMPLATES, type SopStarterTemplate } from "@/lib/templates/index";
+import { SOP_STARTER_TEMPLATES } from "@/lib/templates/index";
 import { TemplateCard } from "./TemplateCard";
 import { TemplateControls } from "./TemplateControls";
 
-type StyleFilter = SopStarterTemplate["style"] | "all";
+type StyleFilter = "step-by-step" | "reference" | "all";
+
+const VISIBLE_TEMPLATES = SOP_STARTER_TEMPLATES.filter((t) => !t.hidden);
 
 function normaliseStyle(raw: string | null): StyleFilter {
-  if (raw === "step-by-step" || raw === "reference" || raw === "safety-checklist") return raw;
+  if (raw === "step-by-step" || raw === "reference") return raw;
   return "all";
 }
 
@@ -36,7 +38,7 @@ export function TemplateGrid() {
   }
 
   const filtered = useMemo(() => {
-    let list = SOP_STARTER_TEMPLATES;
+    let list = VISIBLE_TEMPLATES;
     if (style !== "all") {
       list = list.filter((t) => t.style === style);
     }
