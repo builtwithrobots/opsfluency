@@ -1,9 +1,35 @@
 import "server-only";
 
 import type { GlossaryRow } from "@/lib/types/glossary";
+import type { DocumentType } from "@/lib/types/sop";
 import { extractPdfText } from "./pdf-extraction";
 
 import { SONNET_MODEL, callSonnet, type SonnetResult, type SonnetUserContent } from "./sonnet";
+
+/**
+ * Per-type prompt phrasing. Drives the AI prompts so a Policy document isn't
+ * described to Sonnet as an "SOP" (which leaks SOP-specific framing into the
+ * output, e.g. forced step numbering on a policy memo). All other pipeline
+ * behaviour — chunking, JSON shape, glossary handling — stays identical.
+ */
+interface DocumentTypePromptInfo {
+  /** Full noun form, e.g. "Standard Operating Procedure". Used in the system prompt. */
+  fullName: string;
+  /** Short noun form, e.g. "procedure". Used in user-message wording. */
+  shortName: string;
+}
+
+const DOC_TYPE_PROMPT_INFO: Record<DocumentType, DocumentTypePromptInfo> = {
+  sop:       { fullName: "Standard Operating Procedure",       shortName: "procedure"          },
+  policy:    { fullName: "policy document",                    shortName: "policy"             },
+  training:  { fullName: "training or onboarding document",    shortName: "training document"  },
+  reference: { fullName: "reference document",                 shortName: "reference document" },
+  notice:    { fullName: "notice or bulletin",                 shortName: "notice"             },
+};
+
+function promptInfoFor(type: DocumentType | undefined): DocumentTypePromptInfo {
+  return DOC_TYPE_PROMPT_INFO[type ?? "sop"];
+}
 
 /**
  * SOP conversion — two-call pipeline, both calls on Sonnet.
@@ -63,7 +89,9 @@ export type ChunkProgressEvent =
 // Call 1 — Sonnet: document → Markdown
 // ---------------------------------------------------------------------------
 
-const CONVERSION_SYSTEM_PROMPT = `You are an expert technical writer at OpsFluency, a tool that delivers bilingual SOPs to warehouse and manufacturing workers via QR code. Convert a Standard Operating Procedure document into clean, mobile-friendly Markdown.
+function buildConversionSystemPrompt(documentType: DocumentType | undefined): string {
+  const info = promptInfoFor(documentType);
+  return `You are an expert technical writer at OpsFluency, a tool that delivers bilingual frontline knowledge to warehouse and manufacturing workers via QR code. Convert a ${info.fullName} into clean, mobile-friendly Markdown.
 
 Rules:
 1. Output JSON only in exactly this shape, no Markdown fences, no commentary:
@@ -73,6 +101,7 @@ Rules:
 4. Keep step numbers as ordered lists ("1. ", "2. ") so the worker reader can format them consistently.
 5. Strip page numbers, headers, footers, copyright notices, and revision metadata.
 6. Use plain language. Workers read this on a phone in gloves under bad lighting — short sentences win.`;
+}
 
 interface MarkdownOnly {
   markdown: string;
@@ -96,7 +125,9 @@ function parseMarkdownResponse(rawText: string): MarkdownOnly {
 // Call 2 — Sonnet: Markdown + glossary → flagged terms
 // ---------------------------------------------------------------------------
 
-const SONNET_FLAGGING_SYSTEM_BASE = `You are a bilingual technical reviewer at OpsFluency. You are given a converted SOP in Markdown and must identify site-specific terminology that needs translator attention before English → Spanish translation.
+function buildFlaggingSystemBase(documentType: DocumentType | undefined): string {
+  const info = promptInfoFor(documentType);
+  return `You are a bilingual technical reviewer at OpsFluency. You are given a converted ${info.shortName} in Markdown and must identify site-specific terminology that needs translator attention before English → Spanish translation.
 
 Flag any term that is a proper noun, an acronym, in-house equipment name, or jargon that a generic translator would render incorrectly in Spanish.
 Do NOT flag terms already defined in the company glossary below — use those exactly as specified.
@@ -104,6 +135,7 @@ Do NOT flag generic English vocabulary, common safety terms, or units of measure
 
 Output JSON ONLY in exactly this shape, no Markdown fences, no commentary:
 {"flagged_terms": [{"term": "string — the English term as it appears","reason": "string — short explanation of why it needs definition","suggested_definition_en": "string — your best guess at a one-sentence definition","suggested_term_es": "string — your best guess at the Spanish equivalent"}]}`;
+}
 
 function renderGlossary(glossary: GlossaryRow[]): string {
   if (glossary.length === 0) {
@@ -116,8 +148,11 @@ function renderGlossary(glossary: GlossaryRow[]): string {
   return `Company glossary (already defined — use exactly as specified):\n${lines.join("\n")}`;
 }
 
-function buildFlaggingSystemPrompt(glossary: GlossaryRow[]): string {
-  return `${SONNET_FLAGGING_SYSTEM_BASE}\n\n${renderGlossary(glossary)}`;
+function buildFlaggingSystemPrompt(
+  glossary: GlossaryRow[],
+  documentType: DocumentType | undefined,
+): string {
+  return `${buildFlaggingSystemBase(documentType)}\n\n${renderGlossary(glossary)}`;
 }
 
 interface FlaggedTermsOnly {
@@ -254,9 +289,11 @@ async function flagTermsInChunks(
   chunks: string[],
   glossary: GlossaryRow[],
   ctx: { sopId: string; companyId: string },
+  documentType: DocumentType | undefined,
   signal?: AbortSignal,
 ): Promise<SonnetResult<FlaggedTermsOnly>> {
-  const systemPrompt = buildFlaggingSystemPrompt(glossary);
+  const systemPrompt = buildFlaggingSystemPrompt(glossary, documentType);
+  const docNoun = promptInfoFor(documentType).shortName;
   const accumulated: FlaggedTerm[] = [];
   let inputTokens = 0;
   let outputTokens = 0;
@@ -266,7 +303,7 @@ async function flagTermsInChunks(
       {
         model: SONNET_MODEL,
         systemPrompt,
-        userMessage: `Review the following SOP Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${chunk}\n---END MARKDOWN---`,
+        userMessage: `Review the following ${docNoun} Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${chunk}\n---END MARKDOWN---`,
         maxTokens: 8192,
         parse: parseFlaggingResponse,
         signal,
@@ -305,21 +342,23 @@ async function runFlaggingWithFallback(
   markdown: string,
   glossary: GlossaryRow[],
   ctx: { sopId: string; companyId: string },
+  documentType: DocumentType | undefined,
   signal?: AbortSignal,
 ): Promise<SonnetResult<FlaggedTermsOnly>> {
   // Proactively chunk if markdown is large enough to warrant it.
   if (markdown.length > FLAGGING_CHUNK_MAX_CHARS) {
     const chunks = splitMarkdownForFlagging(markdown);
     if (chunks.length > 1) {
-      return flagTermsInChunks(chunks, glossary, ctx, signal);
+      return flagTermsInChunks(chunks, glossary, ctx, documentType, signal);
     }
   }
 
+  const docNoun = promptInfoFor(documentType).shortName;
   const result = await callSonnet<FlaggedTermsOnly>(
     {
       model: SONNET_MODEL,
-      systemPrompt: buildFlaggingSystemPrompt(glossary),
-      userMessage: `Review the following SOP Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${markdown}\n---END MARKDOWN---`,
+      systemPrompt: buildFlaggingSystemPrompt(glossary, documentType),
+      userMessage: `Review the following ${docNoun} Markdown for site-specific terminology that needs translator attention:\n\n---BEGIN MARKDOWN---\n${markdown}\n---END MARKDOWN---`,
       maxTokens: 8192,
       parse: parseFlaggingResponse,
       signal,
@@ -330,7 +369,7 @@ async function runFlaggingWithFallback(
   if (!result.ok && result.error.code === "AI_TRUNCATED") {
     const chunks = splitMarkdownForFlagging(markdown);
     if (chunks.length > 1) {
-      return flagTermsInChunks(chunks, glossary, ctx, signal);
+      return flagTermsInChunks(chunks, glossary, ctx, documentType, signal);
     }
   }
 
@@ -345,6 +384,12 @@ interface ConvertSopBaseInput {
   glossary: GlossaryRow[];
   sopId: string;
   companyId: string;
+  /**
+   * Document type — drives AI prompt phrasing. Optional for backwards
+   * compatibility; omitted callers get the 'sop' prompt (the pre-migration
+   * default that existed when this module shipped).
+   */
+  documentType?: DocumentType;
   signal?: AbortSignal;
   onChunkProgress?: (event: ChunkProgressEvent) => void;
 }
@@ -361,7 +406,7 @@ async function runPipeline(
   const conversionResult = await callSonnet<MarkdownOnly>(
     {
       model: SONNET_MODEL,
-      systemPrompt: CONVERSION_SYSTEM_PROMPT,
+      systemPrompt: buildConversionSystemPrompt(base.documentType),
       userMessage,
       maxTokens: 16384,
       parse: parseMarkdownResponse,
@@ -380,6 +425,7 @@ async function runPipeline(
     markdown,
     base.glossary,
     ctx,
+    base.documentType,
     base.signal,
   );
 
@@ -413,6 +459,7 @@ async function convertTextInChunks(
   let convOutputTokens = 0;
   const total = chunks.length;
 
+  const docNoun = promptInfoFor(base.documentType).shortName;
   for (let i = 0; i < chunks.length; i++) {
     const label = extractChunkLabel(chunks[i], i);
     base.onChunkProgress?.({ type: "chunk_start", index: i, total, label });
@@ -420,8 +467,8 @@ async function convertTextInChunks(
     const result = await callSonnet<MarkdownOnly>(
       {
         model: SONNET_MODEL,
-        systemPrompt: CONVERSION_SYSTEM_PROMPT,
-        userMessage: `Convert the following document section. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${chunks[i]}\n---END DOCUMENT---`,
+        systemPrompt: buildConversionSystemPrompt(base.documentType),
+        userMessage: `Convert the following document section. The original filename and any visible page chrome are noise — focus on the ${docNoun} content.\n\n---BEGIN DOCUMENT---\n${chunks[i]}\n---END DOCUMENT---`,
         maxTokens: 16384,
         parse: parseMarkdownResponse,
         signal: base.signal,
@@ -438,7 +485,13 @@ async function convertTextInChunks(
   }
 
   const markdown = parts.join("\n\n---\n\n");
-  const flaggingResult = await runFlaggingWithFallback(markdown, base.glossary, ctx, base.signal);
+  const flaggingResult = await runFlaggingWithFallback(
+    markdown,
+    base.glossary,
+    ctx,
+    base.documentType,
+    base.signal,
+  );
   if (!flaggingResult.ok) return flaggingResult;
 
   return {
@@ -478,11 +531,12 @@ export async function convertSopFromText(
   // Single chunk — one Sonnet call with progress bookends.
   input.onChunkProgress?.({ type: "chunk_start", index: 0, total: 1, label: extractChunkLabel(input.documentText, 0) });
 
+  const docNoun = promptInfoFor(input.documentType).shortName;
   const conversionResult = await callSonnet<MarkdownOnly>(
     {
       model: SONNET_MODEL,
-      systemPrompt: CONVERSION_SYSTEM_PROMPT,
-      userMessage: `Convert the following document. The original filename and any visible page chrome are noise — focus on the SOP content.\n\n---BEGIN DOCUMENT---\n${input.documentText}\n---END DOCUMENT---`,
+      systemPrompt: buildConversionSystemPrompt(input.documentType),
+      userMessage: `Convert the following document. The original filename and any visible page chrome are noise — focus on the ${docNoun} content.\n\n---BEGIN DOCUMENT---\n${input.documentText}\n---END DOCUMENT---`,
       maxTokens: 16384,
       parse: parseMarkdownResponse,
       signal: input.signal,
@@ -505,7 +559,13 @@ export async function convertSopFromText(
   input.onChunkProgress?.({ type: "chunk_done", index: 0, total: 1 });
 
   const { markdown } = conversionResult.data;
-  const flaggingResult = await runFlaggingWithFallback(markdown, input.glossary, ctx, input.signal);
+  const flaggingResult = await runFlaggingWithFallback(
+    markdown,
+    input.glossary,
+    ctx,
+    input.documentType,
+    input.signal,
+  );
   if (!flaggingResult.ok) return flaggingResult;
 
   return {
@@ -545,6 +605,7 @@ export async function convertSopFromPdf(
         glossary: input.glossary,
         sopId: input.sopId,
         companyId: input.companyId,
+        documentType: input.documentType,
         signal: input.signal,
         onChunkProgress: input.onChunkProgress,
       });
@@ -552,6 +613,7 @@ export async function convertSopFromPdf(
   }
 
   // Scanned or buffer not provided — use Sonnet's native vision path.
+  const docNoun = promptInfoFor(input.documentType).shortName;
   const userMessage: SonnetUserContent = [
     {
       type: "document",
@@ -563,7 +625,7 @@ export async function convertSopFromPdf(
     },
     {
       type: "text",
-      text: "Convert the SOP in this PDF. Strip page chrome (headers/footers/page numbers/revision metadata) and produce the JSON output described in the system prompt.",
+      text: `Convert the ${docNoun} in this PDF. Strip page chrome (headers/footers/page numbers/revision metadata) and produce the JSON output described in the system prompt.`,
     },
   ];
   return runPipeline(input, userMessage);
@@ -582,6 +644,7 @@ export interface ConvertSopFromImageInput extends ConvertSopBaseInput {
 export async function convertSopFromImage(
   input: ConvertSopFromImageInput,
 ): Promise<SonnetResult<SopConversionResult>> {
+  const docNoun = promptInfoFor(input.documentType).shortName;
   const userMessage: SonnetUserContent = [
     {
       type: "image",
@@ -593,7 +656,7 @@ export async function convertSopFromImage(
     },
     {
       type: "text",
-      text: "Convert the SOP shown in this image. Read all text in the image, infer document structure (headings, steps, warnings), and produce the same JSON output format as for text input.",
+      text: `Convert the ${docNoun} shown in this image. Read all text in the image, infer document structure (headings, steps, warnings), and produce the same JSON output format as for text input.`,
     },
   ];
   return runPipeline(input, userMessage);

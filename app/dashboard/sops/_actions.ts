@@ -26,6 +26,7 @@ import { isWithinCreatorScope } from '@/lib/qr/audience';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import {
   ALLOWED_SOP_TRANSITIONS,
+  DOCUMENT_TYPES,
   SOP_UPLOADS_BUCKET,
   SOP_UPLOAD_MAX_BYTES,
   SOP_UPLOAD_MIME_TYPES,
@@ -34,6 +35,7 @@ import {
   isImageMime,
   isPdfMime,
   isWordMime,
+  type DocumentType,
   type SopStatus,
   type SopTemplate,
 } from '@/lib/types/sop';
@@ -137,6 +139,9 @@ const CreateSopFromUploadSchema = z.object({
   mime_type: z.enum(SOP_UPLOAD_MIME_TYPES),
   file_base64: z.string().min(1),
   audience: SopAudienceSchema,
+  // Document type — drives the AI prompt wording and the suggested
+  // template default. Defaults to 'sop' to match the pre-feature behavior.
+  document_type: z.enum(DOCUMENT_TYPES).default('sop'),
 });
 
 export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ id: string }>> {
@@ -176,6 +181,7 @@ export async function createSopFromUpload(raw: unknown): Promise<ActionResult<{ 
         company_id,
         title: input.title,
         template: null,
+        document_type: input.document_type,
         department_id: input.department_id,
         audience_department_ids: input.audience.department_ids,
         audience_roles: input.audience.roles,
@@ -242,12 +248,18 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
     // Load sop + latest version.
     const { data: sop } = await supabase
       .from('sops')
-      .select('id, status')
+      .select('id, status, document_type')
       .eq('id', input.sop_id)
       .eq('company_id', company_id)
       .maybeSingle();
     if (!sop) return fail('NOT_FOUND');
     if (sop.status !== 'draft') return fail('INVALID_TRANSITION', `Cannot convert from status ${sop.status}`);
+
+    // Pre-migration rows have no document_type column — fall back to 'sop'
+    // (the value the column defaults to) so the prompt phrasing stays the
+    // same for legacy SOPs.
+    const documentType =
+      ((sop as { document_type?: DocumentType | null }).document_type ?? 'sop') as DocumentType;
 
     const version = await getLatestVersion(supabase, input.sop_id);
     if (!version || !version.original_file_url) return fail('NOT_FOUND', 'No upload found');
@@ -273,6 +285,7 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
         glossary,
         sopId: input.sop_id,
         companyId: company_id,
+        documentType,
       });
     } else if (isWordMime(mimeType)) {
       const extracted = await extractWordText(fileBuf);
@@ -281,6 +294,7 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
         glossary,
         sopId: input.sop_id,
         companyId: company_id,
+        documentType,
       });
     } else if (isImageMime(mimeType)) {
       result = await convertSopFromImage({
@@ -289,6 +303,7 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
         glossary,
         sopId: input.sop_id,
         companyId: company_id,
+        documentType,
       });
     } else {
       // Treat as text — utf-8 decode handles TXT and unknowns.
@@ -297,6 +312,7 @@ export async function runConversion(raw: unknown): Promise<ActionResult<{ status
         glossary,
         sopId: input.sop_id,
         companyId: company_id,
+        documentType,
       });
     }
 
@@ -375,6 +391,51 @@ export async function updateSopTemplate(raw: unknown): Promise<ActionResult> {
     if (error) return fail('INTERNAL', error.message);
 
     revalidatePath(`/dashboard/sops/${input.sop_id}`);
+    return { ok: true };
+  } catch (e) {
+    const handled = handleAuthError(e);
+    if (handled) return handled;
+    throw e;
+  }
+}
+
+// ── 3b. Update document type ─────────────────────────────────────────────────
+//
+// Lets a manager re-classify a draft document (e.g. they uploaded "this is
+// a policy" instead of "this is a procedure"). Allowed only while the row
+// is still in draft, before Sonnet conversion has run, so the AI prompt
+// phrasing matches the type for every chunk.
+
+const UpdateDocumentTypeSchema = z.object({
+  sop_id: z.string().uuid(),
+  document_type: z.enum(DOCUMENT_TYPES),
+});
+
+export async function updateDocumentType(raw: unknown): Promise<ActionResult> {
+  try {
+    const { supabase, company_id } = await getCompanyContext('manager');
+    const input = UpdateDocumentTypeSchema.parse(raw);
+
+    const { data: sop } = await supabase
+      .from('sops')
+      .select('id, status')
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (!sop) return fail('NOT_FOUND');
+    if (sop.status !== 'draft') {
+      return fail('INVALID_TRANSITION', 'Document type can only change while the document is still a draft');
+    }
+
+    const { error } = await supabase
+      .from('sops')
+      .update({ document_type: input.document_type })
+      .eq('id', input.sop_id)
+      .eq('company_id', company_id);
+    if (error) return fail('INTERNAL', error.message);
+
+    revalidatePath(`/dashboard/sops/${input.sop_id}`);
+    revalidatePath('/dashboard/sops');
     return { ok: true };
   } catch (e) {
     const handled = handleAuthError(e);

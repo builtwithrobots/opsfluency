@@ -7,8 +7,12 @@ import { FileUp, Plus, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
+  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_LABEL,
   SOP_UPLOAD_MAX_BYTES,
   SOP_UPLOAD_MIME_TYPES,
+  guessDocumentTypeFromFilename,
+  type DocumentType,
   type SopUploadMimeType,
 } from '@/lib/types/sop';
 import type { CreatorScope } from '@/lib/qr/audience';
@@ -68,6 +72,10 @@ export function UploadSopClient({ departments, scope }: Props) {
   const [title, setTitle] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [audience, setAudience] = useState<AudienceState>({ department_ids: [], roles: [] });
+  // True until the manager picks a type — drives the "Detected: …" chip
+  // copy so we never claim a manual pick was auto-detected.
+  const [documentType, setDocumentType] = useState<DocumentType>('sop');
+  const [typeAutoDetected, setTypeAutoDetected] = useState(true);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -81,6 +89,8 @@ export function UploadSopClient({ departments, scope }: Props) {
     setTitle('');
     setDepartmentId('');
     setAudience({ department_ids: [], roles: [] });
+    setDocumentType('sop');
+    setTypeAutoDetected(true);
     setError(null);
     setDragOver(false);
     if (inputRef.current) inputRef.current.value = '';
@@ -107,6 +117,11 @@ export function UploadSopClient({ departments, scope }: Props) {
     setError(null);
     setFile(f);
     if (!title.trim()) setTitle(deriveTitleFromFilename(f.name));
+    // Only re-guess the type if the manager hasn't already overridden —
+    // we don't want a "replace file" action to clobber their explicit pick.
+    if (typeAutoDetected) {
+      setDocumentType(guessDocumentTypeFromFilename(f.name));
+    }
     return true;
   }
 
@@ -134,7 +149,7 @@ export function UploadSopClient({ departments, scope }: Props) {
       return;
     }
     if (!audienceChosen) {
-      setError('Pick at least one department or role for the audience — every SOP needs a defined audience.');
+      setError('Pick at least one department or role for the audience — every document needs a defined audience.');
       return;
     }
     setError(null);
@@ -155,13 +170,14 @@ export function UploadSopClient({ departments, scope }: Props) {
         mime_type: file.type as SopUploadMimeType,
         file_base64: base64,
         audience,
+        document_type: documentType,
       });
 
       if (!result.ok) {
         setError(
           result.error.code === 'INVALID_INPUT'
             ? (result.error.message ?? 'Please check the file and try again.')
-            : 'Could not create the SOP. Please try again.',
+            : 'Could not create the document. Please try again.',
         );
         return;
       }
@@ -176,13 +192,13 @@ export function UploadSopClient({ departments, scope }: Props) {
     <>
       <Button color="brand" onClick={handleOpen}>
         <Plus data-slot="icon" strokeWidth={2} />
-        Upload SOP
+        Upload document
       </Button>
 
       <Dialog open={open} onClose={setOpen} size="lg">
         <form onSubmit={handleSubmit}>
           <div className="flex items-start justify-between">
-            <DialogTitle>Upload a new SOP</DialogTitle>
+            <DialogTitle>Upload a document</DialogTitle>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -193,7 +209,7 @@ export function UploadSopClient({ departments, scope }: Props) {
             </button>
           </div>
           <DialogDescription>
-            PDF, DOCX, DOC, TXT, JPG, or PNG up to 10 MB. One procedure per file works best — keep it under 10 pages for fastest results.
+            PDF, DOCX, DOC, TXT, JPG, or PNG up to 10 MB. Procedures, policies, training, references, and notices all go through the same bilingual pipeline. One document per file works best — keep it under 10 pages for fastest results.
           </DialogDescription>
 
           <DialogBody className="flex flex-col gap-4">
@@ -229,10 +245,41 @@ export function UploadSopClient({ departments, scope }: Props) {
                 <>
                   <Upload className="size-7 text-dc-text-3" strokeWidth={1.5} aria-hidden />
                   <p className="text-sm font-medium text-dc-text">Drop a file or click to browse</p>
-                  <p className="text-xs text-dc-text-3">PDF · DOCX · DOC · TXT · JPG · PNG · max 10 MB · one procedure per file</p>
+                  <p className="text-xs text-dc-text-3">PDF · DOCX · DOC · TXT · JPG · PNG · max 10 MB · one document per file</p>
                 </>
               )}
             </label>
+
+            {file && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="sop-doc-type" className="text-sm font-medium text-dc-text">
+                  Document type
+                  {typeAutoDetected && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-(--color-brand)/10 px-2 py-0.5 text-[10px] font-medium text-(--color-brand)">
+                      Detected from filename
+                    </span>
+                  )}
+                </label>
+                <select
+                  id="sop-doc-type"
+                  value={documentType}
+                  onChange={(e) => {
+                    setDocumentType(e.target.value as DocumentType);
+                    setTypeAutoDetected(false);
+                  }}
+                  className="w-full rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised px-3 py-2 text-sm text-dc-text focus:border-(--color-brand) focus:outline-none"
+                >
+                  {DOCUMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {DOCUMENT_TYPE_LABEL[t].en}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-dc-text-3">
+                  Pipeline is the same for every type — this only adjusts how Claude reads the file and how workers see it.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="sop-title" className="text-sm font-medium text-dc-text">
@@ -292,7 +339,7 @@ export function UploadSopClient({ departments, scope }: Props) {
               scope={scope}
               value={audience}
               onChange={setAudience}
-              description="Document control: pick the departments and/or roles that should see this SOP. Admins and HR managers always see every SOP regardless."
+              description="Document control: pick the departments and/or roles that should see this document. Admins and HR managers always see every document regardless."
             />
 
             {error && (

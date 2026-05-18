@@ -8,7 +8,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Badge } from "@/components/ui/badge";
 import { TagPickerModal } from "@/components/dashboard/TagPickerModal";
 import type { Tag } from "@/lib/types/tags";
-import type { SopStatus } from "@/lib/types/sop";
+import { DOCUMENT_TYPE_LABEL, type DocumentType, type SopStatus } from "@/lib/types/sop";
 
 import { setSopTags } from "@/app/dashboard/tags/_actions/tags";
 
@@ -27,6 +27,7 @@ export interface SopRowWithTags {
   id: string;
   title: string;
   status: SopStatus;
+  document_type: DocumentType | null;
   updated_at: string;
   archived_at: string | null;
   departments: { id: string; name: string } | null;
@@ -103,6 +104,8 @@ function SopRowItem({
             <Badge color={meta.color} dot>{meta.label}</Badge>
           </p>
           <p className="mt-0.5 text-xs text-dc-text-3">
+            {DOCUMENT_TYPE_LABEL[(sop.document_type ?? "sop") as DocumentType].en}
+            <span className="mx-1.5">·</span>
             {sop.departments?.name ?? "No department"}
             <span className="mx-1.5">·</span>
             Updated {new Date(sop.updated_at).toLocaleDateString()}

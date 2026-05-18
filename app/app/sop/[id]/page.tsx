@@ -2,7 +2,12 @@ import { notFound, redirect } from 'next/navigation';
 
 import { AuthError, getCompanyContext, type Role } from '@/lib/auth/company-context';
 import { passesAudience, type QrAudience } from '@/lib/qr/audience';
-import type { WorkerLanguage, SopTemplate } from '@/lib/types/sop';
+import {
+  DOCUMENT_TYPE_LABEL,
+  type DocumentType,
+  type SopTemplate,
+  type WorkerLanguage,
+} from '@/lib/types/sop';
 import { TemplateRenderer } from '@/components/sop/TemplateRenderer';
 import type { HrContact } from '@/components/sop/OnboardingRenderer';
 import { LanguageToggleClient } from './_components/LanguageToggleClient';
@@ -58,6 +63,22 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
     ((sop as { template?: SopTemplate | null }).template) ??
     ((sop as { template_recommendation?: { recommended?: SopTemplate } | null }).template_recommendation?.recommended) ??
     null;
+
+  // document_type lives behind migration 20260518000001. Read defensively
+  // so a pre-migration row never blocks the worker view; the chip just
+  // shows "Procedure" / "Procedimiento" as the safe fallback.
+  let documentType: DocumentType = 'sop';
+  try {
+    const { data: dtRow } = await supabase
+      .from('sops')
+      .select('document_type')
+      .eq('id', id)
+      .maybeSingle();
+    const raw = (dtRow as { document_type?: DocumentType | null } | null)?.document_type;
+    if (raw) documentType = raw;
+  } catch {
+    // migration not yet applied — fall through with the 'sop' default
+  }
 
   // Archived SOPs are never shown to workers.
   if (sop.status === 'archived') {
@@ -215,9 +236,14 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
   return (
     <main className="mx-auto min-h-[100dvh] max-w-2xl px-5 py-6 sm:px-6 sm:py-10" lang={lang}>
       <header className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="font-display text-2xl leading-tight font-bold text-dc-text">
-          {sop.title}
-        </h1>
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-dc-text-3">
+            {DOCUMENT_TYPE_LABEL[documentType][lang]}
+          </p>
+          <h1 className="font-display text-2xl leading-tight font-bold text-dc-text">
+            {sop.title}
+          </h1>
+        </div>
         <LanguageToggleClient sopId={id} current={lang} />
       </header>
 

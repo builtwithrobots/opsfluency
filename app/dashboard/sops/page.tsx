@@ -7,7 +7,13 @@ import { isCurrentUserSuperAdmin } from '@/lib/auth/super-admin-context';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
-import { SOP_STATUS, type SopStatus } from '@/lib/types/sop';
+import {
+  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_LABEL,
+  SOP_STATUS,
+  type DocumentType,
+  type SopStatus,
+} from '@/lib/types/sop';
 import type { Tag } from '@/lib/types/tags';
 import { UploadSopClient } from './_components/UploadSopClient';
 import { SopListClient, type SopRowWithTags } from './_components/SopListClient';
@@ -18,6 +24,7 @@ interface PageProps {
     q?: string;
     status?: string;
     tag?: string;
+    type?: string;
   }>;
 }
 
@@ -31,6 +38,9 @@ export default async function SopsPage({ searchParams }: PageProps) {
   const q = (params.q ?? '').trim();
   const statusFilter: SopStatus | 'all' = (SOP_STATUS as readonly string[]).includes(params.status ?? '')
     ? (params.status as SopStatus)
+    : 'all';
+  const typeFilter: DocumentType | 'all' = (DOCUMENT_TYPES as readonly string[]).includes(params.type ?? '')
+    ? (params.type as DocumentType)
     : 'all';
   const tagId = params.tag ?? null;
 
@@ -61,10 +71,11 @@ export default async function SopsPage({ searchParams }: PageProps) {
   const sopsPromise = (async () => {
     let query = supabase
       .from('sops')
-      .select('id, title, status, updated_at, archived_at, departments(id, name)')
+      .select('id, title, status, document_type, updated_at, archived_at, departments(id, name)')
       .eq('company_id', company_id)
       .order('updated_at', { ascending: false });
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    if (typeFilter !== 'all') query = query.eq('document_type', typeFilter);
     if (q) query = query.ilike('title', `%${q}%`);
     if (sopIds !== null) {
       if (sopIds.length === 0) return { data: [], error: null };
@@ -110,7 +121,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
 
   // Fetch tag assignments for the visible SOPs.
   const visibleSopIds = baseSops.map((s) => s.id);
-  let tagsBySOPId = new Map<string, Tag[]>();
+  const tagsBySOPId = new Map<string, Tag[]>();
   if (visibleSopIds.length > 0) {
     const { data: assignments } = await supabase
       .from('sop_tags')
@@ -138,13 +149,12 @@ export default async function SopsPage({ searchParams }: PageProps) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Heading>Standard Operating Procedures</Heading>
+          <Heading>Documents</Heading>
           <Text className="mt-1.5 max-w-2xl">
-            Upload, review, translate, and publish bilingual procedures. Each published SOP gets a
-            permanent QR code your workers can scan.
+            Upload, review, translate, and publish bilingual procedures, policies, training, references, and notices. Each published document gets a permanent QR code your workers can scan.
           </Text>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-dc-text-3">Sample SOPs:</span>
+            <span className="text-xs text-dc-text-3">Samples:</span>
             <a
               href="/examples/example-sop.docx"
               download
@@ -203,7 +213,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
         >
           Apply
         </button>
-        {(q || statusFilter !== 'all') && (
+        {(q || statusFilter !== 'all' || typeFilter !== 'all') && (
           <Link
             href="/dashboard/sops"
             className="rounded-lg px-3 py-2 text-sm text-dc-text-3 hover:text-dc-text"
@@ -212,6 +222,8 @@ export default async function SopsPage({ searchParams }: PageProps) {
           </Link>
         )}
       </form>
+
+      <DocumentTypeFilterChips active={typeFilter} q={q} status={statusFilter} tag={tagId} />
 
       {allTags.length > 0 && (
         <SopTagFilterBar
@@ -233,7 +245,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
       )}
 
       {!sopsError && sops.length === 0 && (
-        <EmptyState filtered={!!q || statusFilter !== 'all' || !!tagId} />
+        <EmptyState filtered={!!q || statusFilter !== 'all' || typeFilter !== 'all' || !!tagId} />
       )}
 
       {sops.length > 0 && (
@@ -251,7 +263,7 @@ function EmptyState({ filtered }: { filtered: boolean }) {
   if (filtered) {
     return (
       <div className="rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-5 py-10 text-center text-sm text-dc-text-3">
-        No SOPs match your filters.
+        No documents match your filters.
       </div>
     );
   }
@@ -269,13 +281,59 @@ function EmptyState({ filtered }: { filtered: boolean }) {
           <Upload className="size-7" strokeWidth={1.5} />
         </span>
         <div>
-          <h3 className="text-xl font-semibold text-dc-text">Upload your first SOP</h3>
+          <h3 className="text-xl font-semibold text-dc-text">Upload your first document</h3>
           <p className="mt-1 max-w-md text-dc-text-2">
-            Drop a PDF, photo, or text file. Claude reads it, builds clean Markdown, flags
-            site-specific terms, and translates to Spanish — all in one pass.
+            Drop a PDF, photo, or text file — procedures, policies, training, references, or notices. Claude reads it, builds clean Markdown, flags site-specific terms, and translates to Spanish — all in one pass.
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface FilterChipsProps {
+  active: DocumentType | 'all';
+  q: string;
+  status: SopStatus | 'all';
+  tag: string | null;
+}
+
+function DocumentTypeFilterChips({ active, q, status, tag }: FilterChipsProps) {
+  const buildHref = (type: DocumentType | 'all'): string => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (status !== 'all') params.set('status', status);
+    if (tag) params.set('tag', tag);
+    if (type !== 'all') params.set('type', type);
+    const qs = params.toString();
+    return qs ? `/dashboard/sops?${qs}` : '/dashboard/sops';
+  };
+
+  const chips: Array<{ key: DocumentType | 'all'; label: string }> = [
+    { key: 'all', label: 'All' },
+    ...DOCUMENT_TYPES.map((t) => ({ key: t, label: DOCUMENT_TYPE_LABEL[t].en })),
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by document type">
+      {chips.map((chip) => {
+        const isActive = chip.key === active;
+        return (
+          <Link
+            key={chip.key}
+            href={buildHref(chip.key)}
+            aria-current={isActive ? 'page' : undefined}
+            className={[
+              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              isActive
+                ? 'border-(--color-brand) bg-(--color-brand)/10 text-(--color-brand)'
+                : 'border-[color:var(--dc-edge)] bg-dc-raised text-dc-text-2 hover:border-(--color-brand)/40 hover:text-dc-text',
+            ].join(' ')}
+          >
+            {chip.label}
+          </Link>
+        );
+      })}
     </div>
   );
 }
