@@ -31,7 +31,7 @@ import { AudienceClient } from './_components/AudienceClient';
 import { MediaClient, type SopImageRow } from './_components/MediaClient';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
 import type { Role } from '@/lib/auth/company-context';
-import type { SopTemplate } from '@/lib/types/sop';
+import { DOCUMENT_TYPE_LABEL, type DocumentType, type SopTemplate } from '@/lib/types/sop';
 import type { TemplateRecommendation } from '@/lib/ai/template-recommender';
 import { TemplatePickerClient } from './_components/TemplatePickerClient';
 
@@ -91,6 +91,23 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
     .eq('company_id', company_id)
     .maybeSingle();
   if (sopErr || !sop) notFound();
+
+  // document_type lives behind migration 20260518000001. Read defensively
+  // so a pre-migration row never breaks the detail page; fall back to
+  // 'sop' which matches the column default.
+  let documentType: DocumentType = 'sop';
+  try {
+    const { data: dtRow } = await supabase
+      .from('sops')
+      .select('document_type')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    const raw = (dtRow as { document_type?: DocumentType | null } | null)?.document_type;
+    if (raw) documentType = raw;
+  } catch {
+    // migration not yet applied — header shows the default "Procedure" label
+  }
 
   // Audience columns live behind migration 20260427000002. Read them in a
   // separate try/catch so a missing-column or transient PostgREST error
@@ -248,12 +265,16 @@ export default async function SopDetailPage({ params, searchParams }: PageProps)
       <header className="flex flex-col gap-4">
         <Button href="/dashboard/sops" plain className="-ml-2 self-start">
           <ArrowLeft data-slot="icon" strokeWidth={2} />
-          Back to SOPs
+          Back to documents
         </Button>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             <Heading className="truncate">{sop.title}</Heading>
             <Text className="mt-1 flex items-center gap-2 text-xs">
+              <span className="rounded-full border border-[color:var(--dc-edge)] bg-dc-raised px-2 py-0.5 text-[11px] font-medium text-dc-text-2">
+                {DOCUMENT_TYPE_LABEL[documentType].en}
+              </span>
+              <span className="text-dc-text-3">·</span>
               {dept ? <span>{dept.name}</span> : <span className="text-dc-text-3">No department</span>}
               <span className="text-dc-text-3">·</span>
               <span className="text-dc-text-3">Updated {new Date(sop.updated_at).toLocaleDateString()}</span>

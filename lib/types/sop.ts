@@ -25,6 +25,69 @@ export const SOP_TEMPLATE = [
 export type SopTemplate = (typeof SOP_TEMPLATE)[number];
 
 /**
+ * Document type discriminator. All types share the SOP pipeline; the type
+ * drives AI prompt wording, suggested template defaults, and worker-side
+ * labelling. `sop` is the default (and the value backfilled for every
+ * pre-migration row).
+ */
+export const DOCUMENT_TYPES = [
+  "sop",
+  "policy",
+  "training",
+  "reference",
+  "notice",
+] as const;
+
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+/**
+ * Bilingual labels for each document type, per the
+ * `opsfluency-bilingual-content` rule that every user-facing system string
+ * exists in both EN and ES.
+ */
+export const DOCUMENT_TYPE_LABEL: Record<DocumentType, { en: string; es: string }> = {
+  sop:       { en: "Procedure",  es: "Procedimiento" },
+  policy:    { en: "Policy",     es: "Política"      },
+  training:  { en: "Training",   es: "Capacitación"  },
+  reference: { en: "Reference",  es: "Referencia"    },
+  notice:    { en: "Notice",     es: "Aviso"         },
+};
+
+export function documentTypeLabel(type: DocumentType, lang: WorkerLanguage = "en"): string {
+  return DOCUMENT_TYPE_LABEL[type][lang];
+}
+
+/**
+ * Suggested display template for each document type. The upload form
+ * pre-selects this; the manager can always override.
+ */
+export const SUGGESTED_TEMPLATE_BY_TYPE: Record<DocumentType, SopTemplate> = {
+  sop:       "step-by-step",
+  policy:    "reference",
+  training:  "onboarding",
+  reference: "reference",
+  notice:    "step-by-step",
+};
+
+/**
+ * Filename-based heuristic for the upload form's initial type guess.
+ * Cheap, deterministic, no AI call. The manager always sees the chip and
+ * can override before the file goes to Sonnet. Order matters — first
+ * matching rule wins so more-specific terms ("handbook", "onboarding")
+ * beat generic ones.
+ */
+export function guessDocumentTypeFromFilename(filename: string): DocumentType {
+  const f = filename.toLowerCase();
+  if (/\b(onboarding|orientation|welcome|new[-_ ]?hire)\b/.test(f)) return "training";
+  if (/\b(training|certification|certif|tutorial|course|guide)\b/.test(f)) return "training";
+  if (/\b(handbook|policy|policies|code[-_ ]?of[-_ ]?conduct|hr)\b/.test(f)) return "policy";
+  if (/\b(notice|alert|memo|bulletin|announcement)\b/.test(f)) return "notice";
+  if (/\b(spec|specs|specification|reference|directory|contacts?|glossary)\b/.test(f)) return "reference";
+  // Default: SOP. Matches today's behavior for every existing upload.
+  return "sop";
+}
+
+/**
  * Allowed one-way transitions, mirroring the lifecycle documented in
  * `CLAUDE.md` → "SOP status lifecycle". Every Server Action that updates
  * `sops.status` reads the current status in the same transaction and
