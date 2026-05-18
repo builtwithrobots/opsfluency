@@ -1,7 +1,7 @@
 import { FileText, ScanLine } from "lucide-react";
 import Link from "next/link";
 
-import { LanguageToggleClient } from "./_components/LanguageToggleClient";
+import { LanguageToggle } from "@/components/app/LanguageToggle";
 import { AnnouncementsFeed } from "./_components/AnnouncementsFeed";
 import { getCompanyContext } from "@/lib/auth/company-context";
 import type { AnnouncementWithRead } from "@/lib/types/announcements";
@@ -166,7 +166,7 @@ export default async function WorkerHomePage({ searchParams }: Props) {
           </h1>
           <p className="mt-1 text-sm text-dc-text-2">{t.subtitle}</p>
         </div>
-        <LanguageToggleClient current={lang} />
+        <LanguageToggle current={lang} />
       </header>
 
       <div className="mb-8">
@@ -192,7 +192,7 @@ export default async function WorkerHomePage({ searchParams }: Props) {
         >
           {t.departmentsHeading}
         </h2>
-        <div className="rounded-xl border border-dc-edge bg-dc-surface p-5 text-center">
+        <div className="rounded-xl border border-dc-edge bg-dc-surface p-5 text-center shadow-(--shadow-card)">
           <FileText className="mx-auto size-6 text-dc-text-3" strokeWidth={2} aria-hidden />
           <p className="mt-2 text-sm text-dc-text-2">{t.departmentsEmpty}</p>
         </div>
@@ -208,9 +208,9 @@ export default async function WorkerHomePage({ searchParams }: Props) {
         <div className="grid gap-3 sm:grid-cols-2">
           <Link
             href="/app/scan"
-            className="flex min-h-[88px] items-center gap-3 rounded-xl border border-dc-edge bg-dc-surface p-4 transition-colors hover:bg-dc-raised"
+            className="group/card flex min-h-[88px] items-center gap-3 rounded-xl border border-dc-edge bg-dc-surface p-4 shadow-(--shadow-card) transition-all duration-200 hover:-translate-y-0.5 hover:border-(--color-brand)/40 hover:bg-dc-raised hover:shadow-(--shadow-raised) active:translate-y-0 active:scale-[0.99]"
           >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand) transition-colors group-hover/card:bg-(--color-brand)/15">
               <ScanLine className="size-6" strokeWidth={2} aria-hidden />
             </span>
             <span className="min-w-0">
@@ -222,9 +222,9 @@ export default async function WorkerHomePage({ searchParams }: Props) {
           </Link>
           <Link
             href="/app/search"
-            className="flex min-h-[88px] items-center gap-3 rounded-xl border border-dc-edge bg-dc-surface p-4 transition-colors hover:bg-dc-raised"
+            className="group/card flex min-h-[88px] items-center gap-3 rounded-xl border border-dc-edge bg-dc-surface p-4 shadow-(--shadow-card) transition-all duration-200 hover:-translate-y-0.5 hover:border-(--color-brand)/40 hover:bg-dc-raised hover:shadow-(--shadow-raised) active:translate-y-0 active:scale-[0.99]"
           >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand)">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-(--color-brand)/10 text-(--color-brand) transition-colors group-hover/card:bg-(--color-brand)/15">
               <FileText className="size-6" strokeWidth={2} aria-hidden />
             </span>
             <span className="min-w-0">

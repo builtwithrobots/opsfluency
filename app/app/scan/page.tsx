@@ -1,6 +1,6 @@
 import { ScanLine } from "lucide-react";
 
-import { LanguageToggleClient } from "@/app/app/home/_components/LanguageToggleClient";
+import { LanguageToggle } from "@/components/app/LanguageToggle";
 import { getCompanyContext } from "@/lib/auth/company-context";
 import type { WorkerLanguage } from "@/lib/types/sop";
 
@@ -67,7 +67,7 @@ export default async function WorkerScanPage({ searchParams }: Props) {
           </h1>
           <p className="mt-1 text-sm text-dc-text-2">{t.subtitle}</p>
         </div>
-        <LanguageToggleClient current={lang} />
+        <LanguageToggle current={lang} />
       </header>
 
       <ScanClient lang={lang} appOrigin={appOrigin} />

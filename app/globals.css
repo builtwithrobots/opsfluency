@@ -283,10 +283,20 @@
 .animate-beacon-arc-inner { animation: beaconArcPulse 3.5s ease-in-out infinite; }
 .animate-beacon-arc-outer { animation: beaconArcPulse 3.5s ease-in-out 0.4s infinite; }
 
+/* Scan reticle utilities — wired up in app/app/scan/_components/ScanClient.tsx */
+.animate-scan-line       { animation: scanLine 2.4s ease-in-out infinite; }
+.animate-corner-lock     { animation: cornerLock 2.4s ease-in-out infinite; }
+.animate-scan-ripple     { animation: scanRipple 600ms ease-out both; }
+.animate-capture-check   { animation: captureCheck 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-calm-pulse        { animation: none; }
   .animate-beacon-arc-inner  { animation: none; opacity: 1; }
   .animate-beacon-arc-outer  { animation: none; opacity: 1; }
+  .animate-scan-line         { animation: none; opacity: 0; }
+  .animate-corner-lock       { animation: none; }
+  .animate-scan-ripple       { animation: none; opacity: 0; }
+  .animate-capture-check     { animation: none; opacity: 1; transform: none; }
 }
 
 /* ── RADIX ACCORDION ─────────────────────────────────────────────────────

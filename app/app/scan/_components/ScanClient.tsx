@@ -5,6 +5,7 @@ import { AlertCircle, Camera, CheckCircle2, ScanLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { hapticSuccess } from "@/lib/haptics";
 import type { WorkerLanguage } from "@/lib/types/sop";
 
 interface Props {
@@ -77,6 +78,9 @@ export function ScanClient({ lang, appOrigin }: Props) {
     const classified = classify(raw);
     setResult(classified);
     setPaused(true);
+    // Buzz on detection. No-op on iOS Safari — phones that support it
+    // give workers in gloves confirmation they wouldn't otherwise see.
+    hapticSuccess();
   }
 
   function handleError(e: unknown) {
@@ -120,15 +124,53 @@ export function ScanClient({ lang, appOrigin }: Props) {
             video: { width: "100%", height: "100%", objectFit: "cover" },
           }}
         />
-        {/* Custom finder reticle. The library's built-in is disabled
-            above to keep the visual style consistent with the rest of
-            the worker app. */}
+        {/* Custom finder reticle — replaces the library's default to keep
+            visual style consistent with the rest of the worker app.
+
+            Three layered states (idle / detected) share the same square
+            footprint so layout never shifts:
+              1. Vignette + animated scan line sweep + corner brackets
+                 (visible while scanning).
+              2. Ripple + check stamp on detection.
+            All animations use globals.css keyframes that already respect
+            prefers-reduced-motion. */}
         {!paused && !result ? (
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 flex items-center justify-center"
           >
-            <div className="size-3/5 rounded-2xl border-4 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            <div className="relative size-3/5 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]">
+              {/* Scan line — sweeps top-to-bottom every 2.4s */}
+              <span className="absolute inset-x-0 h-0.5 animate-scan-line bg-(--color-brand)" />
+              {/* Four corner brackets — gently pulse */}
+              {(["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((pos) => {
+                const map = {
+                  "top-left":     "top-0 left-0  border-t-4 border-l-4 rounded-tl-xl",
+                  "top-right":    "top-0 right-0 border-t-4 border-r-4 rounded-tr-xl",
+                  "bottom-left":  "bottom-0 left-0  border-b-4 border-l-4 rounded-bl-xl",
+                  "bottom-right": "bottom-0 right-0 border-b-4 border-r-4 rounded-br-xl",
+                } as const;
+                return (
+                  <span
+                    key={pos}
+                    className={`absolute size-7 border-white/85 animate-corner-lock ${map[pos]}`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Capture confirmation — ripple expands outward, checkmark stamps in. */}
+        {result?.kind === "internal" ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
+            <span className="absolute size-3/5 animate-scan-ripple rounded-2xl border-4 border-(--color-brand)" />
+            <span className="flex size-20 items-center justify-center rounded-full bg-(--color-brand) text-white animate-capture-check shadow-(--shadow-float)">
+              <CheckCircle2 className="size-10" strokeWidth={2.5} />
+            </span>
           </div>
         ) : null}
       </div>
@@ -145,27 +187,31 @@ export function ScanClient({ lang, appOrigin }: Props) {
       ) : null}
 
       {result?.kind === "internal" ? (
-        <ResultCard
-          tone="success"
-          icon={CheckCircle2}
-          title={t.detected}
-          subtitle={result.raw}
-          action={{
-            label: t.openProcedure,
-            onClick: () => router.push(result.sopPath),
-          }}
-          secondary={{ label: t.scanAgain, onClick: reset }}
-        />
+        <div className="animate-fade-in">
+          <ResultCard
+            tone="success"
+            icon={CheckCircle2}
+            title={t.detected}
+            subtitle={result.raw}
+            action={{
+              label: t.openProcedure,
+              onClick: () => router.push(result.sopPath),
+            }}
+            secondary={{ label: t.scanAgain, onClick: reset }}
+          />
+        </div>
       ) : null}
 
       {result?.kind === "foreign" ? (
-        <ResultCard
-          tone="warn"
-          icon={AlertCircle}
-          title={t.foreignUrl}
-          subtitle={`${t.raw} ${result.raw}`}
-          secondary={{ label: t.scanAgain, onClick: reset }}
-        />
+        <div className="animate-fade-in">
+          <ResultCard
+            tone="warn"
+            icon={AlertCircle}
+            title={t.foreignUrl}
+            subtitle={`${t.raw} ${result.raw}`}
+            secondary={{ label: t.scanAgain, onClick: reset }}
+          />
+        </div>
       ) : null}
     </div>
   );

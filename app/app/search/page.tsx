@@ -1,7 +1,7 @@
 import { BookOpenText, FileText, Search } from "lucide-react";
 import Link from "next/link";
 
-import { LanguageToggleClient } from "@/app/app/home/_components/LanguageToggleClient";
+import { LanguageToggle } from "@/components/app/LanguageToggle";
 import { getCompanyContext } from "@/lib/auth/company-context";
 import type { WorkerLanguage } from "@/lib/types/sop";
 import type { Tag } from "@/lib/types/tags";
@@ -166,7 +166,7 @@ export default async function WorkerSearchPage({ searchParams }: Props) {
           </h1>
           <p className="mt-1 text-sm text-dc-text-2">{t.subtitle}</p>
         </div>
-        <LanguageToggleClient current={lang} />
+        <LanguageToggle current={lang} />
       </header>
 
       {/* Disabled text search — full-text search coming later */}
