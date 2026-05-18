@@ -70,6 +70,27 @@ export const SUGGESTED_TEMPLATE_BY_TYPE: Record<DocumentType, SopTemplate> = {
 };
 
 /**
+ * Per-type accent color expressed as a CSS variable reference. Consumers
+ * read `.var` and embed it as `var(${var})` so colors come from the
+ * design tokens, not raw hex. Kept here so worker viewer, dashboard
+ * detail, and any future surface classify a document the same way at a
+ * glance.
+ *
+ *   sop       → brand teal (the default; this IS the product)
+ *   policy    → signal-info blue (rules / written expectations)
+ *   training  → signal-hub purple (learning / onboarding)
+ *   reference → signal-neutral gray (lookup material)
+ *   notice    → signal-warn amber (time-bound, requires attention)
+ */
+export const DOCUMENT_TYPE_ACCENT: Record<DocumentType, { var: `--${string}` }> = {
+  sop:       { var: "--color-brand" },
+  policy:    { var: "--color-signal-info" },
+  training:  { var: "--color-signal-hub" },
+  reference: { var: "--color-signal-neutral" },
+  notice:    { var: "--color-signal-warn" },
+};
+
+/**
  * Filename-based heuristic for the upload form's initial type guess.
  * Cheap, deterministic, no AI call. The manager always sees the chip and
  * can override before the file goes to Sonnet. Order matters — first

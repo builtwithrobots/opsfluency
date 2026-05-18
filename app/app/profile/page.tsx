@@ -1,7 +1,7 @@
 import { User as UserIcon } from "lucide-react";
 import { currentUser } from "@clerk/nextjs/server";
 
-import { LanguageToggleClient } from "@/app/app/home/_components/LanguageToggleClient";
+import { LanguageToggle } from "@/components/app/LanguageToggle";
 import { getCompanyContext } from "@/lib/auth/company-context";
 import type { WorkerLanguage } from "@/lib/types/sop";
 
@@ -108,7 +108,7 @@ export default async function WorkerProfilePage({ searchParams }: Props) {
         </h2>
         <div className="flex items-center justify-between gap-3 rounded-xl border border-dc-edge bg-dc-surface p-4">
           <p className="text-sm text-dc-text-2">{t.languageHint}</p>
-          <LanguageToggleClient current={lang} />
+          <LanguageToggle current={lang} />
         </div>
       </section>
 

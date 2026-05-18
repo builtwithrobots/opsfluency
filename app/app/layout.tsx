@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { AppMotionProvider } from "@/components/app/AppMotionProvider";
 import { BottomNav } from "@/components/app/bottom-nav";
 import { PreviewBanner } from "@/components/app/preview-banner";
 import { ScrollToTopButton } from "@/components/app/scroll-to-top";
@@ -68,7 +69,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     member?.preferred_language === "es" ? "es" : "en";
 
   return (
-    <>
+    <AppMotionProvider>
       {ctx.role === "employee" || isEmbedded ? null : (
         <PreviewBanner role={ctx.role} />
       )}
@@ -88,6 +89,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <div className="pb-20">{children}</div>
       <BottomNav lang={navLang} />
       <ScrollToTopButton isEmbedded={isEmbedded} />
-    </>
+    </AppMotionProvider>
   );
 }

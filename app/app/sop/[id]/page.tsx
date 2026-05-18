@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { AuthError, getCompanyContext, type Role } from '@/lib/auth/company-context';
 import { passesAudience, type QrAudience } from '@/lib/qr/audience';
 import {
+  DOCUMENT_TYPE_ACCENT,
   DOCUMENT_TYPE_LABEL,
   type DocumentType,
   type SopTemplate,
@@ -10,9 +11,10 @@ import {
 } from '@/lib/types/sop';
 import { TemplateRenderer } from '@/components/sop/TemplateRenderer';
 import type { HrContact } from '@/components/sop/OnboardingRenderer';
-import { LanguageToggleClient } from './_components/LanguageToggleClient';
+import { LanguageToggle } from '@/components/app/LanguageToggle';
 import { VideoButtonClient } from './_components/VideoButtonClient';
 import { MediaScrollButton } from './_components/MediaScrollButton';
+import { MediaGallery, type GalleryImage } from './_components/MediaGallery';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -233,22 +235,40 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
     }
   }
 
+  const typeAccent = DOCUMENT_TYPE_ACCENT[documentType];
+
   return (
     <main className="mx-auto min-h-[100dvh] max-w-2xl px-5 py-6 sm:px-6 sm:py-10" lang={lang}>
-      <header className="mb-5 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-dc-text-3">
-            {DOCUMENT_TYPE_LABEL[documentType][lang]}
-          </p>
-          <h1 className="font-display text-2xl leading-tight font-bold text-dc-text">
-            {sop.title}
-          </h1>
+      <header className="mb-5 flex items-start justify-between gap-3 animate-fade-in">
+        <div className="min-w-0 flex gap-3">
+          <span
+            aria-hidden
+            className="mt-1 w-[3px] shrink-0 rounded-full self-stretch"
+            style={{ backgroundColor: `var(${typeAccent.var})` }}
+          />
+          <div className="min-w-0">
+            <span
+              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider font-display"
+              style={{
+                backgroundColor: `color-mix(in srgb, var(${typeAccent.var}) 12%, transparent)`,
+                color: `var(${typeAccent.var})`,
+              }}
+            >
+              {DOCUMENT_TYPE_LABEL[documentType][lang]}
+            </span>
+            <h1 className="mt-1.5 font-display text-2xl leading-tight font-bold text-dc-text">
+              {sop.title}
+            </h1>
+          </div>
         </div>
-        <LanguageToggleClient sopId={id} current={lang} />
+        <LanguageToggle current={lang} />
       </header>
 
       {(sopVideoUrl || sopImages.length > 0) && (
-        <div className="mb-5 flex flex-col gap-2">
+        <div
+          className="mb-5 flex flex-col gap-2 animate-fade-in"
+          style={{ animationDelay: "60ms", animationFillMode: "backwards" }}
+        >
           {sopVideoUrl && (
             <VideoButtonClient videoUrl={sopVideoUrl} sopTitle={sop.title} lang={lang} />
           )}
@@ -258,7 +278,10 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      <article className="text-[17px] leading-relaxed">
+      <article
+        className="text-[17px] leading-relaxed animate-fade-in"
+        style={{ animationDelay: "120ms", animationFillMode: "backwards" }}
+      >
         <TemplateRenderer content={content} template={sopTemplate} lang={lang} hrContacts={hrContacts} />
       </article>
 
@@ -271,26 +294,14 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
           <h2 className="mb-4 text-lg font-semibold text-dc-text">
             {lang === 'es' ? 'Medios' : 'Media'}
           </h2>
-          <div className="flex flex-col gap-6">
-            {sopImages.map((img) => {
-              const caption = lang === 'es' ? (img.caption_es ?? img.caption_en) : img.caption_en;
-              const publicUrl = `${supabasePublicUrl}/storage/v1/object/public/sop-images/${img.storage_path}`;
-              return (
-                <figure key={img.id} className="flex flex-col gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={publicUrl}
-                    alt={caption ?? ''}
-                    className="w-full rounded-lg object-contain"
-                    loading="lazy"
-                  />
-                  {caption && (
-                    <figcaption className="text-sm text-dc-text-2">{caption}</figcaption>
-                  )}
-                </figure>
-              );
-            })}
-          </div>
+          <MediaGallery
+            lang={lang}
+            images={sopImages.map<GalleryImage>((img) => ({
+              id: img.id,
+              url: `${supabasePublicUrl}/storage/v1/object/public/sop-images/${img.storage_path}`,
+              caption: lang === 'es' ? (img.caption_es ?? img.caption_en) : img.caption_en,
+            }))}
+          />
         </section>
       )}
     </main>

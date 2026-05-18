@@ -283,10 +283,98 @@
 .animate-beacon-arc-inner { animation: beaconArcPulse 3.5s ease-in-out infinite; }
 .animate-beacon-arc-outer { animation: beaconArcPulse 3.5s ease-in-out 0.4s infinite; }
 
+/* Scan reticle utilities — wired up in app/app/scan/_components/ScanClient.tsx */
+.animate-scan-line       { animation: scanLine 2.4s ease-in-out infinite; }
+.animate-corner-lock     { animation: cornerLock 2.4s ease-in-out infinite; }
+.animate-scan-ripple     { animation: scanRipple 600ms ease-out both; }
+.animate-capture-check   { animation: captureCheck 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-calm-pulse        { animation: none; }
   .animate-beacon-arc-inner  { animation: none; opacity: 1; }
   .animate-beacon-arc-outer  { animation: none; opacity: 1; }
+  .animate-scan-line         { animation: none; opacity: 0; }
+  .animate-corner-lock       { animation: none; }
+  .animate-scan-ripple       { animation: none; opacity: 0; }
+  .animate-capture-check     { animation: none; opacity: 1; transform: none; }
+}
+
+/* ── STEP-BY-STEP SOP RENDERER ───────────────────────────────────────────
+   Scoped layout for the StepByStepRenderer. Replaces the default
+   list-decimal markers (from lib/sop/markdown.tsx) with numbered circle
+   badges and a connecting vertical rail. !important is used on the two
+   list properties because the inline Tailwind utilities on the markdown
+   <ol> have higher class specificity than `.sop-steps ol` alone.
+   ──────────────────────────────────────────────────────────────────────── */
+.sop-steps ol {
+  list-style: none !important;
+  padding-left: 0 !important;
+  counter-reset: sop-step;
+  margin-top: 0.5rem;
+}
+
+.sop-steps ol > li {
+  counter-increment: sop-step;
+  position: relative;
+  padding-left: 3rem;
+  padding-bottom: 1.5rem;
+  min-height: 2.5rem;
+}
+
+.sop-steps ol > li:last-child {
+  padding-bottom: 0;
+}
+
+/* Numbered circle */
+.sop-steps ol > li::before {
+  content: counter(sop-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2rem;
+  height: 2rem;
+  background: var(--color-brand);
+  color: white;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  line-height: 1;
+  /* Ring of background color so the rail "ducks under" each badge cleanly */
+  box-shadow: 0 0 0 4px var(--dc-surface);
+  z-index: 1;
+}
+
+/* Connecting vertical rail — every li except the last */
+.sop-steps ol > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: calc(1rem - 1px);
+  top: 2rem;
+  bottom: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--color-brand) 25%, transparent);
+}
+
+/* Nested ordered lists (sub-steps) reset back to default decimal */
+.sop-steps ol ol {
+  list-style: decimal !important;
+  padding-left: 1.5rem !important;
+  counter-reset: none;
+  margin-top: 0.5rem;
+}
+.sop-steps ol ol > li {
+  counter-increment: none;
+  padding-left: 0;
+  padding-bottom: 0.25rem;
+  min-height: 0;
+}
+.sop-steps ol ol > li::before,
+.sop-steps ol ol > li::after {
+  content: none;
 }
 
 /* ── RADIX ACCORDION ─────────────────────────────────────────────────────
