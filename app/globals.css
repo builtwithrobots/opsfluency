@@ -299,6 +299,84 @@
   .animate-capture-check     { animation: none; opacity: 1; transform: none; }
 }
 
+/* ── STEP-BY-STEP SOP RENDERER ───────────────────────────────────────────
+   Scoped layout for the StepByStepRenderer. Replaces the default
+   list-decimal markers (from lib/sop/markdown.tsx) with numbered circle
+   badges and a connecting vertical rail. !important is used on the two
+   list properties because the inline Tailwind utilities on the markdown
+   <ol> have higher class specificity than `.sop-steps ol` alone.
+   ──────────────────────────────────────────────────────────────────────── */
+.sop-steps ol {
+  list-style: none !important;
+  padding-left: 0 !important;
+  counter-reset: sop-step;
+  margin-top: 0.5rem;
+}
+
+.sop-steps ol > li {
+  counter-increment: sop-step;
+  position: relative;
+  padding-left: 3rem;
+  padding-bottom: 1.5rem;
+  min-height: 2.5rem;
+}
+
+.sop-steps ol > li:last-child {
+  padding-bottom: 0;
+}
+
+/* Numbered circle */
+.sop-steps ol > li::before {
+  content: counter(sop-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2rem;
+  height: 2rem;
+  background: var(--color-brand);
+  color: white;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  line-height: 1;
+  /* Ring of background color so the rail "ducks under" each badge cleanly */
+  box-shadow: 0 0 0 4px var(--dc-surface);
+  z-index: 1;
+}
+
+/* Connecting vertical rail — every li except the last */
+.sop-steps ol > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: calc(1rem - 1px);
+  top: 2rem;
+  bottom: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--color-brand) 25%, transparent);
+}
+
+/* Nested ordered lists (sub-steps) reset back to default decimal */
+.sop-steps ol ol {
+  list-style: decimal !important;
+  padding-left: 1.5rem !important;
+  counter-reset: none;
+  margin-top: 0.5rem;
+}
+.sop-steps ol ol > li {
+  counter-increment: none;
+  padding-left: 0;
+  padding-bottom: 0.25rem;
+  min-height: 0;
+}
+.sop-steps ol ol > li::before,
+.sop-steps ol ol > li::after {
+  content: none;
+}
+
 /* ── RADIX ACCORDION ─────────────────────────────────────────────────────
    Smooth open/close for FAQ accordion items.
    ──────────────────────────────────────────────────────────────────────── */

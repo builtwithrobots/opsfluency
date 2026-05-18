@@ -14,6 +14,7 @@ import type { HrContact } from '@/components/sop/OnboardingRenderer';
 import { LanguageToggle } from '@/components/app/LanguageToggle';
 import { VideoButtonClient } from './_components/VideoButtonClient';
 import { MediaScrollButton } from './_components/MediaScrollButton';
+import { MediaGallery, type GalleryImage } from './_components/MediaGallery';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -293,26 +294,14 @@ export default async function WorkerSopPage({ params, searchParams }: Props) {
           <h2 className="mb-4 text-lg font-semibold text-dc-text">
             {lang === 'es' ? 'Medios' : 'Media'}
           </h2>
-          <div className="flex flex-col gap-6">
-            {sopImages.map((img) => {
-              const caption = lang === 'es' ? (img.caption_es ?? img.caption_en) : img.caption_en;
-              const publicUrl = `${supabasePublicUrl}/storage/v1/object/public/sop-images/${img.storage_path}`;
-              return (
-                <figure key={img.id} className="flex flex-col gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={publicUrl}
-                    alt={caption ?? ''}
-                    className="w-full rounded-lg object-contain"
-                    loading="lazy"
-                  />
-                  {caption && (
-                    <figcaption className="text-sm text-dc-text-2">{caption}</figcaption>
-                  )}
-                </figure>
-              );
-            })}
-          </div>
+          <MediaGallery
+            lang={lang}
+            images={sopImages.map<GalleryImage>((img) => ({
+              id: img.id,
+              url: `${supabasePublicUrl}/storage/v1/object/public/sop-images/${img.storage_path}`,
+              caption: lang === 'es' ? (img.caption_es ?? img.caption_en) : img.caption_en,
+            }))}
+          />
         </section>
       )}
     </main>
