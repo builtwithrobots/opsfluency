@@ -64,10 +64,10 @@ export async function AdminsTab() {
                   key={a.id}
                   className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
                 >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="size-4 text-(--color-brand)" strokeWidth={2} />
-                      <code className="font-mono text-sm text-dc-text">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ShieldCheck className="size-4 shrink-0 text-(--color-brand)" strokeWidth={2} />
+                      <code className="font-mono text-sm break-all text-dc-text">
                         {a.clerk_user_id}
                       </code>
                       {isSelf ? (
