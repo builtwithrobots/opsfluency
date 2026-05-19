@@ -388,54 +388,59 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
         {!data.byModel.length ? (
           <EmptyRow>No AI calls recorded in the last {days} days.</EmptyRow>
         ) : (
-          <div className="mt-2 overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
-            <table className="w-full text-sm">
-              <thead className="border-b border-[color:var(--dc-edge)] bg-dc-raised/50 text-left text-xs font-medium tracking-[0.08em] text-dc-text-3 uppercase">
-                <tr>
-                  <th className="px-4 py-2.5">Model</th>
-                  <th className="px-4 py-2.5 text-right">Calls</th>
-                  <th className="px-4 py-2.5 text-right">Input</th>
-                  <th className="px-4 py-2.5 text-right">Output</th>
-                  <th className="px-4 py-2.5 text-right">Avg duration</th>
-                  <th className="px-4 py-2.5 text-right">Est. cost</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[color:var(--dc-edge)]">
-                {data.byModel.map((m) => (
-                  <tr key={`${m.model}::${m.unit_kind}`}>
-                    <td className="px-4 py-2.5">
-                      <div className="font-mono text-xs text-dc-text">{m.model}</div>
-                      <div className="mt-0.5 text-[10px] tracking-wider text-dc-text-3 uppercase">
-                        per {m.unit_kind}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      {m.calls.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      <span title={`${m.input_units.toLocaleString()} ${unitKindLabel(m.unit_kind, m.input_units)}`}>
-                        {fmtUnits(m.input_units)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      <span title={`${m.output_units.toLocaleString()} ${unitKindLabel(m.unit_kind, m.output_units)}`}>
-                        {fmtUnits(m.output_units)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-dc-text-2">
-                      <span className="inline-flex items-center gap-1">
-                        <Timer className="size-3 text-dc-text-3" strokeWidth={2} />
-                        {fmtMs(m.avg_duration_ms)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">
-                      {fmtUsd(m.estimated_cost)}
-                    </td>
+          <>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
+              <table className="w-full text-sm">
+                <thead className="border-b border-[color:var(--dc-edge)] bg-dc-raised/50 text-left text-xs font-medium tracking-[0.08em] text-dc-text-3 uppercase">
+                  <tr>
+                    <th className="px-4 py-2.5">Model</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Calls</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Input</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Output</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Avg duration</th>
+                    <th className="px-4 py-2.5 text-right">Est. cost</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[color:var(--dc-edge)]">
+                  {data.byModel.map((m) => (
+                    <tr key={`${m.model}::${m.unit_kind}`}>
+                      <td className="px-4 py-2.5">
+                        <div className="font-mono text-xs text-dc-text">{m.model}</div>
+                        <div className="mt-0.5 text-[10px] tracking-wider text-dc-text-3 uppercase">
+                          per {m.unit_kind}
+                        </div>
+                      </td>
+                      <td className="hidden px-4 py-2.5 text-right tabular-nums text-dc-text-2 sm:table-cell">
+                        {m.calls.toLocaleString()}
+                      </td>
+                      <td className="hidden px-4 py-2.5 text-right tabular-nums text-dc-text-2 sm:table-cell">
+                        <span title={`${m.input_units.toLocaleString()} ${unitKindLabel(m.unit_kind, m.input_units)}`}>
+                          {fmtUnits(m.input_units)}
+                        </span>
+                      </td>
+                      <td className="hidden px-4 py-2.5 text-right tabular-nums text-dc-text-2 sm:table-cell">
+                        <span title={`${m.output_units.toLocaleString()} ${unitKindLabel(m.unit_kind, m.output_units)}`}>
+                          {fmtUnits(m.output_units)}
+                        </span>
+                      </td>
+                      <td className="hidden px-4 py-2.5 text-right tabular-nums text-dc-text-2 sm:table-cell">
+                        <span className="inline-flex items-center gap-1">
+                          <Timer className="size-3 text-dc-text-3" strokeWidth={2} />
+                          {fmtMs(m.avg_duration_ms)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-dc-text">
+                        {fmtUsd(m.estimated_cost)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-1 text-[11px] text-dc-text-3 sm:hidden">
+              Showing model + cost. Rotate or widen the screen for full breakdown.
+            </p>
+          </>
         )}
       </div>
 
@@ -451,13 +456,13 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                 <thead className="border-b border-[color:var(--dc-edge)] bg-dc-raised/50 text-left text-xs font-medium tracking-[0.08em] text-dc-text-3 uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Tenant</th>
-                    <th className="px-4 py-2.5 text-right">Calls</th>
-                    <th className="px-4 py-2.5 text-right">Anthropic</th>
-                    <th className="px-4 py-2.5 text-right">Google</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Calls</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Anthropic</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Google</th>
                     <th className="px-4 py-2.5 text-right">Proj.&nbsp;/&nbsp;Month</th>
                     <th className="px-4 py-2.5">vs Cap</th>
-                    <th className="px-4 py-2.5 text-right">Margin</th>
-                    <th className="px-4 py-2.5 text-right">Plan</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Margin</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell">Plan</th>
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
@@ -503,12 +508,12 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                         </td>
 
                         {/* Calls */}
-                        <td className="px-4 py-3 text-right tabular-nums text-dc-text-2">
+                        <td className="hidden px-4 py-3 text-right tabular-nums text-dc-text-2 sm:table-cell">
                           {t.calls.toLocaleString()}
                         </td>
 
                         {/* Anthropic */}
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
                           {t.anthropic_cost > 0 ? (
                             <div>
                               <div className="font-medium text-dc-text-2">{fmtUsd(t.anthropic_cost)}</div>
@@ -522,7 +527,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                         </td>
 
                         {/* Google */}
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
                           {t.google_cost > 0 ? (
                             <div>
                               <div className="font-medium text-dc-text-2">{fmtUsd(t.google_cost)}</div>
@@ -576,7 +581,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                         </td>
 
                         {/* Margin */}
-                        <td className="px-4 py-3 text-right">
+                        <td className="hidden px-4 py-3 text-right sm:table-cell">
                           {marginPct !== null ? (
                             <span className={["font-semibold tabular-nums", marginColor].join(" ")}>
                               {marginPct}%
@@ -587,7 +592,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                         </td>
 
                         {/* Plan selector */}
-                        <td className="px-4 py-3 text-right">
+                        <td className="hidden px-4 py-3 text-right sm:table-cell">
                           <TenantPlanSelect
                             companyId={t.company_id}
                             currentTier={t.plan_tier}
@@ -605,8 +610,12 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
               </table>
             </div>
 
+            <p className="mt-1 text-[11px] text-dc-text-3 sm:hidden">
+              Showing tenant, projection, and cap. Rotate or widen the screen to see calls, costs, margin, and plan.
+            </p>
+
             {/* Legend */}
-            <p className="mt-2 text-[11px] text-dc-text-3">
+            <p className="mt-2 hidden text-[11px] text-dc-text-3 sm:block">
               <strong className="text-dc-text-2">Cap</strong> = AI spend concern threshold (20% of monthly plan price).{" "}
               <strong className="text-dc-text-2">Margin</strong> = est. gross margin after AI + Stripe 3% + Vercel + Supabase fixed COGS.{" "}
               <strong className="text-dc-text-2">Proj.&nbsp;/&nbsp;Month</strong> = {days}d spend extrapolated to 30 days.

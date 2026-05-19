@@ -3,7 +3,7 @@
 // pre-paint theme script so dark mode applies before React hydrates,
 // wires Clerk, and renders the global skip link required for WCAG.
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Chakra_Petch, Inter, JetBrains_Mono } from "next/font/google";
 
@@ -14,6 +14,13 @@ export const metadata: Metadata = {
   title: "OpsFluency: Frontline Knowledge for Multilingual Teams",
   description:
     "Bilingual SOP publishing, QR-triggered learning, and departmental communication for warehouse and manufacturing facilities.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#14B8A6",
 };
 
 const chakraPetch = Chakra_Petch({
@@ -52,7 +59,6 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#14B8A6" />
       </head>
       <ClerkProvider>
         <body className="min-h-screen flex flex-col antialiased bg-dc-bg text-dc-text">

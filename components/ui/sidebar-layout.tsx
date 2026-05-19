@@ -108,7 +108,10 @@ export function SidebarLayout({
 
   return (
     <SidebarCollapsedContext.Provider value={{ collapsed, toggle }}>
-      <div className="relative isolate flex min-h-svh w-full bg-dc-surface max-lg:flex-col lg:bg-dc-bg">
+      <div
+        className="relative isolate flex min-h-svh w-full bg-dc-surface max-lg:flex-col lg:bg-dc-bg"
+        style={{ '--opsf-sidebar-w': `${currentW}px` } as React.CSSProperties}
+      >
         {/* Desktop sidebar */}
         <div
           style={{ width: currentW }}
@@ -148,9 +151,9 @@ export function SidebarLayout({
 
         {/* Main content */}
         <main
-          style={{ paddingLeft: currentW }}
           className={clsx(
-            'flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2',
+            'flex flex-1 flex-col min-w-0 pb-2 lg:pt-2 lg:pr-2',
+            'lg:[padding-left:var(--opsf-sidebar-w)]',
             !isResizing && 'transition-[padding-left] duration-200 ease-in-out',
           )}
         >

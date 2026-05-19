@@ -193,7 +193,7 @@ function ColorPickerDropdown({
 
           {/* Preset swatches */}
           <div className="h-px bg-[color:var(--dc-edge)] mb-2.5" />
-          <div className="grid grid-cols-8 gap-1">
+          <div className="grid grid-cols-6 gap-1 sm:grid-cols-8">
             {TAG_COLORS.map((c) => (
               <button
                 key={c}
