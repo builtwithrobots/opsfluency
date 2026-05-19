@@ -70,7 +70,7 @@ export async function ImpersonationTab() {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
+        <div className="overflow-x-auto rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface shadow-xs">
           <table className="w-full text-sm">
             <thead className="border-b border-[color:var(--dc-edge)] bg-dc-raised/50 text-left text-xs font-medium tracking-[0.08em] text-dc-text-3 uppercase">
               <tr>
@@ -100,7 +100,7 @@ export async function ImpersonationTab() {
                     )}
                   </td>
                   <td className="px-4 py-2.5">
-                    <code className="font-mono text-xs text-dc-text-2">
+                    <code className="font-mono text-xs break-all text-dc-text-2">
                       {e.super_admin_clerk_user_id}
                     </code>
                   </td>

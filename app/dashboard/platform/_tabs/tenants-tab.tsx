@@ -229,8 +229,8 @@ export async function TenantsTab({ expandedId, show = "active" }: TenantsTabProp
                       )}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <code className="font-mono text-xs text-dc-text-3">{t.id}</code>
+                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                    <code className="hidden font-mono text-xs text-dc-text-3 sm:inline">{t.id}</code>
 
                     {/* Toggle member list */}
                     {expandedId === t.id ? (
@@ -293,9 +293,9 @@ export async function TenantsTab({ expandedId, show = "active" }: TenantsTabProp
                             key={m.id}
                             className="flex flex-wrap items-center justify-between gap-3 py-2.5"
                           >
-                            <div className="flex min-w-0 items-center gap-2">
+                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                               <RoleBadge role={m.role} />
-                              <code className="font-mono text-xs text-dc-text-2">
+                              <code className="font-mono text-xs break-all text-dc-text-2">
                                 {m.clerk_user_id}
                               </code>
                               {m.locked_at && (
