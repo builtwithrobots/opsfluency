@@ -184,7 +184,7 @@ export default async function SopsPage({ searchParams }: PageProps) {
         method="GET"
         className="flex flex-wrap items-center gap-2"
       >
-        <div className="relative flex-1 min-w-48 max-w-sm">
+        <div className="relative flex-1 min-w-0 max-w-sm sm:min-w-48">
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dc-text-3" />
           <input
             name="q"

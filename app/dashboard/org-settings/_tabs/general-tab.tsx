@@ -97,7 +97,7 @@ export async function GeneralTab({ saved }: Props) {
           </label>
 
           {/* City / State / ZIP */}
-          <div className="grid grid-cols-[1fr_5rem_8rem] gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_5rem_8rem]">
             <label className="flex flex-col gap-1.5">
               <span className={labelClass}>City</span>
               <input
