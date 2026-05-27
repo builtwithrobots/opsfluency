@@ -2,6 +2,7 @@ import "server-only";
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import type { GlossaryRow } from "@/lib/types/glossary";
+import { isQualifiedForTM, lookupTM, saveTM, sha256 } from "./memory";
 
 /**
  * Google Cloud Translation with glossary injection.
@@ -190,30 +191,22 @@ function sleep(ms: number): Promise<void> {
 interface LogTranslateInput {
   sopId: string | null | undefined;
   companyId: string | null | undefined;
-  /** Source character count Google is billed against. */
+  /** Characters actually sent to Google (0 on a full TM hit). */
   inputChars: number;
   /** Translated character count — informational, not billed. */
   outputChars: number;
   durationMs: number;
+  /** Text segments served from translation_memory cache (not billed). */
+  tmHits: number;
 }
 
-/**
- * Best-effort row into `ai_call_log` after a successful translation.
- * Mirrors the shape and failure handling of `logCall` in
- * `lib/ai/sonnet.ts` — admin client (the table is REVOKE'd from anon
- * + authenticated) and a swallowed catch so a telemetry hiccup never
- * fails an in-flight translation.
- *
- * `unit_kind = 'character'` is what the platform AI usage tab branches
- * on: tokens vs characters use different price-table rows and render
- * different unit labels.
- */
 async function logTranslateCall({
   sopId,
   companyId,
   inputChars,
   outputChars,
   durationMs,
+  tmHits,
 }: LogTranslateInput): Promise<void> {
   try {
     const supabase = getAdminClient();
@@ -225,6 +218,7 @@ async function logTranslateCall({
       sop_id: sopId ?? null,
       company_id: companyId ?? null,
       duration_ms: durationMs,
+      tm_hits: tmHits,
     });
   } catch {
     // Telemetry must never block the main flow.
@@ -247,6 +241,25 @@ export async function translateMarkdown(
         attempt: 1,
       },
     };
+  }
+
+  // TM check: for qualifying short texts (glossary terms, captions, announcements)
+  // look up the full source text before calling Google.
+  if (input.companyId && isQualifiedForTM(input.markdown)) {
+    const hash = sha256(input.markdown);
+    const tmHits = await lookupTM(input.companyId, [hash], input.target);
+    const hit = tmHits.get(hash);
+    if (hit !== undefined) {
+      await logTranslateCall({
+        sopId: input.sopId,
+        companyId: input.companyId,
+        inputChars: 0,
+        outputChars: 0,
+        durationMs: Date.now() - start,
+        tmHits: 1,
+      });
+      return { ok: true, translated: hit };
+    }
   }
 
   const { byLower, pattern } = buildPlaceholderMap(input.glossary);
@@ -305,16 +318,21 @@ export async function translateMarkdown(
           };
         }
         const restored = restorePlaceholders(translatedText, byLower);
-        // Source character count is what Google bills against: the
-        // markdown the caller actually intends to translate, before
-        // placeholder substitution swaps glossary terms with shorter
-        // tokens. Counting `substituted` would understate spend.
+        // Save to TM for future reuse (fire-and-forget, best-effort).
+        if (input.companyId && isQualifiedForTM(input.markdown)) {
+          void saveTM(
+            input.companyId,
+            [{ sourceText: input.markdown, translatedText: restored }],
+            input.target,
+          );
+        }
         await logTranslateCall({
           sopId: input.sopId,
           companyId: input.companyId,
           inputChars: input.markdown.length,
           outputChars: restored.length,
           durationMs: Date.now() - start,
+          tmHits: 0,
         });
         return { ok: true, translated: restored };
       }

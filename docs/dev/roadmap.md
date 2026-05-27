@@ -252,11 +252,12 @@ CREATE TABLE translation_memory (
 );
 ```
 
-- [ ] `20260xxx_translation_memory.sql` — create table, RLS, company isolation policy
-- [ ] `lib/translation/memory.ts` — `lookupTM(company_id, text, lang)` + `saveTM(...)` helpers
-- [ ] Wire TM lookup into `lib/translation/google.ts` — check before calling Google, write on miss
-- [ ] Mark manager-approved edits as `source: 'manager_edit'` (highest trust; used first on lookup)
-- [ ] TM hit rate telemetry in `ai_call_log` (add `tm_hit BOOLEAN` column)
+- [x] `20260527000001_translation_memory.sql` — create table, RLS, company isolation policy
+- [x] `lib/translation/memory.ts` — `lookupTM(company_id, hashes, lang)` + `saveTM(...)` helpers (SHA-256 keyed, batch ops, upsert with ignoreDuplicates)
+- [x] Wire TM lookup into `lib/translation/structured.ts` — leaf-level cache for SOP translation (TM hit applies translation directly; miss goes to Google, result saved to TM)
+- [x] Wire TM lookup into `lib/translation/google.ts` — full-text cache for short strings (glossary terms, captions, announcements)
+- [ ] Mark manager-approved edits as `source: 'manager_edit'` (highest trust; hook in SOP Spanish edit flow — Phase 2.5)
+- [x] TM hit rate telemetry in `ai_call_log` (added `tm_hits INT DEFAULT 0` column in `20260527000002_ai_call_log_tm_hits.sql`)
 - [ ] TM stats widget on platform AI console — per-tenant hit rate + estimated savings
 - [ ] Migration to back-fill existing published `sop_versions` into TM on first use
 
