@@ -73,7 +73,7 @@ For operations managers at 50–500-worker bilingual facilities who are losing w
 
 **Entry point:** Safety checklist SOPs, lockout/tagout procedures, PPE documentation.
 
-**Buy trigger:** Post-incident corrective action requirement, or annual safety audit prep.
+**Buy trigger:** Post-incident corrective action requirement, annual safety audit prep, or proactive OSHA compliance documentation. Key standards driving urgency: 29 CFR 1910.178 (forklifts — 3-year record retention, competency evaluation required), 1910.1200 (HAZCOM — written program must document how comprehension is verified), 1910.132 (PPE — employer must ascertain each employee understands proper use). OSHA compliance guidance is explicit: attendance sign-in sheets alone do not satisfy the comprehension verification requirement.
 
 ---
 
@@ -98,6 +98,16 @@ Total manager time: under 15 minutes per SOP.
 ### The moat message (why not just use Google Translate)
 
 Generic translation doesn't know that "the 3-line" means the third packaging conveyor at your facility, not Line 3 in a warehouse in another city. OpsFluency builds a company glossary the first time you define a term and injects it into every future translation. The same term, correctly translated, across every document. That consistency is the difference between a worker who trusts the procedure and one who has to verify it.
+
+### The compliance message
+
+"We had an OSHA near-miss. I need proof workers are reading the safety procedures." That's the sentence that turns an Operations Manager into a buyer and an EHS Director into a champion.
+
+OSHA does not require a specific test score. It does require documented proof of comprehension — not just attendance. A sign-in sheet from a group training doesn't show that your forklift operator understood the lockout/tagout procedure. A timestamped quiz result with the exact questions asked, the answers given, and a pass/fail against a threshold you set — that does.
+
+OpsFluency generates a 3-question bilingual comprehension check automatically when a procedure publishes. Workers take it on their phone after reading. The result is an immutable record: who, when, which version, which questions, what they answered, whether they passed. For most facilities, that exceeds what 29 CFR 1910.178, 1910.132, and 1910.1200 require. It's the difference between "we trained everyone" and "we can prove everyone understood."
+
+*(Phase 2B feature — available at all pricing tiers. Advanced analytics and re-quiz workflows on Growth and Scale.)*
 
 ### Manifesto lines (approved for marketing surfaces)
 
@@ -132,6 +142,7 @@ Most operations managers are not evaluating us against a named competitor. They 
 - **QR-to-procedure, mounted at the machine** — the physical touchpoint that makes the digital content reachable on the floor without a laptop or company email.
 - **Manager-approval gate on translations** — a manager signs off on the Spanish before it's live. This is not a liability hedge; it's the correct answer to "how do we know the Spanish is right."
 - **Magic link auth with no passwords** — workers on the floor don't have password managers. Magic links expire, rotate, and can be resent in 30 seconds from the manager dashboard. No IT ticket required.
+- **Comprehension records (Phase 2B)** — auto-generated bilingual quiz after every SOP publish. Immutable timestamped record of who passed, what questions they saw, in which language, against which SOP version. Covers 29 CFR 1910.178 (forklift), 1910.132 (PPE), and 1910.1200 (HAZCOM) documentation requirements. No competitor combines this with bilingual publishing and machine-mounted QR delivery.
 - **Flat-rate pricing** — a 200-worker floor and a 350-worker floor pay the same $199/month. Adding workers doesn't break the budget.
 
 ---
@@ -154,7 +165,7 @@ Most operations managers are not evaluating us against a named competitor. They 
 - **Annual discount is the conversion tool.** Month-to-month exists so buyers can start without a commitment. The annual pitch happens at 60 days when they've published their first 10 SOPs and can see the time savings.
 - **Enterprise is a conversation, not a form.** 500+ worker facilities have IT requirements, SSO, custom SLAs. Enterprise pricing is quoted after a 30-minute call. Do not publish a number.
 
-**What's included at every tier (no feature gating at MVP):**
+**What's included at every tier:**
 
 - Unlimited SOPs
 - Unlimited QR codes
@@ -164,6 +175,25 @@ Most operations managers are not evaluating us against a named competitor. They 
 - HR module
 - Scan analytics
 - Full AI conversion pipeline
+- Comprehension quizzes — worker takes quiz + OSHA-compliant record + basic CSV export *(Phase 2B)*
+
+**Phase 2B feature gating — Comprehension Verification:**
+
+The quiz compliance floor (quiz taking + basic export) is available at all tiers because every OSHA-regulated employer needs it regardless of size. Management analytics and workflow tools are tiered:
+
+| Feature | Starter | Growth | Scale |
+|---|---|---|---|
+| Worker quiz + bilingual questions | ✅ | ✅ | ✅ |
+| Department pass threshold + max attempts config | ✅ | ✅ | ✅ |
+| Immutable comprehension records | ✅ | ✅ | ✅ |
+| Basic export — all records, CSV | ✅ | ✅ | ✅ |
+| SOP Comprehension tab (pass rate, employee table) | ❌ | ✅ | ✅ |
+| Per-employee comprehension history | ❌ | ✅ | ✅ |
+| Advanced export (date range, filters, JSON) | ❌ | ✅ | ✅ |
+| Re-quiz assignments + worker badge | ❌ | ✅ | ✅ |
+| Department compliance summary | ❌ | ❌ | ✅ |
+
+**Sales framing:** "Every tier gets OSHA-compliant comprehension records. Growth and Scale add the dashboards to manage compliance at scale."
 
 **Free trial:** 14-day full-access trial, no credit card required. Trial ends → Growth tier prompt → card or cancel. Do not gate features during trial.
 
@@ -281,7 +311,7 @@ These are the blockers between "working product" and "sellable product." Everyth
 
 - [ ] **Help center** — 10–15 articles covering the most common questions from Phase 1 customers. Hosted on Intercom or Notion (public) — don't build custom.
 - [ ] **Status page** — status.opsfluency.com via Betterstack or Upptime. One hour to set up. Customers ask.
-- [ ] **Comprehension quizzes** (Phase 2B) — OSHA-defensible training record. This becomes a sales accelerator for EHS buyers, not just a product feature.
+- [ ] **Comprehension quizzes** (Phase 2B) — Auto-generated bilingual quiz on every published SOP. Produces immutable timestamped records that satisfy 29 CFR 1910.178 (forklift), 1910.132 (PPE), and 1910.1200 (HAZCOM) documentation requirements. OSHA requires proof of comprehension, not just attendance — this is the proof. Primary sales accelerator for EHS/Safety Director buyers. Available at all tiers; management analytics on Growth+.
 - [ ] **Translation Memory stats** in manager dashboard — lets managers see the cost savings compounding. Reinforces the glossary value story.
 
 ---
@@ -329,3 +359,4 @@ These phrases are banned from all OpsFluency marketing copy:
 | Date | Change |
 |---|---|
 | 2026-05-27 | Initial draft. Covers positioning, ICP, messages, differentiation, pricing, sales motion, channels, launch readiness, security copy. |
+| 2026-05-27 | Added compliance/quiz tier breakdown to Pricing (§5); compliance message to Key Messages (§3); comprehension records to competitive differentiation (§4); OSHA-specific buy trigger to Secondary ICP (§2); strengthened Launch Readiness comprehension quizzes line (§8). Based on OSHA research: 29 CFR 1910.178, 1910.132, 1910.1200. |
