@@ -256,9 +256,9 @@ CREATE TABLE translation_memory (
 - [x] `lib/translation/memory.ts` — `lookupTM(company_id, hashes, lang)` + `saveTM(...)` helpers (SHA-256 keyed, batch ops, upsert with ignoreDuplicates)
 - [x] Wire TM lookup into `lib/translation/structured.ts` — leaf-level cache for SOP translation (TM hit applies translation directly; miss goes to Google, result saved to TM)
 - [x] Wire TM lookup into `lib/translation/google.ts` — full-text cache for short strings (glossary terms, captions, announcements)
-- [ ] Mark manager-approved edits as `source: 'manager_edit'` (highest trust; hook in SOP Spanish edit flow — Phase 2.5)
+- [x] Mark manager-approved edits as `source: 'manager_edit'` — `saveSpanishEdit` action paragraph-pairs EN/ES content and saves qualifying segments to TM with `source: 'manager_edit'` after every successful Spanish save
 - [x] TM hit rate telemetry in `ai_call_log` (added `tm_hits INT DEFAULT 0` column in `20260527000002_ai_call_log_tm_hits.sql`)
-- [ ] TM stats widget on platform AI console — per-tenant hit rate + estimated savings
+- [x] TM stats widget on platform AI console — headline `SimpleStat` for total TM cache hits; per-tenant "TM hits" column (green) in top-tenants table; legend entry explaining segment savings
 - [ ] Migration to back-fill existing published `sop_versions` into TM on first use
 
 ### 2B — Comprehension Verification (Post-SOP Quizzes)
