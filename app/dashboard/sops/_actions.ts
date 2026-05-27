@@ -21,6 +21,7 @@ import type { GlossaryRow } from '@/lib/types/glossary';
 // path below to preserve mdast scaffolding.
 import { translateMarkdownStructured } from '@/lib/translation/structured';
 import { translateMarkdown } from '@/lib/translation/google';
+import { isQualifiedForTM, saveTM } from '@/lib/translation/memory';
 import { createQrCode } from '@/lib/qr/generate';
 import { isWithinCreatorScope } from '@/lib/qr/audience';
 import { getCreatorScope } from '@/lib/qr/creator-scope';
@@ -722,6 +723,20 @@ export async function saveSpanishEdit(raw: unknown): Promise<ActionResult> {
       .update({ content_es: input.content_es, needs_retranslation: false })
       .eq('id', version.id);
     if (error) return fail('INTERNAL', error.message);
+
+    // Save manager-approved translations to TM so future retranslations of
+    // the same SOP reuse the manager's corrected Spanish.
+    // Pairs EN and ES paragraphs by position (double-newline split). Assumes
+    // the manager edited specific paragraphs without restructuring the document.
+    if (version.content_en) {
+      const enParas = version.content_en.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+      const esParas = input.content_es.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+      const entries = enParas
+        .slice(0, Math.min(enParas.length, esParas.length, 500))
+        .map((en, i) => ({ sourceText: en, translatedText: esParas[i], source: 'manager_edit' as const }))
+        .filter((e) => isQualifiedForTM(e.sourceText) && isQualifiedForTM(e.translatedText));
+      if (entries.length > 0) void saveTM(company_id, entries, 'es');
+    }
 
     revalidatePath(`/dashboard/sops/${input.sop_id}`);
     revalidatePath(`/app/sop/${input.sop_id}`);

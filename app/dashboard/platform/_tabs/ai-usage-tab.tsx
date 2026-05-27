@@ -54,6 +54,7 @@ interface AiCallRow {
   duration_ms: number;
   company_id: string | null;
   created_at: string;
+  tm_hits: number;
 }
 
 interface ModelRollup {
@@ -81,6 +82,7 @@ interface TenantRollup {
   projected_monthly: number; // total_cost extrapolated to 30 days
   prior_total_cost: number;  // spend in the equivalent prior window
   trend_pct: number | null;  // (current - prior) / prior; null if no prior data
+  tm_hits: number;           // translation memory segments served from cache
 }
 
 interface UsageData {
@@ -91,6 +93,7 @@ interface UsageData {
   totalOutputTokens: number;
   totalInputChars: number;
   totalOutputChars: number;
+  totalTmHits: number;       // translation memory cache hits across all calls
   byModel: ModelRollup[];
   topTenants: TenantRollup[];
 }
@@ -123,7 +126,7 @@ async function loadUsage(days: number): Promise<UsageData> {
   const [{ data: calls, error }, { data: priorCalls }] = await Promise.all([
     admin
       .from("ai_call_log")
-      .select("model, input_units, output_units, cache_write_tokens, cache_read_tokens, unit_kind, duration_ms, company_id, created_at")
+      .select("model, input_units, output_units, cache_write_tokens, cache_read_tokens, unit_kind, duration_ms, company_id, created_at, tm_hits")
       .gte("created_at", since),
     admin
       .from("ai_call_log")
@@ -150,6 +153,7 @@ async function loadUsage(days: number): Promise<UsageData> {
   let totalOutputTokens = 0;
   let totalInputChars = 0;
   let totalOutputChars = 0;
+  let totalTmHits = 0;
 
   const modelMap = new Map<string, ModelRollup>();
   const tenantMap = new Map<string, TenantRollup>();
@@ -158,6 +162,7 @@ async function loadUsage(days: number): Promise<UsageData> {
     totalDurationMs += r.duration_ms;
     const cost = estimateCost(r);
     totalEstimatedCost += cost;
+    totalTmHits += r.tm_hits ?? 0;
 
     if (r.unit_kind === "token") {
       totalInputTokens += r.input_units;
@@ -200,8 +205,10 @@ async function loadUsage(days: number): Promise<UsageData> {
         projected_monthly: 0,
         prior_total_cost: 0,
         trend_pct: null,
+        tm_hits: 0,
       };
       t.calls += 1;
+      t.tm_hits += r.tm_hits ?? 0;
       if (r.unit_kind === "token") {
         t.anthropic_cost += cost;
         t.input_tokens += r.input_units;
@@ -259,6 +266,7 @@ async function loadUsage(days: number): Promise<UsageData> {
     totalOutputTokens,
     totalInputChars,
     totalOutputChars,
+    totalTmHits,
     byModel,
     topTenants: topTenantRollups,
   };
@@ -341,7 +349,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
       </div>
 
       {/* Headline stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SimpleStat
           label="Calls"
           value={data.totalCalls.toLocaleString()}
@@ -357,6 +365,12 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
           label="Est. cost"
           value={fmtUsd(data.totalEstimatedCost)}
           icon={<DollarSign className="size-5" strokeWidth={2} />}
+        />
+        <SimpleStat
+          label="TM cache hits"
+          value={data.totalTmHits.toLocaleString()}
+          sub="segments saved from Google"
+          icon={<Languages className="size-5" strokeWidth={2} />}
         />
       </div>
 
@@ -459,6 +473,7 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                     <th className="hidden px-4 py-2.5 text-right sm:table-cell">Calls</th>
                     <th className="hidden px-4 py-2.5 text-right sm:table-cell">Anthropic</th>
                     <th className="hidden px-4 py-2.5 text-right sm:table-cell">Google</th>
+                    <th className="hidden px-4 py-2.5 text-right sm:table-cell" title="Translation memory cache hits — segments served without calling Google">TM hits</th>
                     <th className="px-4 py-2.5 text-right">Proj.&nbsp;/&nbsp;Month</th>
                     <th className="px-4 py-2.5">vs Cap</th>
                     <th className="hidden px-4 py-2.5 text-right sm:table-cell">Margin</th>
@@ -534,6 +549,18 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
                               <div className="mt-0.5 text-[10px] text-dc-text-3">
                                 {fmtUnits(t.input_chars)} in · {fmtUnits(t.output_chars)} out
                               </div>
+                            </div>
+                          ) : (
+                            <span className="text-dc-text-3">—</span>
+                          )}
+                        </td>
+
+                        {/* TM cache hits */}
+                        <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
+                          {t.tm_hits > 0 ? (
+                            <div>
+                              <div className="font-medium text-emerald-400">{t.tm_hits.toLocaleString()}</div>
+                              <div className="mt-0.5 text-[10px] text-dc-text-3">segments cached</div>
                             </div>
                           ) : (
                             <span className="text-dc-text-3">—</span>
@@ -619,7 +646,8 @@ export async function AiUsageTab({ days: rawDays = 30 }: AiUsageTabProps) {
               <strong className="text-dc-text-2">Cap</strong> = AI spend concern threshold (20% of monthly plan price).{" "}
               <strong className="text-dc-text-2">Margin</strong> = est. gross margin after AI + Stripe 3% + Vercel + Supabase fixed COGS.{" "}
               <strong className="text-dc-text-2">Proj.&nbsp;/&nbsp;Month</strong> = {days}d spend extrapolated to 30 days.
-              Trend compares to the prior {days}-day window.
+              Trend compares to the prior {days}-day window.{" "}
+              <strong className="text-dc-text-2">TM hits</strong> = translation memory segments served from cache — each hit is one text segment not sent to Google.
             </p>
           </>
         )}
