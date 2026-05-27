@@ -21,10 +21,94 @@
 
 ## OSHA Compliance Notes
 
-- **No mandated pass score.** 29 CFR 1910.178 (forklifts), 1910.132 (PPE), 1910.1200 (HAZCOM) all require training and evaluation of understanding — none specify a percentage.
-- **Records required:** Who was trained, date, content, method. Keep for **3 years** (General Industry). Comprehension events are immutable once written — no hard delete, only soft archive.
-- **What OpsFluency provides:** Timestamped pass/fail record with SOP version, question text, answer chosen, language, and employee ID. This exceeds OSHA's documentation requirements and covers ISO 9001 / ISO 45001 competency evidence needs.
-- **What OpsFluency does NOT provide (and does not need to):** Proctor identity verification, time-to-complete measurement, or anti-gaming guarantees. A wall-mounted QR + warehouse floor environment is inherently observable by supervisors.
+### What OSHA mandates (and what it does not)
+
+**No mandated pass score.** 29 CFR 1910.178 (forklifts), 1910.132 (PPE), 1910.1200 (HAZCOM), and 1910.119 (PSM) all require training and "demonstrated competence" — none specify a minimum percentage score. The 67% default (2 of 3 correct) is an industry convention for the practical floor, not a legal requirement.
+
+**Comprehension verification is required — attendance alone is not enough.** OSHA compliance guidance explicitly states that "simple attendance sign-in sheets do not satisfy the comprehension verification requirement." Employers must document the method used to verify understanding (quiz, hands-on demonstration, or verbal evaluation) and the result. A compliance officer reviewing records is expected to look beyond paper — employees must have actually understood the training.
+
+**Required record content (all covered standards):**
+- Employee name or other identifying information
+- Date of training
+- Date of evaluation / competency check
+- Topics covered
+- Identity of the person who conducted training or evaluation
+- Evidence of comprehension — quiz score, pass/fail, or documented demonstration
+
+### Retention requirements by standard
+
+| Standard | Coverage | Retention |
+|---|---|---|
+| 29 CFR 1910.178 | Forklifts / powered industrial trucks | **3 years**; re-certification required at least every 3 years |
+| 29 CFR 1910.1030 | Bloodborne pathogens | **3 years from training date** |
+| 29 CFR 1910.132 | Personal protective equipment (PPE) | 1 year minimum (general industry) |
+| 29 CFR 1910.1200 | Hazard Communication (HAZCOM / GHS) | Written program must document comprehension method; exposure records for duration of employment |
+| 29 CFR 1910.119 | Process Safety Management (PSM) | Duration of employment |
+
+> **3 years is the safe design floor for warehousing and manufacturing.** Forklift and bloodborne pathogen standards — the two most cited for this ICP — both require 3 years. The export UI and retention messaging are built around this minimum. Customers with PSM-covered processes should be directed to consult their EHS counsel about duration-of-employment retention.
+
+### What OpsFluency records vs. OSHA minimum
+
+| Requirement | OSHA minimum | What OpsFluency stores |
+|---|---|---|
+| Employee identity | Name or ID | `clerk_user_id` + `employee_id` (survives employee row deletion via `ON DELETE SET NULL`) |
+| Training date | Date of training | `completed_at` — timestamped, immutable |
+| Evaluation date | Date of competency check | Same as `completed_at` — the quiz is the evaluation |
+| Topics covered | What was trained on | `questions_snapshot` — exact question text at time of attempt |
+| Pass/fail | Competency demonstrated | `passed` boolean + `score` integer percentage |
+| Method of evaluation | Quiz, demo, or verbal | AI-generated bilingual quiz; `sop_quizzes.model` records which model generated it |
+| Document version | N/A (not required) | `sop_version_number` — exceeds minimum |
+| Language | N/A (not required) | `language` (en/es) — exceeds minimum |
+| All attempts | N/A (not required) | Full attempt history, immutable, no delete path for managers — exceeds minimum |
+
+The `questions_snapshot` field is specifically what makes this audit-defensible: an inspector sees exactly what the employee was asked — not just a score — with the question wording frozen at the moment of the attempt, immune to future quiz regeneration.
+
+### What OpsFluency does NOT provide (and does not need to)
+
+- **Proctor / identity verification.** Not required by OSHA for general industry. A machine-mounted QR on a warehouse floor is inherently observable by supervisors.
+- **Time-to-complete measurement.** Not required; not tracked.
+- **Anti-gaming guarantees.** Not required. For safety-critical procedures, set `quiz_max_attempts = 1` and `quiz_pass_threshold_pct = 100` in department settings — the configuration is the deterrent in supervised environments.
+
+### Sources
+
+- [OSHA Training Standards Policy Statements (2010-04-28)](https://www.osha.gov/laws-regs/standardinterpretations/2010-04-28)
+- [29 CFR 1910.178 — Powered Industrial Trucks (Forklifts)](https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.178)
+- [OSHA Powered Industrial Truck Compliance Directive CPL 02-01-028](https://www.osha.gov/enforcement/directives/cpl-02-01-028)
+- [29 CFR 1910.1200 — Hazard Communication (HAZCOM / GHS)](https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.1200)
+- [29 CFR 1910.132 — Personal Protective Equipment](https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.30)
+- [OSHA Training Recordkeeping: What Employers Need to Know](https://www.expirationreminder.com/blog/osha-training-recordkeeping-requirements)
+- [Training Record Retention: Federal and State Requirements Guide](https://vekuri.com/blog/training-record-retention-requirements-federal-state)
+
+---
+
+## Tier Availability
+
+Comprehension verification is an OSHA compliance requirement, not a premium feature. Every employer covered by General Industry standards (29 CFR 1910) must document comprehension — gating the quiz itself or basic record export on higher tiers would create a compliance gap for Starter customers.
+
+The split is **compliance floor on all tiers, compliance management on Growth+**:
+
+| Feature | Starter | Growth | Scale |
+|---|---|---|---|
+| Quiz generation (Haiku, ~$0.001/quiz) | ✅ | ✅ | ✅ |
+| Worker takes quiz in PWA | ✅ | ✅ | ✅ |
+| Pass/fail + score displayed to worker | ✅ | ✅ | ✅ |
+| Department pass threshold configuration | ✅ | ✅ | ✅ |
+| Max attempts configuration | ✅ | ✅ | ✅ |
+| Immutable `sop_comprehension_events` records | ✅ | ✅ | ✅ |
+| Basic export — all records, CSV, no filters | ✅ | ✅ | ✅ |
+| SOP Comprehension tab (pass rate gauge, employee table, unattempted list) | ❌ | ✅ | ✅ |
+| Per-employee comprehension history drill-down | ❌ | ✅ | ✅ |
+| Advanced export (date range, department/SOP filter, JSON option) | ❌ | ✅ | ✅ |
+| Re-quiz assignments + worker badge flow | ❌ | ✅ | ✅ |
+| Department compliance summary (% of dept passed per SOP) | ❌ | ❌ | ✅ |
+
+**Rationale:**
+
+- **Compliance floor on all tiers.** A Starter customer with 30 forklift operators is just as OSHA-regulated as a Scale customer with 400. Basic quiz taking and a "download all records as CSV" export must be universally available. Gating either of these would mean Starter customers can't meet their legal documentation obligations — a product liability problem, not a feature decision.
+- **Analytics on Growth+.** The Comprehension tab (gauges, pass-rate trends, unattempted employee lists) is a management visibility tool, not a compliance minimum. A 30-person Starter facility can satisfy an OSHA auditor with the basic CSV export; they don't need a dashboard to do it.
+- **Re-quiz assignments on Growth+.** Proactively assigning re-quizzes, tracking who has outstanding assignments, and surfacing re-quiz counts in manager dashboards is a workflow orchestration feature. Starter customers can direct employees to re-attempt manually.
+- **Department compliance summary on Scale.** Aggregate compliance visibility across all departments (for 150–500 worker operations managing many SOPs across many departments) is a Scale-tier capability.
+- **No token-cost gating.** Quiz generation uses Haiku at `max_tokens: 1500`, costing ~$0.001 per quiz. This is absorbed into all tiers with no metering — the cost is negligible.
 
 ---
 
@@ -331,3 +415,12 @@ When each section below is complete, check the corresponding item in `docs/dev/r
 - **Analytics integration with SOP Health Score (Phase 2C):** Pass rate feeds directly into health score formula. No additional work needed at quiz build time — `sop_comprehension_events` is the data source.
 - **Voice-read quiz questions (Phase 2F integration):** When voice playback is built, extend it to read quiz questions aloud after SOP content finishes playing.
 - **Multi-language quiz generation beyond Spanish (Phase 3):** No changes to quiz-generator.ts needed — just pass the appropriate target language. The bilingual JSONB schema already supports N-language options.
+
+---
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-27 | Initial spec. Design decisions, schema, pipeline, PWA UI, manager dashboard, export, re-quiz flow. |
+| 2026-05-27 | Expanded OSHA Compliance Notes with per-standard retention requirements, required record content, OpsFluency vs. OSHA minimum comparison table, and source citations (29 CFR 1910.178, 1910.132, 1910.1200, 1910.1030, 1910.119). Added Tier Availability section with compliance floor rationale (all tiers) and management analytics tier gates (Growth/Scale). |
