@@ -11,6 +11,7 @@ import type { Node } from 'unist';
 import { getAdminClient } from '@/lib/supabase/admin';
 import type { GlossaryRow } from '@/lib/types/glossary';
 import { GOOGLE_TRANSLATE_MODEL } from './google';
+import { isQualifiedForTM, lookupTM, saveTM, sha256, type TmEntry } from './memory';
 
 /**
  * Structure-preserving Markdown translator.
@@ -236,9 +237,12 @@ function sleep(ms: number): Promise<void> {
 interface LogTranslateInput {
   sopId: string | null | undefined;
   companyId: string | null | undefined;
+  /** Characters actually sent to Google (excludes TM hits). */
   inputChars: number;
   outputChars: number;
   durationMs: number;
+  /** Text segments served from translation_memory cache (not billed). */
+  tmHits: number;
 }
 
 async function logTranslateCall({
@@ -247,6 +251,7 @@ async function logTranslateCall({
   inputChars,
   outputChars,
   durationMs,
+  tmHits,
 }: LogTranslateInput): Promise<void> {
   try {
     const supabase = getAdminClient();
@@ -258,6 +263,7 @@ async function logTranslateCall({
       sop_id: sopId ?? null,
       company_id: companyId ?? null,
       duration_ms: durationMs,
+      tm_hits: tmHits,
     });
   } catch {
     // Never block on telemetry.
@@ -389,11 +395,12 @@ export async function translateMarkdownStructured(
     };
   }
 
-  // 2. Collect leaves.
+  // 2. Collect leaves + snapshot original English texts before any mutation.
   const slots = collectTextSlots(tree);
+  const originalTexts = slots.map((s) => s.get());
+
   if (slots.length === 0) {
-    // Nothing to translate (e.g., a doc that's only code/HTML). Just
-    // re-emit the source so the caller doesn't have to special-case.
+    // Nothing to translate (e.g., a doc that's only code/HTML).
     const out = unified()
       .use(remarkParse)
       .use(remarkGfm)
@@ -402,69 +409,118 @@ export async function translateMarkdownStructured(
     return { ok: true, translated: typeof out === 'string' ? out : input.markdown };
   }
 
-  // 3. Apply glossary substitution per leaf.
+  // 3. TM lookup: check qualifying leaves against the company cache.
+  //    A hit applies the stored translation directly — no Google call for that leaf.
+  const tmHitIndices = new Set<number>();
+  if (input.companyId) {
+    const qualifiedPairs: Array<{ slotIndex: number; hash: string }> = [];
+    for (let i = 0; i < slots.length; i++) {
+      if (isQualifiedForTM(originalTexts[i])) {
+        qualifiedPairs.push({ slotIndex: i, hash: sha256(originalTexts[i]) });
+      }
+    }
+    if (qualifiedPairs.length > 0) {
+      const hashes = qualifiedPairs.map((p) => p.hash);
+      const tmHits = await lookupTM(input.companyId, hashes, input.target);
+      for (const { slotIndex, hash } of qualifiedPairs) {
+        const hit = tmHits.get(hash);
+        if (hit !== undefined) {
+          slots[slotIndex].set(hit);
+          tmHitIndices.add(slotIndex);
+        }
+      }
+    }
+  }
+
+  // 4. Determine which slots still need Google.
+  const pendingIndices: number[] = [];
+  for (let i = 0; i < slots.length; i++) {
+    if (!tmHitIndices.has(i)) pendingIndices.push(i);
+  }
+
+  // Helper: stringify the tree (TM hits already applied to slots).
+  function stringifyTree(): TranslationResult {
+    try {
+      const stringified = unified()
+        .use(remarkParse)
+        .use(remarkGfm)
+        .use(remarkStringify)
+        .stringify(tree);
+      return { ok: true, translated: typeof stringified === 'string' ? stringified : '' };
+    } catch (err) {
+      return {
+        ok: false,
+        error: {
+          code: 'TRANSLATION_INTERNAL',
+          retry_allowed: false,
+          message: err instanceof Error ? `mdast stringify failed: ${err.message}` : 'mdast stringify failed',
+          duration_ms: Date.now() - start,
+          attempt: MAX_RETRIES + 1,
+        },
+      };
+    }
+  }
+
+  // Full TM hit — no Google call at all.
+  if (pendingIndices.length === 0) {
+    await logTranslateCall({
+      sopId: input.sopId,
+      companyId: input.companyId,
+      inputChars: 0,
+      outputChars: 0,
+      durationMs: Date.now() - start,
+      tmHits: tmHitIndices.size,
+    });
+    return stringifyTree();
+  }
+
+  // 5. Apply glossary substitution to pending leaves only.
   const { byLower, pattern } = buildPlaceholderMap(input.glossary);
-  const englishLeaves = slots.map((s) =>
-    pattern ? substituteIn(s.get(), byLower, pattern) : s.get(),
+  const pendingSubstituted = pendingIndices.map((i) =>
+    pattern ? substituteIn(originalTexts[i], byLower, pattern) : originalTexts[i],
   );
 
-  // 4. Send leaves to Google in batches of ≤128 segments (API hard limit).
-  //    Each batch is retried independently; first failure short-circuits.
-  const chunks = chunkArray(englishLeaves, SEGMENT_BATCH_SIZE);
-  const translated: string[] = [];
+  // 6. Send pending leaves to Google in batches of ≤128 segments.
+  const chunks = chunkArray(pendingSubstituted, SEGMENT_BATCH_SIZE);
+  const translatedPending: string[] = [];
   for (const chunk of chunks) {
     const result = await translateChunkWithRetry(
       apiKey, chunk, input.source, input.target, input.signal, start,
     );
     if (!result.ok) return result;
-    translated.push(...result.results);
+    translatedPending.push(...result.results);
   }
 
-  // 5. Restore glossary placeholders + write translations back to the tree.
-  for (let i = 0; i < slots.length; i++) {
-    const restored = restoreIn(translated[i], byLower);
-    slots[i].set(restored);
+  // 7. Restore glossary placeholders + write Google translations back to tree.
+  for (let j = 0; j < pendingIndices.length; j++) {
+    slots[pendingIndices[j]].set(restoreIn(translatedPending[j], byLower));
   }
 
-  // 6. Stringify back to Markdown. remark-gfm here means GFM features
-  //    (tables, task lists, strikethrough) emit valid GFM syntax — same
-  //    shape the renderer reads with the same plugin.
-  let out: string;
-  try {
-    const stringified = unified()
-      .use(remarkParse)
-      .use(remarkGfm)
-      .use(remarkStringify)
-      .stringify(tree);
-    out = typeof stringified === 'string' ? stringified : '';
-  } catch (err) {
-    return {
-      ok: false,
-      error: {
-        code: 'TRANSLATION_INTERNAL',
-        retry_allowed: false,
-        message: err instanceof Error ? `mdast stringify failed: ${err.message}` : 'mdast stringify failed',
-        duration_ms: Date.now() - start,
-        attempt: MAX_RETRIES + 1,
-      },
-    };
+  // 8. Save new translations to TM (fire-and-forget, best-effort).
+  if (input.companyId) {
+    const entries: TmEntry[] = [];
+    for (let j = 0; j < pendingIndices.length; j++) {
+      const idx = pendingIndices[j];
+      if (isQualifiedForTM(originalTexts[idx])) {
+        entries.push({
+          sourceText: originalTexts[idx],
+          translatedText: restoreIn(translatedPending[j], byLower),
+        });
+      }
+    }
+    void saveTM(input.companyId, entries, input.target);
   }
 
+  // 9. Stringify and log.
+  const googleChars = pendingIndices.reduce((sum, idx) => sum + originalTexts[idx].length, 0);
   await logTranslateCall({
     sopId: input.sopId,
     companyId: input.companyId,
-    // Source character count is what Google bills against: the
-    // original markdown the caller sent in. Counting joined leaves
-    // would understate (we don't bill for structural scaffolding,
-    // but the markdown the manager edited is the right reference).
-    inputChars: input.markdown.length,
-    // Google does not charge for output characters. `out` is the
-    // remark-stringified tree which adds extra blank lines and trailing
-    // newlines, inflating the count well above the real translated
-    // content length. Log 0 to avoid the misleading metric.
+    inputChars: googleChars,   // actual chars billed by Google (excludes TM hits)
     outputChars: 0,
     durationMs: Date.now() - start,
+    tmHits: tmHitIndices.size,
   });
 
-  return { ok: true, translated: out };
+  return stringifyTree();
 }
