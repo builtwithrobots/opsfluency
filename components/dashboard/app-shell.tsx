@@ -45,7 +45,7 @@ interface AppShellProps {
 // ── Brand mark ──────────────────────────────────────────────────────────────
 
 function BrandMark() {
-  return <BeaconLogo size="lg" className="shrink-0" />;
+  return <BeaconLogo size="sm" className="shrink-0" />;
 }
 
 // ── Company context label (above user footer, below footer divider) ──────────
@@ -357,10 +357,10 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-3 px-2 py-2">
+        <div className="flex flex-col items-center px-2 py-3">
           <BrandMark />
           {!collapsed && (
-            <span className="flex flex-col min-w-0">
+            <span className="flex flex-col items-center mt-2 min-w-0">
               <span className={`${brandNameClasses} font-bold leading-none`}>
                 OPS<span className="text-(--color-brand)">FLUENCY</span>
               </span>
