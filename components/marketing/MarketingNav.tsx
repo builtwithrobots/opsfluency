@@ -23,10 +23,10 @@ import { BeaconLogo } from "@/components/ui/BeaconLogo";
 type NavLink = { label: string; href: string };
 
 const NAV_LINKS: NavLink[] = [
-  { label: "Features", href: "/features" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "How it works", href: "/how-it-works" },
+  { label: "What I Do", href: "/what-i-do" },
+  { label: "Tools", href: "/tools" },
   { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -115,11 +115,8 @@ export function MarketingNav() {
 
           <div className="hidden items-center gap-2 md:flex">
             <ThemeToggle />
-            <Button href="/sign-in" variant="ghost" size="sm">
-              Sign in
-            </Button>
-            <Button href="/sign-up" variant="primary" size="sm">
-              Start free
+            <Button href="/contact" variant="primary" size="sm">
+              Talk to Rob
             </Button>
           </div>
 
@@ -202,11 +199,8 @@ export function MarketingNav() {
                 })}
               </ul>
               <div className="mt-auto flex flex-col gap-3 border-t border-dc-edge px-4 py-6">
-                <Button href="/sign-in" variant="secondary" size="lg" fullWidth onClick={closeSheet}>
-                  Sign in
-                </Button>
-                <Button href="/sign-up" variant="primary" size="lg" fullWidth onClick={closeSheet}>
-                  Start free
+                <Button href="/contact" variant="primary" size="lg" fullWidth onClick={closeSheet}>
+                  Talk to Rob
                 </Button>
               </div>
             </motion.div>

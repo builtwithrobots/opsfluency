@@ -1,15 +1,55 @@
-// v1.0.0
-// Problem section. Three stat callouts in a row with the first
-// ("17 hrs/week") emphasized via .animate-brand-glow per the home
-// override. Summary paragraph below.
+// v2.0.0
+// Problem section. Four pain-point quote blocks — customer quote in
+// italic blockquote style, Rob's direct response below. Two columns
+// on desktop, single column on mobile.
 
 import { Container } from "@/components/marketing/Container";
-import { SectionHeader } from "@/components/marketing/SectionHeader";
-import { StatCallout } from "@/components/marketing/StatCallout";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 const HEADING_ID = "home-problem-heading";
+
+type PainPoint = {
+  quote: string;
+  response: string;
+};
+
+const PAIN_POINTS: PainPoint[] = [
+  {
+    quote:
+      "My Spanish-speaking workers keep making the same mistakes. I don't think they're reading the instructions.",
+    response: "They're not. The instructions are in English.",
+  },
+  {
+    quote: "I've rewritten this SOP three times. Nobody uses it.",
+    response:
+      "That's a delivery problem, not a content problem. The SOP needs to reach the worker at the machine, in their language, without a supervisor standing there.",
+  },
+  {
+    quote:
+      "We had an OSHA near-miss. I need proof workers are reading the safety procedures — not just attending the training.",
+    response:
+      "A sign-in sheet is not proof of comprehension. I can show you what is.",
+  },
+  {
+    quote: "Turnover in the first 60 days is killing us and I don't know why.",
+    response:
+      "Workers don't quit for fifty cents more per hour. They quit because they feel incompetent. That's fixable.",
+  },
+];
+
+function PainCard({ quote, response }: PainPoint) {
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border border-dc-edge bg-dc-surface p-6">
+      <blockquote className="border-l-2 border-[var(--color-brand)] pl-4 text-base italic leading-relaxed text-dc-text-2">
+        {`"${quote}"`}
+      </blockquote>
+      <p className="text-sm font-semibold leading-relaxed text-dc-text">
+        {response}
+      </p>
+    </div>
+  );
+}
 
 export function HomeProblem() {
   return (
@@ -20,31 +60,19 @@ export function HomeProblem() {
     >
       <Container className="flex flex-col gap-12">
         <MotionSectionItem>
-          <SectionHeader
+          <span
             id={HEADING_ID}
-            eyebrow="The real problem"
-            heading="Workers don't quit for fifty cents more per hour."
-            subhead="They quit because they are frustrated and embarrassed. Nod-through training is the root cause, and the numbers below are what it costs you every single week."
-          />
+            className="block text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            What I hear from every new client
+          </span>
         </MotionSectionItem>
         <MotionSectionItem>
-          <div className="grid gap-10 md:grid-cols-3">
-            <StatCallout
-              emphasis
-              value="17 hrs"
-              label="Per supervisor, per week"
-              caption="Spent re-explaining procedures to workers who nodded through training."
-            />
-            <StatCallout
-              value="Week 8"
-              label="When most workers quit"
-              caption="By the two-month mark, the worker has given up. Everyone blames pay."
-            />
-            <StatCallout
-              value="0%"
-              label="Confidence on Day 1"
-              caption="English-only onboarding leaves non-English speakers guessing from the start."
-            />
+          <div className="grid gap-6 md:grid-cols-2">
+            {PAIN_POINTS.map((point) => (
+              <PainCard key={point.quote} {...point} />
+            ))}
           </div>
         </MotionSectionItem>
       </Container>

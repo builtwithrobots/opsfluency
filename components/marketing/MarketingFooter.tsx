@@ -126,10 +126,10 @@ export function MarketingFooter() {
             &copy; {year} OpsFluency. All rights reserved.
           </p>
           <p
-            className="font-mono"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="font-semibold tracking-wide text-dc-text-2"
+            style={{ fontFamily: "var(--font-display)" }}
           >
-            Built by Rob. 20 years of operations leadership.
+            Fluent in Your Floor.
           </p>
         </div>
       </Container>
