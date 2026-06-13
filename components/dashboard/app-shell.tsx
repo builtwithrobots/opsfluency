@@ -362,7 +362,7 @@ function SidebarContents({ viewer }: { viewer: Viewer }) {
           {!collapsed && (
             <span className="flex flex-col items-center mt-2 min-w-0">
               <span className={`${brandNameClasses} font-bold leading-none`}>
-                OPS<span className="text-(--color-brand)">FLUENCY</span><sup className="text-[7px] font-normal tracking-normal align-super text-dc-text-3">™</sup>
+                OPS<span className="text-(--color-brand)">FLUENCY</span><sup className="text-[10px] font-normal tracking-normal align-super text-dc-text-3">™</sup>
               </span>
               <span className="mt-0.5 text-[10px] font-medium tracking-[0.12em] text-dc-text-3 uppercase leading-none">
                 Frontline Intelligence
