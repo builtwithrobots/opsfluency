@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 /**
  * Routes that require a Clerk session. Everything else is public —
@@ -22,6 +23,15 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
+  // On the app subdomain, redirect / to /sign-in so visitors land in the
+  // auth flow instead of the consultancy marketing homepage.
+  // Signed-in users are bounced from /sign-in → /dashboard by Clerk automatically
+  // (NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/dashboard).
+  const host = req.headers.get("host") ?? "";
+  if (host.startsWith("app.") && req.nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL("/sign-in", req.url));
+  }
+
   if (isProtectedRoute(req)) await auth.protect();
 });
 
