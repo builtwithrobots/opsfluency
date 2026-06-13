@@ -218,6 +218,10 @@ function QRSheet({ variant, qrCodeId, config, companyName, logoUrl }: SheetProps
         </div>
       )}
 
+      {showTopBand && (
+        <div style={{ height: config.spacing_band_gap }} />
+      )}
+
       <div
         className="flex flex-1 flex-col items-center justify-center px-6 text-center"
         style={{ gap: config.spacing_middle }}

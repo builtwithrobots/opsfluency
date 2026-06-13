@@ -530,8 +530,13 @@ export default function QRPrintEditor({
                       value={config.spacing_footer}
                       onChange={v => patch({ spacing_footer: v })}
                     />
+                    <SpacingSlider
+                      label="Between bands"
+                      value={config.spacing_band_gap}
+                      onChange={v => patch({ spacing_band_gap: v })}
+                    />
                     <p className="text-xs text-dc-text-3">
-                      Controls the gap between elements inside each band.
+                      Controls gaps between and within each band.
                     </p>
                   </div>
                 )}

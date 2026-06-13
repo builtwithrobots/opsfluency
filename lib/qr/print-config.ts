@@ -73,13 +73,16 @@ export interface PrintConfig {
   /**
    * Per-band spacing in pixels, the gap between elements inside each band.
    * Range 0 to 60, step 5.
-   *   spacing_top    → gap inside top band (logo ↔ company name)
-   *   spacing_middle → gap inside middle band (header ↔ sub-header ↔ QR ↔ tagline)
-   *   spacing_footer → gap inside footer band (footer ↔ footer2)
+   *   spacing_top      → gap inside top band (logo ↔ company name)
+   *   spacing_middle   → gap inside middle band (header ↔ sub-header ↔ QR ↔ tagline)
+   *   spacing_footer   → gap inside footer band (footer ↔ footer2)
+   *   spacing_band_gap → gap between top band and middle band
    */
-  spacing_top:    number;
-  spacing_middle: number;
-  spacing_footer: number;
+  spacing_top:      number;
+  spacing_middle:   number;
+  spacing_footer:   number;
+  /** Gap in pixels between the top band and the middle band. 0 preserves the pre-existing centred layout. */
+  spacing_band_gap: number;
 }
 
 const DEFAULT_TEMPLATE_BY_TYPE: Record<QrTargetType, PrintTemplate> = {
@@ -129,6 +132,7 @@ export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline' | 'tagl
   spacing_top:            16,
   spacing_middle:         20,
   spacing_footer:         12,
+  spacing_band_gap:        0,
 };
 
 /** Slider config shared by every percentage-based size control. */
@@ -181,6 +185,7 @@ export const DESIGN_DEFAULT_KEYS = [
   'spacing_top',
   'spacing_middle',
   'spacing_footer',
+  'spacing_band_gap',
 ] as const satisfies readonly (keyof PrintConfig)[];
 
 export type DesignDefaultKey = (typeof DESIGN_DEFAULT_KEYS)[number];
