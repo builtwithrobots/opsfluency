@@ -1,7 +1,6 @@
-// v2.0.0
+// v2.1.0
 // Consultancy homepage. Signed-in users route away to their correct surface.
-// Six sections: Hero → Problem → Services → Credibility → Tools → Final CTA.
-// Copy sourced verbatim from docs/branding/pivot061226/consultancy-homepage.md.
+// Section order: Hero → Services → Credibility → Problem → Tools → Final CTA.
 
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
@@ -18,11 +17,11 @@ import { getRequestClient } from "@/lib/supabase/server";
 export const metadata: Metadata = {
   title: "OpsFluency — Operations Consulting & Bilingual SOP Platform",
   description:
-    "Rob Ramos has 22 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA compliance requirements — and built the software to do it faster.",
+    "Rob Ramos has >20 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA, ISO 9001, and cGMP compliance requirements — and built the software to do it faster.",
   openGraph: {
     title: "Fluent in Your Floor.",
     description:
-      "Rob Ramos has 22 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA compliance requirements.",
+      "Rob Ramos has >20 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA, ISO 9001, and cGMP compliance requirements.",
     type: "website",
   },
 };
@@ -52,9 +51,9 @@ export default async function MarketingHome() {
   return (
     <>
       <HomeHero />
-      <HomeProblem />
       <HomeServices />
       <HomeCredibility />
+      <HomeProblem />
       <HomeTools />
       <HomeFinalCTA />
     </>

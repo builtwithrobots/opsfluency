@@ -1,7 +1,6 @@
-// v2.0.0
-// Problem section. Four pain-point quote blocks — customer quote in
-// italic blockquote style, Rob's direct response below. Two columns
-// on desktop, single column on mobile.
+// v3.0.0
+// Problem section. Four pain-point quote blocks with decorative large
+// quotation marks. Two columns on desktop, single column on mobile.
 
 import { Container } from "@/components/marketing/Container";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
@@ -40,8 +39,15 @@ const PAIN_POINTS: PainPoint[] = [
 
 function PainCard({ quote, response }: PainPoint) {
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-dc-edge bg-dc-surface p-6">
-      <blockquote className="border-l-2 border-[var(--color-brand)] pl-4 text-base italic leading-relaxed text-dc-text-2">
+    <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-dc-edge bg-dc-surface p-6 pt-8">
+      {/* Decorative large quotation mark */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-4 top-2 select-none font-serif text-6xl leading-none text-[var(--color-brand)]/15"
+      >
+        &ldquo;
+      </span>
+      <blockquote className="border-l-[3px] border-[var(--color-brand)] pl-4 text-base italic leading-relaxed text-dc-text-2">
         {`"${quote}"`}
       </blockquote>
       <p className="text-sm font-semibold leading-relaxed text-dc-text">
@@ -56,7 +62,7 @@ export function HomeProblem() {
     <MotionSection
       aria-labelledby={HEADING_ID}
       variants={staggerContainer}
-      className="py-16 md:py-24"
+      className="py-16 md:py-24 bg-dc-raised"
     >
       <Container className="flex flex-col gap-12">
         <MotionSectionItem>
