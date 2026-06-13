@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Languages, Save } from 'lucide-react';
+import { Languages, RotateCcw, Save } from 'lucide-react';
 import {
   defaultPrintConfig,
   FONT_FAMILY_LABELS,
@@ -86,6 +86,10 @@ export default function QRPrintEditor({
   const patch = useCallback((updates: Partial<PrintConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
   }, []);
+
+  const resetConfig = useCallback(() => {
+    setConfig(defaultPrintConfig(targetType, { footer2: companyPhone ?? '' }));
+  }, [targetType, companyPhone]);
 
   // Translates all non-empty EN fields and patches the *_es counterparts.
   const translateLabels = useCallback(async (current: PrintConfig) => {
@@ -544,6 +548,18 @@ export default function QRPrintEditor({
             )}
           </div>
         ))}
+
+        <div className="pt-2">
+          <Button
+            type="button"
+            color="dark"
+            className="w-full"
+            onClick={resetConfig}
+          >
+            <RotateCcw data-slot="icon" strokeWidth={2} />
+            Reset to defaults
+          </Button>
+        </div>
 
         {showPrintButton && (
           <div className="flex items-stretch gap-2 pt-2">

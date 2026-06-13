@@ -129,10 +129,10 @@ export const BASE_PRINT_CONFIG: Omit<PrintConfig, 'template' | 'tagline' | 'tagl
   bold_footer2:           false,
   // Spacing defaults sit roughly mid-slider so users can tighten or loosen
   // each band by a meaningful amount in either direction.
-  spacing_top:            16,
+  spacing_top:            20,
   spacing_middle:         20,
-  spacing_footer:         12,
-  spacing_band_gap:        0,
+  spacing_footer:         20,
+  spacing_band_gap:       20,
 };
 
 /** Slider config shared by every percentage-based size control. */
