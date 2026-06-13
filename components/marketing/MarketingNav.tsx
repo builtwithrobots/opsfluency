@@ -76,7 +76,7 @@ export function MarketingNav() {
             className="inline-flex items-center gap-2"
             aria-label="OpsFluency home"
           >
-            <BeaconLogo size="md" />
+            <BeaconLogo size="sm" />
             <span
               className="text-xl font-bold tracking-tight text-dc-text"
               style={{ fontFamily: "var(--font-display)" }}
