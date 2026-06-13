@@ -11,7 +11,7 @@ export const metadata = {
 export default function Page() {
   return (
     <AuthShell mode="sign-in">
-      <SignIn appearance={clerkAppearance} />
+      <SignIn appearance={clerkAppearance} forceRedirectUrl="/dashboard" />
     </AuthShell>
   );
 }
