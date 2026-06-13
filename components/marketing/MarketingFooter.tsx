@@ -122,9 +122,15 @@ export function MarketingFooter() {
           </div>
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-dc-edge pt-6 text-xs text-dc-text-3 md:flex-row md:items-center">
-          <p>
-            &copy; {year} OpsFluency. All rights reserved.
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p>&copy; {year} OpsFluency. All rights reserved.</p>
+            <a
+              href="https://app.opsfluency.com"
+              className="text-dc-text-2 transition-colors hover:text-[var(--color-brand)]"
+            >
+              app.opsfluency.com →
+            </a>
+          </div>
           <p
             className="font-semibold tracking-wide text-dc-text-2"
             style={{ fontFamily: "var(--font-display)" }}
