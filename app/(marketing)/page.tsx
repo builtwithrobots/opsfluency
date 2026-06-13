@@ -1,29 +1,28 @@
-// v1.1.0
-// Marketing Home. Signed-in users route away to their correct surface.
-// Signed-out users see the seven-section marketing page. Each section
-// is its own component under components/marketing/home/.
+// v2.0.0
+// Consultancy homepage. Signed-in users route away to their correct surface.
+// Six sections: Hero → Problem → Services → Credibility → Tools → Final CTA.
+// Copy sourced verbatim from docs/branding/pivot061226/consultancy-homepage.md.
 
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { HomeCredibility } from "@/components/marketing/home/HomeCredibility";
 import { HomeFinalCTA } from "@/components/marketing/home/HomeFinalCTA";
-import { HomeFounder } from "@/components/marketing/home/HomeFounder";
 import { HomeHero } from "@/components/marketing/home/HomeHero";
-import { HomeHowItWorks } from "@/components/marketing/home/HomeHowItWorks";
-import { HomePricingTeaser } from "@/components/marketing/home/HomePricingTeaser";
 import { HomeProblem } from "@/components/marketing/home/HomeProblem";
-import { HomeSolution } from "@/components/marketing/home/HomeSolution";
+import { HomeServices } from "@/components/marketing/home/HomeServices";
+import { HomeTools } from "@/components/marketing/home/HomeTools";
 import { getRequestClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "OpsFluency: Make every frontline worker competent from Day 1",
+  title: "OpsFluency — Operations Consulting & Bilingual SOP Platform",
   description:
-    "Bilingual SOPs, QR-triggered learning, and departmental communication for multilingual warehouse and manufacturing teams. Live in 24 hours. No hardware required.",
+    "Rob Ramos has 22 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA compliance requirements — and built the software to do it faster.",
   openGraph: {
-    title: "OpsFluency: Make every frontline worker competent from Day 1",
+    title: "Fluent in Your Floor.",
     description:
-      "Bilingual SOPs, QR-triggered learning, and departmental communication. Live in 24 hours. No hardware required.",
+      "Rob Ramos has 22 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA compliance requirements.",
     type: "website",
   },
 };
@@ -54,10 +53,9 @@ export default async function MarketingHome() {
     <>
       <HomeHero />
       <HomeProblem />
-      <HomeSolution />
-      <HomeHowItWorks />
-      <HomePricingTeaser />
-      <HomeFounder />
+      <HomeServices />
+      <HomeCredibility />
+      <HomeTools />
       <HomeFinalCTA />
     </>
   );
