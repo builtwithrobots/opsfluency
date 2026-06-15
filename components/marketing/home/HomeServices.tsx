@@ -1,20 +1,22 @@
-// v2.0.0
-// Services section. Four service cards: Fractional Operations Leadership
-// (featured, brand-glow), Operations Consulting, Platform Setup, Custom
-// Tools. Icons from lucide-react, ghost CTAs with 44px touch targets.
+// v3.0.0
+// Services section. Blueprint refresh: ghost numeral "02", section border,
+// FramedPanel cards with sharp corners and S1/S2/S3 mono tags.
+// Featured (Fractional) gets teal top border + brand glow.
 
 import { ArrowRight, ClipboardList, Layers, Users, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Button } from "@/components/marketing/Button";
 import { Container } from "@/components/marketing/Container";
-import { SectionHeader } from "@/components/marketing/SectionHeader";
+import { FramedPanel } from "@/components/marketing/FramedPanel";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
 const HEADING_ID = "home-services-heading";
 
 type ServiceCard = {
+  tag: string;
   icon: ReactNode;
   title: string;
   description: string;
@@ -27,16 +29,18 @@ type ServiceCard = {
 
 const SERVICES: ServiceCard[] = [
   {
+    tag: "S1",
     icon: <Users className="h-5 w-5" strokeWidth={2} />,
     title: "Fractional Operations Leadership",
     description:
-      "Most facilities do not have a leadership gap. They have a systems gap. I come in, assess where decisions are breaking down, and build the workflows and processes your existing team needs to own the operation themselves. No new layers of management. No dependency on me staying. When the engagement ends, your supervisors and mid-level managers are making better decisions, holding each other accountable, and running a floor that does not need me in the room. That is the whole point.",
+      "Most facilities do not have a leadership gap. They have a systems gap. I come in, assess where decisions are breaking down, and build the workflows and processes your existing team needs to own the operation themselves. No new layers of management. No dependency on me staying. When the engagement ends, your supervisors and mid-level managers are making better decisions, holding each other accountable, and running a floor that does not need me in the room.",
     detail: "Weekly or bi-weekly engagement. Minimum three months.",
     ctaLabel: "Talk to Rob",
     ctaHref: "/contact",
     featured: true,
   },
   {
+    tag: "S2",
     icon: <ClipboardList className="h-5 w-5" strokeWidth={2} />,
     title: "Operations Consulting",
     description:
@@ -46,16 +50,17 @@ const SERVICES: ServiceCard[] = [
     ctaHref: "/contact",
   },
   {
+    tag: "S3",
     icon: <Layers className="h-5 w-5" strokeWidth={2} />,
     title: "Platform Setup",
     description:
       "Full implementation of the OpsFluency platform. SOP import, glossary setup, bilingual publishing, QR code installation, manager training. Done right the first time, by the person who built it.",
     detail: "One-time setup fee plus monthly subscription.",
     ctaLabel: "See the platform",
-    ctaHref: "https://app.opsfluency.com",
-    ctaExternal: true,
+    ctaHref: "/tools",
   },
   {
+    tag: "S4",
     icon: <Wrench className="h-5 w-5" strokeWidth={2} />,
     title: "Custom Tools",
     description:
@@ -67,6 +72,7 @@ const SERVICES: ServiceCard[] = [
 ];
 
 function Card({
+  tag,
   icon,
   title,
   description,
@@ -77,33 +83,35 @@ function Card({
   featured,
 }: ServiceCard) {
   return (
-    <div
-      className={[
-        "flex flex-col gap-5 rounded-xl border p-6",
-        featured
-          ? "animate-brand-glow border-[var(--color-brand)]/40 bg-dc-surface"
-          : "border-dc-edge bg-dc-surface",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+    <FramedPanel
+      featured={featured}
+      hoverable
+      className="flex flex-col gap-5 p-6"
     >
-      {/* Icon container */}
-      <div
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg"
-        style={{
-          background:
-            "color-mix(in srgb, var(--color-brand) 12%, transparent)",
-          color: "var(--color-brand)",
-        }}
-        aria-hidden="true"
-      >
-        {icon}
+      {/* Mono tag + icon */}
+      <div className="flex items-center justify-between">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-[0.14em] text-dc-text-3"
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          {tag}
+        </span>
+        <div
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md"
+          style={{
+            background: "color-mix(in srgb, var(--color-brand) 12%, transparent)",
+            color: "var(--color-brand)",
+          }}
+          aria-hidden="true"
+        >
+          {icon}
+        </div>
       </div>
 
       {/* Copy */}
       <div className="flex flex-1 flex-col gap-3">
         <h3
-          className="text-lg font-bold tracking-tight text-dc-text"
+          className="text-base font-bold tracking-tight text-dc-text"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {title}
@@ -111,10 +119,14 @@ function Card({
         <p className="flex-1 text-sm leading-relaxed text-dc-text-2">
           {description}
         </p>
-        <p className="text-xs italic text-dc-text-3">{detail}</p>
+        <p
+          className="text-[11px] italic text-dc-text-3"
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          {detail}
+        </p>
       </div>
 
-      {/* Ghost CTA -- min-h-[44px] satisfies WCAG touch target */}
       <Button
         href={ctaHref}
         variant="ghost"
@@ -127,7 +139,7 @@ function Card({
       >
         {ctaLabel}
       </Button>
-    </div>
+    </FramedPanel>
   );
 }
 
@@ -136,26 +148,27 @@ export function HomeServices() {
     <MotionSection
       aria-labelledby={HEADING_ID}
       variants={staggerContainer}
-      className="bg-dc-raised py-16 md:py-24"
+      className="border-t border-dc-edge py-16 md:py-24"
     >
       <Container className="flex flex-col gap-12">
         <MotionSectionItem>
-          <SectionHeader
-            id={HEADING_ID}
-            eyebrow="How I can help"
+          <BlueprintSectionHeader
+            numeral="02"
+            kicker="How I can help"
             heading="Four ways to work together."
             subhead="Every engagement starts with a conversation. We figure out what you actually need before anything else."
+            id={HEADING_ID}
           />
         </MotionSectionItem>
         <MotionSectionItem>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             {SERVICES.map((service) => (
               <Card key={service.title} {...service} />
             ))}
           </div>
         </MotionSectionItem>
-        <MotionSectionItem className="flex flex-col items-center gap-4 text-center">
-          <p className="text-base text-dc-text-2">
+        <MotionSectionItem>
+          <p className="text-sm text-dc-text-2">
             Most engagements start with one conversation and grow from there.
             Not sure which fits? That is what the first call is for.
           </p>

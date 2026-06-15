@@ -1,5 +1,6 @@
-// v1.0.0
-// Feature comparison table.
+// v2.0.0
+// Feature comparison table. Blueprint refresh: ghost numeral "02",
+// section border-top, Fractional column tinted rgba(20,184,166,0.05).
 // Desktop (lg+): proper <table> with thead/tbody, scope attributes on
 // every th, brand top border on the featured (fractional) column.
 // Mobile (<lg): @headlessui/react Tab group -- one tier at a time,
@@ -13,8 +14,8 @@
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { Check, X } from "lucide-react";
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
-import { SectionHeader } from "@/components/marketing/SectionHeader";
 
 type Cell = boolean | string;
 
@@ -218,6 +219,11 @@ function DesktopTable() {
                     <td
                       key={tier.id}
                       className="px-5 py-3.5 text-center"
+                      style={
+                        tier.id === "fractional"
+                          ? { background: "rgba(20,184,166,0.05)" }
+                          : undefined
+                      }
                     >
                       <CellValue
                         value={feature.tiers[tier.id]}
@@ -320,13 +326,18 @@ const HEADING_ID = "services-comparison-heading";
 
 export function ServicesComparison() {
   return (
-    <section aria-labelledby={HEADING_ID} className="py-16 md:py-24 bg-dc-bg">
-      <Container className="flex flex-col gap-10">
-        <SectionHeader
-          id={HEADING_ID}
-          eyebrow="Compare engagements"
+    <section
+      id="services-comparison"
+      aria-labelledby={HEADING_ID}
+      className="border-t border-dc-edge py-16 md:py-24"
+    >
+      <Container className="flex flex-col gap-12">
+        <BlueprintSectionHeader
+          numeral="02"
+          kicker="Compare engagements"
           heading="What is included in each."
           subhead="Every engagement is direct access to Rob. The difference is scope, depth, and what you need on the other side."
+          id={HEADING_ID}
         />
         <DesktopTable />
         <MobileTabs />

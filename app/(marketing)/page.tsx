@@ -13,10 +13,8 @@ import { HomeCredibilityStrip } from "@/components/marketing/home/HomeCredibilit
 import { HomeFounder } from "@/components/marketing/home/HomeFounder";
 import { HomeHero } from "@/components/marketing/home/HomeHero";
 import { HomeHowItWorks } from "@/components/marketing/home/HomeHowItWorks";
-import { HomePricingTeaser } from "@/components/marketing/home/HomePricingTeaser";
 import { HomeProblem } from "@/components/marketing/home/HomeProblem";
 import { HomeServices } from "@/components/marketing/home/HomeServices";
-import { HomeSolution } from "@/components/marketing/home/HomeSolution";
 import { getRequestClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -60,10 +58,8 @@ export default async function MarketingHome() {
       <HomeCredibilityStrip />
       <HomeProblem />
       <HomeServices />
-      <HomeSolution />
       <HomeHowItWorks />
       <HomeFounder />
-      <HomePricingTeaser />
       <HomeFinalCTA />
     </>
   );
