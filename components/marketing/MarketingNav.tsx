@@ -23,7 +23,7 @@ import { BeaconLogo } from "@/components/ui/BeaconLogo";
 type NavLink = { label: string; href: string };
 
 const NAV_LINKS: NavLink[] = [
-  { label: "What I Do", href: "/what-i-do" },
+  { label: "Services", href: "/services" },
   { label: "Tools", href: "/tools" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },

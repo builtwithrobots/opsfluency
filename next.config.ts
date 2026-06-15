@@ -107,6 +107,15 @@ const nextConfig: NextConfig = {
   // turbopack config (even empty) to suppress the "webpack config but no
   // turbopack config" build error introduced in Next 16.
   turbopack: {},
+  async redirects() {
+    return [
+      {
+        source: "/what-i-do",
+        destination: "/services",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
