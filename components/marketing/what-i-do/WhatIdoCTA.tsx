@@ -1,6 +1,6 @@
-// v3.0.0
-// Home page final CTA. Full-bleed teal gradient. Two CTAs: primary
-// to /contact, secondary to app.opsfluency.com/sign-up (external).
+// v1.0.0
+// What I Do final CTA. Not sure which fits? That is what the first
+// call is for.
 
 import { ArrowRight } from "lucide-react";
 
@@ -9,7 +9,7 @@ import { Container } from "@/components/marketing/Container";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
-export function HomeFinalCTA() {
+export function WhatIdoCTA() {
   return (
     <MotionSection
       aria-label="Talk to Rob"
@@ -22,17 +22,17 @@ export function HomeFinalCTA() {
             className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            {"Let's talk about your operation."}
+            Not sure which fits?
           </h2>
         </MotionSectionItem>
         <MotionSectionItem>
-          <p className="max-w-2xl text-lg leading-relaxed text-white/85 md:text-xl">
-            Whether you need a consultant, a platform, or both -- it starts
-            with a conversation. No pitch deck. No sales cycle. One honest look
-            at what you are dealing with and what would actually help.
+          <p className="max-w-2xl text-lg leading-relaxed text-white/85">
+            Most people who reach out are not sure which option is right yet.
+            That is exactly what the first call figures out. No commitment, no
+            pressure. Just an honest conversation about your operation.
           </p>
         </MotionSectionItem>
-        <MotionSectionItem className="flex flex-wrap items-center justify-center gap-4">
+        <MotionSectionItem>
           <Button
             href="/contact"
             size="lg"
@@ -40,16 +40,6 @@ export function HomeFinalCTA() {
             trailingIcon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
           >
             Talk to Rob
-          </Button>
-          <Button
-            href="https://app.opsfluency.com/sign-up"
-            variant="secondary"
-            size="lg"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="border-white/40 text-white hover:border-white/60 hover:bg-white/10"
-          >
-            Try the platform free
           </Button>
         </MotionSectionItem>
       </Container>

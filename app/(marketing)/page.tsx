@@ -1,27 +1,33 @@
-// v2.1.0
-// Consultancy homepage. Signed-in users route away to their correct surface.
-// Section order: Hero → Services → Credibility → Problem → Tools → Final CTA.
+// v3.0.0
+// Consultancy homepage. New section order per site audit June 2026:
+// Hero → CredibilityStrip → Problem → Services → Solution →
+// HowItWorks → Founder → PricingTeaser → FinalCTA
+// Signed-in users route away to their correct surface.
 
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { HomeCredibility } from "@/components/marketing/home/HomeCredibility";
 import { HomeFinalCTA } from "@/components/marketing/home/HomeFinalCTA";
+import { HomeCredibilityStrip } from "@/components/marketing/home/HomeCredibilityStrip";
+import { HomeFounder } from "@/components/marketing/home/HomeFounder";
 import { HomeHero } from "@/components/marketing/home/HomeHero";
+import { HomeHowItWorks } from "@/components/marketing/home/HomeHowItWorks";
+import { HomePricingTeaser } from "@/components/marketing/home/HomePricingTeaser";
 import { HomeProblem } from "@/components/marketing/home/HomeProblem";
 import { HomeServices } from "@/components/marketing/home/HomeServices";
-import { HomeTools } from "@/components/marketing/home/HomeTools";
+import { HomeSolution } from "@/components/marketing/home/HomeSolution";
 import { getRequestClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "OpsFluency — Operations Consulting & Bilingual SOP Platform",
+  title:
+    "OpsFluency -- Operations Consulting, Fractional Leadership, and Bilingual SOP Platform",
   description:
-    "Rob Ramos has >20 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA, ISO 9001, and cGMP compliance requirements — and built the software to do it faster.",
+    "20 years of warehouse and manufacturing operations leadership. Consulting, fractional ops leadership, and the OpsFluency bilingual SOP platform for multilingual frontline teams.",
   openGraph: {
-    title: "Fluent in Your Floor.",
+    title: "OpsFluency -- Fix your operation. Train your team to own it.",
     description:
-      "Rob Ramos has >20 years of warehouse and manufacturing operations experience. He helps bilingual facilities fix SOPs, reduce turnover, and meet OSHA, ISO 9001, and cGMP compliance requirements.",
+      "20 years of warehouse and manufacturing operations leadership. Consulting, fractional ops leadership, and the OpsFluency bilingual SOP platform for multilingual frontline teams.",
     type: "website",
   },
 };
@@ -51,10 +57,13 @@ export default async function MarketingHome() {
   return (
     <>
       <HomeHero />
-      <HomeServices />
-      <HomeCredibility />
+      <HomeCredibilityStrip />
       <HomeProblem />
-      <HomeTools />
+      <HomeServices />
+      <HomeSolution />
+      <HomeHowItWorks />
+      <HomeFounder />
+      <HomePricingTeaser />
       <HomeFinalCTA />
     </>
   );

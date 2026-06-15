@@ -26,6 +26,7 @@ export const ContactFormSchema = z.object({
     .string()
     .min(10, "Tell us a bit more (at least 10 characters).")
     .max(2000, "Keep it under 2000 characters."),
+  main_problem: z.string().max(2000).optional(),
 });
 
 export type ContactFormInput = z.infer<typeof ContactFormSchema>;

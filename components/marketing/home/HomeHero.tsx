@@ -1,7 +1,8 @@
-// v3.0.0
-// Consultancy homepage hero. Editorial authority with industrial precision.
-// Pill eyebrow badge, decorative teal rule, large headline with underline
-// accent, expanded 4-item trust strip including compliance credentials.
+// v4.0.0
+// Consultancy homepage hero. Eyebrow updated to reflect the three
+// service lanes. Headline is the consultancy promise, not the product
+// description. Subhead leads with Rob's background, ends with the
+// platform origin story. Secondary CTA is external.
 
 import { ArrowRight } from "lucide-react";
 
@@ -46,7 +47,7 @@ export function HomeHero() {
             className="inline-flex items-center rounded-full border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Operations Consulting &amp; Bilingual SOP Platform
+            Operations consulting. Bilingual platform. Custom tools.
           </span>
         </MotionSectionItem>
 
@@ -56,21 +57,25 @@ export function HomeHero() {
             className="max-w-4xl text-5xl font-bold tracking-tight text-dc-text md:text-6xl lg:text-7xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Your floor is running on{" "}
+            Fix your operation.{" "}
             <span className="relative inline-block">
-              tribal knowledge.
+              Train your team to own it.
               <span
                 aria-hidden="true"
                 className="absolute -bottom-1 left-0 h-[3px] w-full rounded-full bg-[var(--color-brand)]/40"
               />
-            </span>
+            </span>{" "}
+            Leave it running.
           </h1>
         </MotionSectionItem>
 
         {/* Subhead */}
         <MotionSectionItem>
           <p className="max-w-2xl text-lg leading-relaxed text-dc-text-2 md:text-xl">
-            {"I've spent more than 20 years fixing that — in warehouses, manufacturing plants, and 3PLs across the country. OpsFluency is how I do it now."}
+            20 years of warehouse and manufacturing leadership, turned into a
+            consulting practice built for facilities that need results, not
+            reports. OpsFluency is the platform I built because the tools I
+            needed did not exist.
           </p>
         </MotionSectionItem>
 
@@ -83,8 +88,14 @@ export function HomeHero() {
           >
             Talk to Rob
           </Button>
-          <Button href="https://app.opsfluency.com" variant="secondary" size="lg">
-            See the Platform
+          <Button
+            href="https://app.opsfluency.com"
+            variant="secondary"
+            size="lg"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            See the platform
           </Button>
         </MotionSectionItem>
 

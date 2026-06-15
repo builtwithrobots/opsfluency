@@ -1,6 +1,5 @@
-// v3.0.0
-// Home page final CTA. Full-bleed teal gradient. Two CTAs: primary
-// to /contact, secondary to app.opsfluency.com/sign-up (external).
+// v1.0.0
+// Tools final CTA. Full-bleed teal gradient, Rob's direct close.
 
 import { ArrowRight } from "lucide-react";
 
@@ -9,7 +8,7 @@ import { Container } from "@/components/marketing/Container";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
-export function HomeFinalCTA() {
+export function ToolsCTA() {
   return (
     <MotionSection
       aria-label="Talk to Rob"
@@ -26,13 +25,12 @@ export function HomeFinalCTA() {
           </h2>
         </MotionSectionItem>
         <MotionSectionItem>
-          <p className="max-w-2xl text-lg leading-relaxed text-white/85 md:text-xl">
-            Whether you need a consultant, a platform, or both -- it starts
-            with a conversation. No pitch deck. No sales cycle. One honest look
-            at what you are dealing with and what would actually help.
+          <p className="max-w-xl text-lg leading-relaxed text-white/85">
+            You are not talking to a receptionist or a sales rep. You are
+            talking to Rob.
           </p>
         </MotionSectionItem>
-        <MotionSectionItem className="flex flex-wrap items-center justify-center gap-4">
+        <MotionSectionItem>
           <Button
             href="/contact"
             size="lg"
@@ -40,16 +38,6 @@ export function HomeFinalCTA() {
             trailingIcon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
           >
             Talk to Rob
-          </Button>
-          <Button
-            href="https://app.opsfluency.com/sign-up"
-            variant="secondary"
-            size="lg"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="border-white/40 text-white hover:border-white/60 hover:bg-white/10"
-          >
-            Try the platform free
           </Button>
         </MotionSectionItem>
       </Container>

@@ -1,6 +1,6 @@
-// v1.0.0
-// About page final CTA. Sends people to /contact per the About
-// override.
+// v2.0.0
+// About page final CTA. Secondary button points to
+// app.opsfluency.com/sign-up (external) instead of /sign-up.
 
 import { ArrowRight } from "lucide-react";
 
@@ -12,7 +12,7 @@ export function AboutFinalCTA() {
     <CTABlock
       ariaLabel="Talk to Rob"
       heading="If this sounds like your operation, we should talk."
-      subhead="No SDR. No qualification form. A direct line to the person who built it."
+      subhead="No pitch deck. No sales cycle. A direct line to the person who built it."
       primary={
         <Button
           href="/contact"
@@ -25,9 +25,11 @@ export function AboutFinalCTA() {
       }
       secondary={
         <Button
-          href="/sign-up"
+          href="https://app.opsfluency.com/sign-up"
           variant="secondary"
           size="lg"
+          target="_blank"
+          rel="noopener noreferrer"
           className="border-white/40 text-white hover:bg-white/10 hover:border-white/60"
         >
           Start a free trial

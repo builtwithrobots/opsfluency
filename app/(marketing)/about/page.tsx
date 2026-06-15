@@ -1,15 +1,16 @@
-// v1.0.0
-// About page. Narrow prose-first layout per the About page override.
-// Every section uses the `prose` (max-w-2xl) Container variant.
+// v2.0.0
+// About page. AboutRoadmap replaced with AboutHowIWork per site audit
+// June 2026. Section order: Hero → FounderStory → Insight → Mission →
+// HowIWork → FinalCTA.
 
 import type { Metadata } from "next";
 
 import { AboutFinalCTA } from "@/components/marketing/about/AboutFinalCTA";
 import { AboutFounderStory } from "@/components/marketing/about/AboutFounderStory";
 import { AboutHero } from "@/components/marketing/about/AboutHero";
+import { AboutHowIWork } from "@/components/marketing/about/AboutHowIWork";
 import { AboutInsight } from "@/components/marketing/about/AboutInsight";
 import { AboutMission } from "@/components/marketing/about/AboutMission";
-import { AboutRoadmap } from "@/components/marketing/about/AboutRoadmap";
 
 export const metadata: Metadata = {
   title: "About OpsFluency: built by an operator, for operators",
@@ -30,7 +31,7 @@ export default function AboutPage() {
       <AboutFounderStory />
       <AboutInsight />
       <AboutMission />
-      <AboutRoadmap />
+      <AboutHowIWork />
       <AboutFinalCTA />
     </>
   );
