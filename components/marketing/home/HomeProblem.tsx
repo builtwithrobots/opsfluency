@@ -1,8 +1,10 @@
-// v3.0.0
-// Problem section. Four pain-point quote blocks with decorative large
-// quotation marks. Two columns on desktop, single column on mobile.
+// v4.0.0
+// Problem section. Blueprint refresh: section border-top, ghost numeral
+// "01", FramedPanel cards with sharp corners.
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
+import { FramedPanel } from "@/components/marketing/FramedPanel";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
@@ -26,7 +28,7 @@ const PAIN_POINTS: PainPoint[] = [
   },
   {
     quote:
-      "We had an OSHA near-miss. I need proof workers are reading the safety procedures — not just attending the training.",
+      "We had an OSHA near-miss. I need proof workers are reading the safety procedures -- not just attending the training.",
     response:
       "A sign-in sheet is not proof of comprehension. I can show you what is.",
   },
@@ -39,7 +41,7 @@ const PAIN_POINTS: PainPoint[] = [
 
 function PainCard({ quote, response }: PainPoint) {
   return (
-    <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-dc-edge bg-dc-surface p-6 pt-8">
+    <FramedPanel hoverable className="flex flex-col gap-4 overflow-hidden p-6 pt-8">
       {/* Decorative large quotation mark */}
       <span
         aria-hidden="true"
@@ -47,13 +49,22 @@ function PainCard({ quote, response }: PainPoint) {
       >
         &ldquo;
       </span>
-      <blockquote className="border-l-[3px] border-[var(--color-brand)] pl-4 text-base italic leading-relaxed text-dc-text-2">
+      <blockquote className="border-l-2 border-[var(--color-brand)] pl-4 text-base italic leading-relaxed text-dc-text-2">
         {`"${quote}"`}
       </blockquote>
+      {/* 1px dashed divider */}
+      <span
+        aria-hidden="true"
+        className="block h-px w-full"
+        style={{
+          background:
+            "repeating-linear-gradient(90deg, var(--color-dc-edge-2) 0 7px, transparent 7px 14px)",
+        }}
+      />
       <p className="text-sm font-semibold leading-relaxed text-dc-text">
         {response}
       </p>
-    </div>
+    </FramedPanel>
   );
 }
 
@@ -62,20 +73,19 @@ export function HomeProblem() {
     <MotionSection
       aria-labelledby={HEADING_ID}
       variants={staggerContainer}
-      className="py-16 md:py-24 bg-dc-raised"
+      className="border-t border-dc-edge py-16 md:py-24"
     >
       <Container className="flex flex-col gap-12">
         <MotionSectionItem>
-          <span
+          <BlueprintSectionHeader
+            numeral="01"
+            kicker="What I hear from every new client"
+            heading="The problems are always the same."
             id={HEADING_ID}
-            className="block text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            What I hear from every new client
-          </span>
+          />
         </MotionSectionItem>
         <MotionSectionItem>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             {PAIN_POINTS.map((point) => (
               <PainCard key={point.quote} {...point} />
             ))}

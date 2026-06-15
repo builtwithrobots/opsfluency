@@ -24,7 +24,7 @@ export function HomeCredibilityStrip() {
     <MotionSection
       aria-label="Career credentials"
       variants={staggerContainer}
-      className="bg-dc-raised"
+      className="border-t border-dc-edge bg-dc-raised"
     >
       <Container>
         <dl className="grid grid-cols-2 divide-x divide-dc-edge border-y border-dc-edge lg:grid-cols-4">

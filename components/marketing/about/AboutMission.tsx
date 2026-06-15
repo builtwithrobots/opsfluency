@@ -1,7 +1,10 @@
-// v1.0.0
-// Three-part mission. Prose container, plain list, no cards.
+// v2.0.0
+// Three-part mission. Blueprint refresh: ghost numeral "02", section
+// border-top, numbered framed cards.
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
+import { FramedPanel } from "@/components/marketing/FramedPanel";
 import { MotionSection } from "@/components/motion/MotionSection";
 
 const HEADING_ID = "about-mission-heading";
@@ -27,46 +30,35 @@ export function AboutMission() {
   return (
     <MotionSection
       aria-labelledby={HEADING_ID}
-      className="py-12 md:py-16"
+      className="border-t border-dc-edge py-12 md:py-16"
     >
-      <Container width="prose" className="flex flex-col gap-8">
-        <div className="flex flex-col gap-3">
-          <span
-            className="text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Mission
-          </span>
-          <h2
-            id={HEADING_ID}
-            className="text-3xl font-semibold tracking-tight text-dc-text md:text-4xl"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Three things we are trying to accomplish.
-          </h2>
-        </div>
-        <ol className="flex flex-col gap-8">
+      <Container className="flex flex-col gap-10">
+        <BlueprintSectionHeader
+          numeral="02"
+          kicker="Mission"
+          heading="Three things we are trying to accomplish."
+          id={HEADING_ID}
+        />
+        <ol className="grid gap-5 md:grid-cols-3 max-w-5xl">
           {PILLARS.map((pillar, index) => (
-            <li key={pillar.title} className="flex flex-col gap-2">
-              <div className="flex items-baseline gap-4">
-                <span
-                  aria-hidden="true"
-                  className="text-xl font-bold tabular-nums text-[var(--color-brand)]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  0{index + 1}
-                </span>
-                <h3
-                  className="text-xl font-semibold text-dc-text md:text-2xl"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {pillar.title}
-                </h3>
-              </div>
-              <p className="pl-10 text-base leading-relaxed text-dc-text-2 md:text-lg">
+            <FramedPanel key={pillar.title} as="li" className="flex flex-col gap-4 p-6">
+              <span
+                aria-hidden="true"
+                className="text-[10px] font-semibold uppercase tracking-[0.14em] text-dc-text-3"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                {`0${index + 1}`}
+              </span>
+              <h3
+                className="text-base font-semibold text-dc-text"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {pillar.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-dc-text-2">
                 {pillar.body}
               </p>
-            </li>
+            </FramedPanel>
           ))}
         </ol>
       </Container>

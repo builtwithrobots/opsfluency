@@ -1,6 +1,7 @@
-// v1.0.0
-// Three-column tier card grid. Fractional Leadership is featured
-// (center column) with brand glow border and "Most requested" badge.
+// v2.0.0
+// Three-column tier card grid. Blueprint refresh: S1/S2/S3 mono tags,
+// sharp 4px radius, border-t-3px teal on featured (Fractional).
+// "Most requested" badge at top-center. Ghost numeral "01" header.
 // Desktop: three columns. Mobile: single column stack.
 // No pricing, no dollar amounts anywhere on this component.
 
@@ -8,11 +9,14 @@
 
 import { ArrowRight, Check } from "lucide-react";
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Button } from "@/components/marketing/Button";
 import { Container } from "@/components/marketing/Container";
+import { FramedPanel } from "@/components/marketing/FramedPanel";
 
 type TierDef = {
   id: string;
+  tag: string;
   name: string;
   tagline: string;
   featured: boolean;
@@ -26,6 +30,7 @@ type TierDef = {
 const TIERS: TierDef[] = [
   {
     id: "consulting",
+    tag: "S1",
     name: "Operations Consulting",
     tagline: "Fresh eyes on your operation. Findings you can act on.",
     featured: false,
@@ -44,6 +49,7 @@ const TIERS: TierDef[] = [
   },
   {
     id: "fractional",
+    tag: "S2",
     name: "Fractional Leadership",
     tagline: "Build the systems. Empower the team. Leave it running.",
     featured: true,
@@ -63,6 +69,7 @@ const TIERS: TierDef[] = [
   },
   {
     id: "custom",
+    tag: "S3",
     name: "Custom App Solutions",
     tagline: "If the right tool does not exist yet, we build it.",
     featured: false,
@@ -81,44 +88,52 @@ const TIERS: TierDef[] = [
   },
 ];
 
-function TierCard({ tier }: { tier: TierDef }) {
-  const cardClasses = [
-    "relative flex flex-col gap-5 rounded-2xl border p-7",
-    tier.featured
-      ? "border-[var(--color-brand)] bg-white dark:bg-dc-raised animate-brand-glow shadow-xl"
-      : "border-dc-edge bg-dc-surface",
-  ].join(" ");
+const HEADING_ID = "services-tier-heading";
 
+function TierCard({ tier }: { tier: TierDef }) {
   return (
-    <div className={cardClasses}>
+    <FramedPanel
+      featured={tier.featured}
+      className={[
+        "relative flex flex-col gap-5 p-7",
+        tier.featured ? "translate-y-[-4px]" : "",
+      ].join(" ")}
+    >
       {tier.featured ? (
         <div aria-hidden="true" className="absolute -top-3.5 left-1/2 -translate-x-1/2">
           <span
-            className="inline-block rounded-full bg-[var(--color-brand)] px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-white"
+            className="inline-block rounded-full bg-[var(--color-brand)] px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Most requested
           </span>
         </div>
       ) : null}
-      {/* sr-only label so screen readers get the featured status independent of color/badge */}
       {tier.featured ? (
         <span className="sr-only">Most requested engagement type</span>
       ) : null}
 
+      {/* Mono tag */}
+      <span
+        className="text-[10px] font-semibold uppercase tracking-[0.14em] text-dc-text-3"
+        style={{ fontFamily: "var(--font-mono)" }}
+      >
+        {tier.tag}
+      </span>
+
       <div className="flex flex-col gap-1">
         <h3
-          className="text-sm font-semibold text-dc-text"
+          className="text-base font-semibold text-dc-text"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {tier.name}
         </h3>
-        <p className="text-base leading-snug text-dc-text-2">{tier.tagline}</p>
+        <p className="text-sm leading-snug text-dc-text-2">{tier.tagline}</p>
       </div>
 
       <div className="flex flex-col gap-0.5">
         <p
-          className="text-xs text-dc-text-3"
+          className="text-[11px] text-dc-text-3"
           style={{ fontFamily: "var(--font-mono)" }}
         >
           {tier.engagementModel}
@@ -126,7 +141,14 @@ function TierCard({ tier }: { tier: TierDef }) {
         <p className="text-xs italic text-dc-text-3">{tier.startsWith}</p>
       </div>
 
-      <hr className="border-dc-edge" />
+      <span
+        aria-hidden="true"
+        className="block h-px w-full"
+        style={{
+          background:
+            "repeating-linear-gradient(90deg, var(--color-dc-edge) 0 7px, transparent 7px 14px)",
+        }}
+      />
 
       <ul className="flex flex-col gap-2.5">
         {tier.highlights.map((item) => (
@@ -152,15 +174,22 @@ function TierCard({ tier }: { tier: TierDef }) {
           {tier.cta}
         </Button>
       </div>
-    </div>
+    </FramedPanel>
   );
 }
 
 export function ServicesTierGrid() {
   return (
-    <section aria-label="Service tiers" className="pb-16 pt-4 md:pb-24">
-      <Container>
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+    <section aria-labelledby={HEADING_ID} className="border-t border-dc-edge py-16 md:py-24">
+      <Container className="flex flex-col gap-12">
+        <BlueprintSectionHeader
+          numeral="01"
+          kicker="The engagements"
+          heading="Pick the level of involvement that fits."
+          subhead="Every engagement includes direct access to Rob. No account manager in the middle."
+          id={HEADING_ID}
+        />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {TIERS.map((tier) => (
             <TierCard key={tier.id} tier={tier} />
           ))}

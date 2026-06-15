@@ -11,6 +11,7 @@ import { AboutHero } from "@/components/marketing/about/AboutHero";
 import { AboutHowIWork } from "@/components/marketing/about/AboutHowIWork";
 import { AboutInsight } from "@/components/marketing/about/AboutInsight";
 import { AboutMission } from "@/components/marketing/about/AboutMission";
+import { AboutRoadmap } from "@/components/marketing/about/AboutRoadmap";
 
 export const metadata: Metadata = {
   title: "About OpsFluency: built by an operator, for operators",
@@ -32,6 +33,7 @@ export default function AboutPage() {
       <AboutInsight />
       <AboutMission />
       <AboutHowIWork />
+      <AboutRoadmap />
       <AboutFinalCTA />
     </>
   );

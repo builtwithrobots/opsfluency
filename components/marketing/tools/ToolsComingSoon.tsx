@@ -1,13 +1,14 @@
-// v1.0.0
-// Coming soon tools section. "In development" badge, body copy about
-// what is being built, and a ghost CTA to /contact for custom builds.
+// v2.0.0
+// Blueprint refresh: BlueprintSectionHeader numeral "02", FramedPanel,
+// signal-warn badge matching AboutRoadmap style.
 
 import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/marketing/Button";
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
-import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
-import { staggerContainer } from "@/lib/motion/variants";
+import { FramedPanel } from "@/components/marketing/FramedPanel";
+import { MotionSection } from "@/components/motion/MotionSection";
 
 const HEADING_ID = "tools-coming-soon-heading";
 
@@ -15,48 +16,47 @@ export function ToolsComingSoon() {
   return (
     <MotionSection
       aria-labelledby={HEADING_ID}
-      variants={staggerContainer}
-      className="py-16 md:py-24"
+      className="border-t border-dc-edge py-12 md:py-16"
     >
-      <Container>
-        <MotionSectionItem>
-          <div className="flex flex-col gap-6 rounded-2xl border border-dc-edge bg-dc-surface p-8 md:p-12">
-            {/* Badge */}
+      <Container className="flex flex-col gap-10">
+        <BlueprintSectionHeader
+          numeral="02"
+          kicker="In development"
+          heading="More tools coming."
+          id={HEADING_ID}
+        />
+
+        <FramedPanel className="flex flex-col gap-5 p-8 max-w-3xl">
+          {/* Badge */}
+          <span
+            className="inline-flex items-center gap-2 self-start rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+            style={{
+              background: "color-mix(in srgb, var(--color-signal-warn) 12%, transparent)",
+              color: "var(--color-signal-warn)",
+              border: "1px solid color-mix(in srgb, var(--color-signal-warn) 25%, transparent)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
             <span
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-widest"
-              style={{
-                background:
-                  "color-mix(in srgb, var(--color-signal-warn) 12%, transparent)",
-                color: "var(--color-signal-warn)",
-              }}
-            >
-              <span
-                aria-hidden="true"
-                className="inline-block h-1.5 w-1.5 animate-calm-pulse rounded-full bg-[var(--color-signal-warn)]"
-              />
-              In development
-            </span>
+              aria-hidden="true"
+              className="inline-block h-1.5 w-1.5 shrink-0 animate-calm-pulse rounded-full bg-[var(--color-signal-warn)]"
+            />
+            In development
+          </span>
 
-            <h2
-              id={HEADING_ID}
-              className="text-2xl font-bold tracking-tight text-dc-text md:text-3xl"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              More tools coming.
-            </h2>
+          <p className="text-base leading-relaxed text-dc-text-2">
+            Every operational problem I work on becomes a candidate for the
+            next tool. Current candidates include a shift handoff tracker, a
+            compliance audit checklist builder, and a visual work instruction
+            generator for equipment with no written SOP.
+          </p>
 
-            <p className="max-w-2xl text-base leading-relaxed text-dc-text-2 md:text-lg">
-              Every operational problem I work on becomes a candidate for the
-              next tool. Current candidates include a shift handoff tracker, a
-              compliance audit checklist builder, and a visual work instruction
-              generator for equipment with no written SOP.
-            </p>
+          <p className="text-base leading-relaxed text-dc-text-2">
+            If you have a specific workflow problem that no tool solves
+            cleanly, {"let's"} talk about whether a custom build makes sense.
+          </p>
 
-            <p className="text-base leading-relaxed text-dc-text-2">
-              If you have a specific workflow problem that no tool solves
-              cleanly, {"let's"} talk about whether a custom build makes sense.
-            </p>
-
+          <div>
             <Button
               href="/contact"
               variant="ghost"
@@ -66,7 +66,7 @@ export function ToolsComingSoon() {
               Talk to Rob
             </Button>
           </div>
-        </MotionSectionItem>
+        </FramedPanel>
       </Container>
     </MotionSection>
   );

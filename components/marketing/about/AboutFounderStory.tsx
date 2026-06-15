@@ -1,7 +1,8 @@
-// v1.0.0
-// Founder story. Long-form prose with three oversized pull-quote beats
-// per the About override. All prose is text-lg leading-relaxed.
+// v2.0.0
+// Founder story. Blueprint refresh: ghost numeral "01" section header,
+// section border-top. Long-form prose + three oversized pull-quote beats.
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
 import { MotionSection } from "@/components/motion/MotionSection";
 
@@ -22,22 +23,16 @@ export function AboutFounderStory() {
   return (
     <MotionSection
       aria-labelledby={HEADING_ID}
-      className="py-12 md:py-16"
+      className="border-t border-dc-edge py-12 md:py-16"
     >
-      <Container width="prose" className="flex flex-col gap-6">
-        <span
-          className="text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          The story
-        </span>
-        <h2
+      <Container className="flex flex-col gap-10">
+        <BlueprintSectionHeader
+          numeral="01"
+          kicker="The story"
+          heading="Twenty years in operations. One obvious problem nobody was solving."
           id={HEADING_ID}
-          className="text-3xl font-semibold tracking-tight text-dc-text md:text-4xl"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Twenty years in operations. One obvious problem nobody was solving.
-        </h2>
+        />
+        <div className="max-w-2xl flex flex-col gap-6">
         <p className="text-lg leading-relaxed text-dc-text-2">
           I spent my career running warehouses, distribution centers, and manufacturing floors. Good teams. Good people. Good procedures, mostly. And every single site had the same problem: the non-English-speaking half of the workforce was running on guesswork, pattern-matching, and the patience of whoever sat next to them.
         </p>
@@ -71,6 +66,7 @@ export function AboutFounderStory() {
         <p className="text-lg leading-relaxed text-dc-text-2">
           I built this for the squeezed middle manager who needs a win next shift, not a committee-approved rollout plan for next quarter. If that is you, we should talk.
         </p>
+        </div>
       </Container>
     </MotionSection>
   );

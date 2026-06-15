@@ -1,6 +1,7 @@
-// v3.0.0
-// Home page final CTA. Full-bleed teal gradient. Two CTAs: primary
-// to /contact, secondary to app.opsfluency.com/sign-up (external).
+// v4.0.0
+// Home page final CTA. Blueprint refresh: contained teal panel with
+// corner ticks (not full-bleed). Secondary CTA → "See my services".
+// Subhead focuses on the consulting practice, not platform.
 
 import { ArrowRight } from "lucide-react";
 
@@ -14,43 +15,70 @@ export function HomeFinalCTA() {
     <MotionSection
       aria-label="Talk to Rob"
       variants={staggerContainer}
-      className="relative isolate overflow-hidden bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-dim)] py-20 md:py-32"
+      className="border-t border-dc-edge py-20 md:py-32"
     >
-      <Container className="flex flex-col items-center gap-8 text-center text-white">
+      <Container>
         <MotionSectionItem>
-          <h2
-            className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl"
-            style={{ fontFamily: "var(--font-display)" }}
+          <div
+            className="relative overflow-hidden rounded-lg px-8 py-14 text-center md:px-16 md:py-20"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--color-brand), var(--color-brand-dim))",
+            }}
           >
-            {"Let's talk about your operation."}
-          </h2>
-        </MotionSectionItem>
-        <MotionSectionItem>
-          <p className="max-w-2xl text-lg leading-relaxed text-white/85 md:text-xl">
-            Whether you need a consultant, a platform, or both -- it starts
-            with a conversation. No pitch deck. No sales cycle. One honest look
-            at what you are dealing with and what would actually help.
-          </p>
-        </MotionSectionItem>
-        <MotionSectionItem className="flex flex-wrap items-center justify-center gap-4">
-          <Button
-            href="/contact"
-            size="lg"
-            className="bg-white text-[var(--color-brand-dim)] hover:bg-white/90"
-            trailingIcon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
-          >
-            Talk to Rob
-          </Button>
-          <Button
-            href="https://app.opsfluency.com/sign-up"
-            variant="secondary"
-            size="lg"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="border-white/40 text-white hover:border-white/60 hover:bg-white/10"
-          >
-            Try the platform free
-          </Button>
+            {/* Corner ticks (white at 60% alpha) */}
+            {(["tl", "tr", "bl", "br"] as const).map((pos) => {
+              const posClass = {
+                tl: "-top-px -left-px border-t-2 border-l-2",
+                tr: "-top-px -right-px border-t-2 border-r-2",
+                bl: "-bottom-px -left-px border-b-2 border-l-2",
+                br: "-bottom-px -right-px border-b-2 border-r-2",
+              }[pos];
+              return (
+                <span
+                  key={pos}
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute h-5 w-5 ${posClass}`}
+                  style={{ borderColor: "rgba(255,255,255,0.6)" }}
+                />
+              );
+            })}
+
+            <h2
+              className="mx-auto max-w-2xl text-white"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+                fontSize: "clamp(26px,3.4vw,44px)",
+                lineHeight: 1.08,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {"Let's talk about your operation."}
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-white/85">
+              No pitch deck. No sales cycle. One honest conversation about what
+              you are dealing with and what would actually help.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+              <Button
+                href="/contact"
+                size="lg"
+                className="bg-white text-[var(--color-brand-dim)] hover:bg-white/90"
+                trailingIcon={<ArrowRight className="h-4 w-4" strokeWidth={2} />}
+              >
+                Talk to Rob
+              </Button>
+              <Button
+                href="/services"
+                variant="secondary"
+                size="lg"
+                className="border-white/40 text-white hover:border-white/60 hover:bg-white/10"
+              >
+                See my services
+              </Button>
+            </div>
+          </div>
         </MotionSectionItem>
       </Container>
     </MotionSection>
