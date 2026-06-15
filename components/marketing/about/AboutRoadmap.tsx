@@ -1,8 +1,10 @@
-// v1.0.0
-// Short roadmap view. MVP today, Phase 2 next. Prose container,
-// two-column vertical list with a dividing rule between them.
+// v2.0.0
+// Roadmap. Blueprint refresh: ghost numeral "04", section border-top,
+// two framed cards side by side with animated status dots.
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
+import { FramedPanel } from "@/components/marketing/FramedPanel";
 import { MotionSection } from "@/components/motion/MotionSection";
 
 const HEADING_ID = "about-roadmap-heading";
@@ -45,43 +47,49 @@ export function AboutRoadmap() {
   return (
     <MotionSection
       aria-labelledby={HEADING_ID}
-      className="py-12 md:py-16"
+      className="border-t border-dc-edge py-12 md:py-16"
     >
-      <Container width="prose" className="flex flex-col gap-8">
-        <div className="flex flex-col gap-3">
-          <span
-            className="text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Roadmap
-          </span>
-          <h2
-            id={HEADING_ID}
-            className="text-3xl font-semibold tracking-tight text-dc-text md:text-4xl"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            What is live, and what is next.
-          </h2>
-        </div>
-        <div className="grid gap-8 md:grid-cols-2">
+      <Container className="flex flex-col gap-10">
+        <BlueprintSectionHeader
+          numeral="04"
+          kicker="Roadmap"
+          heading="What is live, and what is next."
+          id={HEADING_ID}
+        />
+        <div className="grid gap-5 md:grid-cols-2 max-w-3xl">
           {BUCKETS.map((bucket) => {
-            const liveDotClass =
-              bucket.state === "live"
-                ? "bg-[var(--color-signal-ok)] animate-heartbeat"
-                : "bg-[var(--color-signal-warn)] animate-calm-pulse";
+            const isLive = bucket.state === "live";
             return (
-              <div key={bucket.label} className="flex flex-col gap-3">
+              <FramedPanel key={bucket.label} className="flex flex-col gap-4 p-6">
+                {/* Status badge */}
                 <span
-                  className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-dc-text-2"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  className="inline-flex items-center gap-2 self-start rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                  style={{
+                    background: isLive
+                      ? "color-mix(in srgb, var(--color-signal-ok) 12%, transparent)"
+                      : "color-mix(in srgb, var(--color-signal-warn) 12%, transparent)",
+                    color: isLive
+                      ? "var(--color-signal-ok)"
+                      : "var(--color-signal-warn)",
+                    border: isLive
+                      ? "1px solid color-mix(in srgb, var(--color-signal-ok) 25%, transparent)"
+                      : "1px solid color-mix(in srgb, var(--color-signal-warn) 25%, transparent)",
+                    fontFamily: "var(--font-mono)",
+                  }}
                 >
                   <span
                     aria-hidden="true"
-                    className={`inline-block h-1.5 w-1.5 rounded-full ${liveDotClass}`}
+                    className={[
+                      "inline-block h-1.5 w-1.5 rounded-full shrink-0",
+                      isLive
+                        ? "bg-[var(--color-signal-ok)] animate-heartbeat"
+                        : "bg-[var(--color-signal-warn)] animate-calm-pulse",
+                    ].join(" ")}
                   />
                   {bucket.label}
                 </span>
-                <ul className="flex flex-col gap-2 text-base text-dc-text-2">
+
+                <ul className="flex flex-col gap-2 text-sm text-dc-text-2">
                   {bucket.items.map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <span
@@ -92,7 +100,7 @@ export function AboutRoadmap() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </FramedPanel>
             );
           })}
         </div>
