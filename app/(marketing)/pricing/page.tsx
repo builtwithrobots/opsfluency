@@ -1,13 +1,14 @@
-// v1.0.0
-// Pricing page. The billing toggle drives prices across three sections,
-// so all three live inside a single BillingProvider. Everything else is
-// plain section composition.
+// v2.0.0
+// Pricing page. Blueprint refresh: PricingHero left-aligned, new
+// PricingConsultingSection (numeral "01") added before the platform
+// billing context. Platform is numeral "02" in PricingTierGrid.
 
 import type { Metadata } from "next";
 
 import { BillingProvider } from "@/components/marketing/pricing/billing-context";
 import { PricingBillingToggle } from "@/components/marketing/pricing/PricingBillingToggle";
 import { PricingComparison } from "@/components/marketing/pricing/PricingComparison";
+import { PricingConsultingSection } from "@/components/marketing/pricing/PricingConsultingSection";
 import { PricingExpenseCallout } from "@/components/marketing/pricing/PricingExpenseCallout";
 import { PricingFAQ } from "@/components/marketing/pricing/PricingFAQ";
 import { PricingFinalCTA } from "@/components/marketing/pricing/PricingFinalCTA";
@@ -30,6 +31,7 @@ export default function PricingPage() {
   return (
     <>
       <PricingHero />
+      <PricingConsultingSection />
       <BillingProvider>
         <PricingBillingToggle />
         <PricingTierGrid />

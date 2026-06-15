@@ -13,6 +13,7 @@ import { ArrowRight, Check } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/marketing/Button";
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
 import {
   TIERS,
@@ -60,7 +61,7 @@ function TierCard({ tier }: { tier: Tier }) {
   const ctaLabel = tier.slug === "enterprise" ? "Talk to sales" : "Start free trial";
 
   const cardClasses = [
-    "relative flex h-full min-w-[280px] flex-col gap-5 rounded-xl border p-6 md:p-7 snap-center",
+    "relative flex h-full min-w-[280px] flex-col gap-5 rounded-[4px] border p-6 md:p-7 snap-center",
     tier.featured
       ? "border-[var(--color-brand)] bg-dc-raised animate-brand-glow"
       : "border-dc-edge bg-dc-surface",
@@ -136,10 +137,18 @@ function CTA({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
+const TIER_HEADING_ID = "pricing-tiers-heading";
+
 export function PricingTierGrid() {
   return (
-    <section aria-label="Pricing tiers" className="py-10 md:py-16">
-      <Container>
+    <section aria-labelledby={TIER_HEADING_ID} className="py-10 md:py-16">
+      <Container className="flex flex-col gap-8">
+        <BlueprintSectionHeader
+          numeral="02"
+          kicker="The platform"
+          heading="Choose a tier."
+          id={TIER_HEADING_ID}
+        />
         <div className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 lg:grid-cols-4 lg:gap-6">
           {TIERS.map((tier) => (
             <TierCard key={tier.slug} tier={tier} />

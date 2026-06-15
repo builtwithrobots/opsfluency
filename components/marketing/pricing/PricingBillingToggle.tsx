@@ -25,7 +25,7 @@ export function PricingBillingToggle() {
   const { mode, setMode } = useBilling();
 
   return (
-    <section aria-label="Billing cadence" className="py-6 md:py-8">
+    <section aria-label="Billing cadence" className="border-t border-dc-edge py-8 md:py-10">
       <Container className="flex flex-col items-center gap-3">
         <div
           role="radiogroup"

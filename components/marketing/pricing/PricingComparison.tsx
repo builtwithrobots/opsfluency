@@ -10,8 +10,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Minus } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { BlueprintSectionHeader } from "@/components/marketing/BlueprintSectionHeader";
 import { Container } from "@/components/marketing/Container";
-import { SectionHeader } from "@/components/marketing/SectionHeader";
 import {
   TIERS,
   priceFor,
@@ -133,7 +133,7 @@ function PriceCell({ tier }: { tier: Tier }) {
 function DesktopTable() {
   return (
     <div className="hidden lg:block">
-      <div className="grid grid-cols-[minmax(240px,1.4fr)_repeat(4,minmax(0,1fr))] items-center gap-x-2 rounded-xl border border-dc-edge bg-dc-surface">
+      <div className="grid grid-cols-[minmax(240px,1.4fr)_repeat(4,minmax(0,1fr))] items-center gap-x-2 rounded-[4px] border border-dc-edge bg-dc-surface">
         <div className="sticky top-16 z-10 col-span-full grid grid-cols-subgrid border-b border-dc-edge-2 bg-dc-overlay px-4 py-4">
           <span
             className="text-xs font-semibold uppercase tracking-widest text-dc-text-2"
@@ -198,7 +198,7 @@ function MobileCard({ tier }: { tier: Tier }): ReactNode {
   return (
     <div
       className={[
-        "flex flex-col gap-3 rounded-xl border p-5",
+        "flex flex-col gap-3 rounded-[4px] border p-5",
         tier.featured
           ? "border-[var(--color-brand)] bg-dc-raised"
           : "border-dc-edge bg-dc-surface",
@@ -249,13 +249,14 @@ function MobileCards() {
 
 export function PricingComparison() {
   return (
-    <section aria-labelledby={HEADING_ID} className="py-16 md:py-24">
+    <section aria-labelledby={HEADING_ID} className="border-t border-dc-edge py-12 md:py-16">
       <Container className="flex flex-col gap-10">
-        <SectionHeader
-          id={HEADING_ID}
-          eyebrow="Compare tiers"
+        <BlueprintSectionHeader
+          numeral="03"
+          kicker="Compare tiers"
           heading="Every feature, side by side."
-          subhead="The full matrix. If it's on this page, it's on your plan at the tier that says so."
+          subhead="The full matrix. If it is on this page, it is on your plan at the tier that says so."
+          id={HEADING_ID}
         />
         <DesktopTable />
         <MobileCards />
