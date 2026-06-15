@@ -30,6 +30,16 @@ const FAQ: QA[] = [
     answer:
       "That is the best way to start. Stand it up on one facility, see the scan analytics for a few weeks, then roll to the rest. Pricing is flat rate, so the pilot is the same price as the rollout.",
   },
+  {
+    question: "What does a typical consulting engagement look like?",
+    answer:
+      "It starts with a half-day discovery session, on-site or via video. I give you a written findings report within five business days. From there we scope the work together -- project, retainer, or fractional depending on what you actually need.",
+  },
+  {
+    question: "Do you work with facilities outside Utah?",
+    answer:
+      "Yes. Most consulting work is remote-first with on-site visits as needed. Travel is scoped into the project cost upfront so there are no surprises.",
+  },
 ];
 
 const HEADING_ID = "contact-faq-heading";

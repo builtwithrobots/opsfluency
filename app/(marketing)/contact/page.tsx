@@ -1,7 +1,6 @@
-// v1.0.0
-// Contact page. Hero, form, direct channels, short FAQ. No final
-// CTABlock: the form itself is the CTA, and a second CTA after it
-// would be noise.
+// v2.0.0
+// Contact page. Metadata updated: no "SDR" language. Components
+// unchanged in composition; copy updates live inside each component.
 
 import type { Metadata } from "next";
 
@@ -13,11 +12,11 @@ import { ContactHero } from "@/components/marketing/contact/ContactHero";
 export const metadata: Metadata = {
   title: "Contact OpsFluency: talk to Rob directly",
   description:
-    "No SDR, no qualification form. Send a note or email Rob directly. Reply within one business day.",
+    "No qualification form. Send a note or email Rob directly. Reply within one business day.",
   openGraph: {
     title: "Contact OpsFluency",
     description:
-      "Talk to the person who built the product. No SDR. No qualification form.",
+      "Talk to the person who built the product. No qualification form.",
     type: "website",
   },
 };

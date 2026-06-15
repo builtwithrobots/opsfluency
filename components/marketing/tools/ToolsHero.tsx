@@ -1,42 +1,42 @@
-// v2.0.0
-// About hero. Rob-first opening: leads with his background, ends with
-// the platform origin story. Prose container (max-w-2xl) per the
-// About page override.
+// v1.0.0
+// Tools page hero. Eyebrow + headline + subhead. Brief -- the
+// platform card below carries the detail.
 
 import { Container } from "@/components/marketing/Container";
 import { MotionSection, MotionSectionItem } from "@/components/motion/MotionSection";
 import { staggerContainer } from "@/lib/motion/variants";
 
-export function AboutHero() {
+const HEADING_ID = "tools-heading";
+
+export function ToolsHero() {
   return (
     <MotionSection
-      aria-label="About"
+      aria-labelledby={HEADING_ID}
       variants={staggerContainer}
       className="py-20 md:py-28"
     >
-      <Container width="prose" className="flex flex-col gap-6">
+      <Container className="flex flex-col gap-6">
         <MotionSectionItem>
           <span
             className="text-xs font-semibold uppercase tracking-widest text-[var(--color-brand)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            About
+            Tools
           </span>
         </MotionSectionItem>
         <MotionSectionItem>
           <h1
-            className="text-4xl font-bold tracking-tight text-dc-text md:text-5xl lg:text-6xl"
+            id={HEADING_ID}
+            className="max-w-3xl text-5xl font-bold tracking-tight text-dc-text md:text-6xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Built by an operator, for operators.
+            Built because they did not exist.
           </h1>
         </MotionSectionItem>
         <MotionSectionItem>
-          <p className="text-lg leading-relaxed text-dc-text-2 md:text-xl">
-            I am not a consultant who found an interesting industry. I spent
-            twenty years in it -- from the floor to Director of Operations
-            across three simultaneous sites. I built OpsFluency because I
-            needed it and it did not exist. Now I use it with every client.
+          <p className="max-w-2xl text-lg leading-relaxed text-dc-text-2 md:text-xl">
+            Every tool I use with clients started as a problem I could not solve
+            with what was available. OpsFluency is the first. More are coming.
           </p>
         </MotionSectionItem>
       </Container>

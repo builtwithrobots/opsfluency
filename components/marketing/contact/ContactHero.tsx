@@ -1,6 +1,6 @@
-// v1.0.0
-// Contact hero. Narrow container, centered, no visual, no CTAs. The
-// form below is the CTA.
+// v2.0.0
+// Contact hero. Subhead updated: Rob-direct positioning, no "SDR"
+// language anywhere.
 
 import { Hero } from "@/components/marketing/Hero";
 
@@ -10,7 +10,7 @@ export function ContactHero() {
       ariaLabel="Contact"
       eyebrow="Contact"
       headline="Talk to Rob."
-      subhead="No SDR. No qualification form. A direct line to the person who built it."
+      subhead="You are not talking to a receptionist or a sales rep. You are talking to Rob."
     />
   );
 }

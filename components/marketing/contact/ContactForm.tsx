@@ -39,6 +39,7 @@ type FormState = {
   company: string;
   employees: ContactFormInput["employees"] | "";
   message: string;
+  main_problem: string;
 };
 
 const INITIAL: FormState = {
@@ -47,6 +48,7 @@ const INITIAL: FormState = {
   company: "",
   employees: "",
   message: "",
+  main_problem: "",
 };
 
 function validateField(
@@ -194,7 +196,7 @@ export function ContactForm() {
           Send a note.
         </h2>
         <p className="mt-2 text-base leading-relaxed text-dc-text-2">
-          Five fields. Nothing gets forwarded to a sales team.
+          Nothing gets forwarded to a sales team.
         </p>
 
         <form
@@ -366,6 +368,25 @@ export function ContactForm() {
                 {errors.message}
               </p>
             ) : null}
+          </div>
+
+          <div>
+            <label
+              htmlFor={`${reactId}-main-problem`}
+              className={labelClasses()}
+            >
+              What are you trying to fix?{" "}
+              <span className="font-normal text-dc-text-3">(optional)</span>
+            </label>
+            <textarea
+              id={`${reactId}-main-problem`}
+              name="main_problem"
+              rows={4}
+              value={values.main_problem}
+              onChange={(e) => setField("main_problem", e.target.value)}
+              className={inputClasses(false)}
+              placeholder="Briefly describe the main operational problem you are dealing with. This helps Rob come prepared."
+            />
           </div>
 
           <div className="pt-2">
