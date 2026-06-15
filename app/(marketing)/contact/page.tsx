@@ -1,12 +1,12 @@
-// v2.0.0
-// Contact page. Metadata updated: no "SDR" language. Components
-// unchanged in composition; copy updates live inside each component.
+// v3.0.0
+// Contact page. Blueprint refresh: ContactForm + ContactDirectChannels
+// replaced by ContactBody (2-col framed form + sidebar). ContactHero
+// updated to left-aligned Blueprint pattern.
 
 import type { Metadata } from "next";
 
-import { ContactDirectChannels } from "@/components/marketing/contact/ContactDirectChannels";
+import { ContactBody } from "@/components/marketing/contact/ContactBody";
 import { ContactFAQ } from "@/components/marketing/contact/ContactFAQ";
-import { ContactForm } from "@/components/marketing/contact/ContactForm";
 import { ContactHero } from "@/components/marketing/contact/ContactHero";
 
 export const metadata: Metadata = {
@@ -25,8 +25,7 @@ export default function ContactPage() {
   return (
     <>
       <ContactHero />
-      <ContactForm />
-      <ContactDirectChannels />
+      <ContactBody />
       <ContactFAQ />
     </>
   );
