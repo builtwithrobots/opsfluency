@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { bootstrapCompany } from "@/lib/auth/bootstrap-company";
@@ -125,6 +126,7 @@ export async function createCompanyWizardAction(
         .eq("id", company_id);
     }
 
+    revalidatePath("/dashboard");
     return { status: "success", company_id };
   } catch (e) {
     return {
@@ -239,6 +241,7 @@ export interface OnboardingDepartment {
   name: string;
   color_hex: string;
   icon_key: string;
+  is_system: boolean;
 }
 
 export type GetDepartmentsResult =
@@ -250,7 +253,7 @@ export async function getOnboardingDepartmentsAction(): Promise<GetDepartmentsRe
     const { supabase, company_id } = await getCompanyContext();
     const { data, error } = await supabase
       .from("departments")
-      .select("id, name, color_hex, icon_key")
+      .select("id, name, color_hex, icon_key, is_system")
       .eq("company_id", company_id)
       .order("name", { ascending: true });
 
@@ -279,15 +282,15 @@ export async function updateOnboardingDepartmentAction(
     const { supabase, company_id } = await getCompanyContext();
     const parsed = UpdateDeptSchema.parse(input);
 
-    // HR name is locked — preserve it silently rather than throwing.
+    // System-department names are locked — preserve the DB name silently.
     const { data: existing } = await supabase
       .from("departments")
-      .select("name")
+      .select("name, is_system")
       .eq("id", parsed.id)
       .eq("company_id", company_id)
       .single();
 
-    const finalName = existing?.name === "HR" ? "HR" : parsed.name;
+    const finalName = existing?.is_system ? existing.name : parsed.name;
 
     const { error } = await supabase
       .from("departments")
@@ -318,9 +321,15 @@ export type SendInviteResult =
   | { ok: false; error: string };
 
 export async function sendOnboardingInviteAction(formData: FormData): Promise<SendInviteResult> {
-  const result = await createTeamInvite(formData);
-  if (!result.ok) {
-    return { ok: false, error: result.error.message ?? result.error.code };
+  // Onboarding invites are always manager-role regardless of what the client sends.
+  formData.set("role", "manager");
+  try {
+    const result = await createTeamInvite(formData);
+    if (!result.ok) {
+      return { ok: false, error: result.error.message ?? result.error.code };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to send invite." };
   }
-  return { ok: true };
 }

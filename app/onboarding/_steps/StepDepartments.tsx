@@ -30,6 +30,7 @@ interface DeptState extends OnboardingDepartment {
 export function StepDepartments({ onContinue }: Props) {
   const [depts, setDepts] = useState<DeptState[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -45,6 +46,8 @@ export function StepDepartments({ onContinue }: Props) {
             editingName: d.name,
           })),
         );
+      } else {
+        setLoadError(true);
       }
       setLoading(false);
     });
@@ -56,7 +59,7 @@ export function StepDepartments({ onContinue }: Props) {
   }
 
   async function saveDept(dept: DeptState) {
-    if (dept.name === "HR") return; // locked
+    if (dept.is_system) return; // system-department names are locked
     updateLocal(dept.id, { saving: true, saved: false, error: null });
     const result = await updateOnboardingDepartmentAction({
       id: dept.id,
@@ -77,6 +80,7 @@ export function StepDepartments({ onContinue }: Props) {
   }
 
   async function changeColor(dept: DeptState, color: string) {
+    if (dept.saving) return; // don't race a concurrent name-blur save
     updateLocal(dept.id, { color_hex: color, saving: true, saved: false, error: null });
     const result = await updateOnboardingDepartmentAction({
       id: dept.id,
@@ -95,12 +99,25 @@ export function StepDepartments({ onContinue }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col gap-4">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(5)].map((_, i) => (
           <div
             key={i}
             className="h-16 rounded-xl border border-[color:var(--dc-edge)] bg-dc-raised animate-pulse"
           />
         ))}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col gap-4 py-2">
+        <p className="text-sm text-dc-text-2">
+          Couldn&apos;t load your departments. Refresh the page to try again.
+        </p>
+        <Button type="button" color="brand" onClick={onContinue} className="w-full">
+          Continue anyway →
+        </Button>
       </div>
     );
   }
@@ -139,9 +156,25 @@ interface CardProps {
   onColorChange: (color: string) => void | Promise<void>;
 }
 
+// Debounce the native color-picker's continuous onChange to avoid flooding the server.
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout>;
+  return ((...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  }) as T;
+}
+
 function DeptCard({ dept, onNameChange, onNameBlur, onColorChange }: CardProps) {
-  const isHR = dept.name === "HR";
+  const isSystem = dept.is_system;
   const colorInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep the ref current so the debounced function always calls the latest prop.
+  const onColorChangeRef = useRef(onColorChange);
+  useEffect(() => { onColorChangeRef.current = onColorChange; });
+  const debouncedColorChange = useRef(
+    debounce((color: string) => onColorChangeRef.current(color), 300),
+  ).current;
 
   return (
     <li className="flex items-center gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-dc-surface px-4 py-3">
@@ -159,7 +192,7 @@ function DeptCard({ dept, onNameChange, onNameBlur, onColorChange }: CardProps) 
           ref={colorInputRef}
           type="color"
           value={dept.color_hex}
-          onChange={(e) => onColorChange(e.target.value)}
+          onChange={(e) => debouncedColorChange(e.target.value)}
           className="sr-only"
           tabIndex={-1}
           aria-hidden
@@ -187,7 +220,7 @@ function DeptCard({ dept, onNameChange, onNameBlur, onColorChange }: CardProps) 
 
       {/* Name input */}
       <div className="flex-1 min-w-0">
-        {isHR ? (
+        {isSystem ? (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-dc-text-2">{dept.name}</span>
             <span className="flex items-center gap-1 text-xs text-dc-text-3">

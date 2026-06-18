@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Building2, ImageIcon, X } from "lucide-react";
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -30,6 +30,7 @@ export function StepCompany({ onSuccess }: Props) {
   const [isUploading, startUploadTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const successHandled = useRef(false);
 
   const nameError = state.status === "error" ? state.fieldErrors?.name?.[0] : undefined;
   const phoneError = state.status === "error" ? state.fieldErrors?.phone?.[0] : undefined;
@@ -71,9 +72,14 @@ export function StepCompany({ onSuccess }: Props) {
     });
   }
 
-  if (state.status === "success") {
-    void handleSuccess(state.company_id);
-  }
+  useEffect(() => {
+    if (state.status === "success" && !successHandled.current) {
+      successHandled.current = true;
+      void handleSuccess(state.company_id);
+    }
+  // handleSuccess closes over stable refs/state; state is the only trigger.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-6" noValidate>
