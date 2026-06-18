@@ -154,8 +154,8 @@ function DesktopTable() {
           ))}
         </div>
         {GROUPS.map((group) => (
-          <div key={group.heading} className="col-span-full">
-            <div className="grid grid-cols-subgrid border-b border-dc-edge bg-dc-raised px-4 py-2">
+          <div key={group.heading} className="col-span-full grid grid-cols-subgrid">
+            <div className="col-span-full grid grid-cols-subgrid border-b border-dc-edge bg-dc-raised px-4 py-2">
               <span
                 className="col-span-full text-xs font-semibold uppercase tracking-widest text-dc-text-3"
                 style={{ fontFamily: "var(--font-display)" }}
@@ -166,7 +166,7 @@ function DesktopTable() {
             {group.rows.map((row) => (
               <div
                 key={row.label}
-                className="grid grid-cols-subgrid items-center border-b border-dc-edge px-4 py-3 last:border-b-0"
+                className="col-span-full grid grid-cols-subgrid items-center border-b border-dc-edge px-4 py-3 last:border-b-0"
               >
                 <span className="text-sm text-dc-text">{row.label}</span>
                 {TIERS.map((tier) => (
