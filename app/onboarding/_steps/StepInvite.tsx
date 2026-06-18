@@ -25,11 +25,16 @@ export function StepInvite({ onDone }: Props) {
   const [departments, setDepartments] = useState<OnboardingDepartment[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [depsLoading, startDepsTransition] = useTransition();
+  const [depsLoadError, setDepsLoadError] = useState(false);
 
   useEffect(() => {
     startDepsTransition(async () => {
       const result = await getOnboardingDepartmentsAction();
-      if (result.ok) setDepartments(result.data);
+      if (result.ok) {
+        setDepartments(result.data);
+      } else {
+        setDepsLoadError(true);
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -42,7 +47,7 @@ export function StepInvite({ onDone }: Props) {
 
     const fd = new FormData(e.currentTarget);
     const email = String(fd.get("email") ?? "").trim();
-    const dept = String(fd.get("department_id") ?? "").trim();
+    const dept = String(fd.get("department_ids") ?? "").trim();
 
     if (!email) {
       setEmailError("Email address is required.");
@@ -142,10 +147,14 @@ export function StepInvite({ onDone }: Props) {
         <Label htmlFor="invite-department">Department</Label>
         {depsLoading ? (
           <div className="h-10 rounded-lg border border-[color:var(--dc-edge)] bg-dc-raised animate-pulse" />
+        ) : depsLoadError ? (
+          <p className="text-sm text-(--color-signal-urgent)">
+            Couldn&apos;t load departments — refresh the page to try again.
+          </p>
         ) : (
           <select
             id="invite-department"
-            name="department_id"
+            name="department_ids"
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
             aria-invalid={Boolean(deptError)}
