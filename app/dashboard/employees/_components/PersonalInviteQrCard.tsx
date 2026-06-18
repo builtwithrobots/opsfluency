@@ -26,13 +26,13 @@ export function PersonalInviteQrCard({ claimUrl, employeeName }: Props) {
           {employeeName ?? "the employee"}
         </span>
         . They scan it and tap one button — no phone entry, no password.
-        Valid for 7 days.
+        Valid for 1 hour.
       </p>
 
       <div className="flex flex-col items-center gap-4 rounded-xl border border-[color:var(--dc-edge)] bg-white p-5 dark:bg-zinc-800 sm:flex-row sm:items-start">
         {/* QR */}
         <div className="shrink-0 rounded-lg border border-[color:var(--dc-edge)] bg-white p-2 shadow-xs dark:bg-white">
-          <QRCodeSVG value={claimUrl} size={120} />
+          <QRCodeSVG value={claimUrl} size={200} level="M" includeMargin />
         </div>
 
         {/* URL + actions */}
